@@ -1,22 +1,23 @@
 #ifndef _LINUX_PID_H
 #define _LINUX_PID_H
 
-enum pid_type
+enum pid_type		// 标识符类型，不同类型的id共用一个id池
 {
-	PIDTYPE_PID,
-	PIDTYPE_TGID,
-	PIDTYPE_PGID,
-	PIDTYPE_SID,
-	PIDTYPE_MAX
+	PIDTYPE_PID,	// 进程ID，pid
+	PIDTYPE_TGID,	// 线程组ID，线程组中leader线程的进程ID，tgid，
+	PIDTYPE_PGID,	// 进程组ID，进程组中leader进程的进程ID，pgid
+	PIDTYPE_SID,	// 会话ID，回话中leader进程的进程ID，sid
+	PIDTYPE_MAX		// 表示类型的数量，为4
 };
 
 struct pid
 {
 	/* Try to keep pid_chain in the same cacheline as nr for find_pid */
-	int nr;
-	struct hlist_node pid_chain;
+	int nr;     // id号
+	struct hlist_node pid_chain;        // 桶链表
 	/* list of pids with the same nr, only one of them is in the hash */
-	struct list_head pid_list;
+	// 具有相同nr的pid列表，其中只有一个在哈希中
+	struct list_head pid_list;      // nr相同时使用
 };
 
 #define pid_task(elem, type) \
