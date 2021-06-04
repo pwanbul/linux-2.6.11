@@ -374,32 +374,47 @@ ENTRY(name)				\
 /* The include is where all of the SMP etc. interrupts come from */
 #include "entry_arch.h"
 
+/* 固定格式：
+   ENTRY(handler_name)
+    pushl $0            # 有些异常处理有返回值，则由硬件自动的把出错码置入栈中，没有返回值的，垫入一个0
+    pushl $do_handler_name
+    jmp error_code      # error_code是通用的，使用divide_error中的
+
+    除了少数的处理函数，大部分的函数定义都是由宏生成，do_##name
+ */
+
+
 ENTRY(divide_error)
-	pushl $0			# no error code
-	pushl $do_divide_error
+	pushl $0			# no error code                                 9
+	pushl $do_divide_error      # do_name，这个符号由宏代码生成             8
 	ALIGN
-error_code:
-	pushl %ds
-	pushl %eax
+error_code:     # 所有的异常函数共用这个error_code
+    /* 1. 为do_handler_name准备参数
+       2. 清除DF
+       3. 把error_code处设置为-1，在返回时和系统调用返回区分开
+       4. 设置__USER_DS
+    */
+	pushl %ds                                                           7
+	pushl %eax                                                          6
 	xorl %eax, %eax
-	pushl %ebp
-	pushl %edi
-	pushl %esi
-	pushl %edx
+	pushl %ebp                                                          5
+	pushl %edi                                                          4
+	pushl %esi                                                          3
+	pushl %edx                                                          2
 	decl %eax			# eax = -1
-	pushl %ecx
-	pushl %ebx
-	cld
+	pushl %ecx                                                          1
+	pushl %ebx      # 以上把do_name可能用到的寄存器保存现场                   0
+	cld     # 清除eflags中DF
 	movl %es, %ecx
-	movl ES(%esp), %edi		# get the function address
-	movl ORIG_EAX(%esp), %edx	# get the error code
-	movl %eax, ORIG_EAX(%esp)
-	movl %ecx, ES(%esp)
+	movl ES(%esp), %edi		# get the function address，即$do_divide_error
+	movl ORIG_EAX(%esp), %edx	# get the error code，即编号9处的值
+	movl %eax, ORIG_EAX(%esp)   # 把-1放入编号9处，以区分系统调用
+	movl %ecx, ES(%esp)         # 在8处写入，es的值
 	movl $(__USER_DS), %ecx
-	movl %ecx, %ds
-	movl %ecx, %es
-	movl %esp,%eax			# pt_regs pointer
-	call *%edi
+	movl %ecx, %ds          # 设置用户数据段的段描述符
+	movl %ecx, %es          # 设置用户数据段的段描述符
+	movl %esp,%eax			# pt_regs pointer， 把0处(当前栈顶)的地址放入eax中
+	call *%edi          # 参数通过eax和edx传递,fastcall方式
 	jmp ret_from_exception
 
 ENTRY(coprocessor_error)

@@ -68,6 +68,7 @@ char ignore_fpu_irq = 0;
  * The IDT has to be page-aligned to simplify the Pentium
  * F0 0F bug workaround.. We have a special link segment
  * for this.
+ * 中断描述符表 256个元素
  */
 struct desc_struct idt_table[256] __attribute__((__section__(".data.idt"))) = { {0, 0}, };
 
@@ -393,7 +394,7 @@ static void do_trap(int trapnr, int signr, char *str, int vm86,
 		return;
 	}
 }
-
+// 9-11号异常
 #define DO_ERROR(trapnr, signr, str, name) \
 fastcall void do_##name(struct pt_regs * regs, long error_code) \
 { \
@@ -403,6 +404,7 @@ fastcall void do_##name(struct pt_regs * regs, long error_code) \
 	do_trap(trapnr, signr, str, 0, regs, error_code, NULL); \
 }
 
+// 6,17号异常
 #define DO_ERROR_INFO(trapnr, signr, str, name, sicode, siaddr) \
 fastcall void do_##name(struct pt_regs * regs, long error_code) \
 { \
@@ -417,6 +419,7 @@ fastcall void do_##name(struct pt_regs * regs, long error_code) \
 	do_trap(trapnr, signr, str, 0, regs, error_code, &info); \
 }
 
+// 3-5号异常
 #define DO_VM86_ERROR(trapnr, signr, str, name) \
 fastcall void do_##name(struct pt_regs * regs, long error_code) \
 { \
@@ -426,20 +429,22 @@ fastcall void do_##name(struct pt_regs * regs, long error_code) \
 	do_trap(trapnr, signr, str, 1, regs, error_code, NULL); \
 }
 
+// 0号异常,eg.   0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->eip
 #define DO_VM86_ERROR_INFO(trapnr, signr, str, name, sicode, siaddr) \
 fastcall void do_##name(struct pt_regs * regs, long error_code) \
 { \
 	siginfo_t info; \
-	info.si_signo = signr; \
+	info.si_signo = signr; \        // 信号编号
 	info.si_errno = 0; \
-	info.si_code = sicode; \
-	info.si_addr = (void __user *)siaddr; \
+	info.si_code = sicode; \        // 信号编号，更详细的原因
+	info.si_addr = (void __user *)siaddr; \     // 出错的地址
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
 						== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, 1, regs, error_code, &info); \
 }
 
+// 部分do_handler_name函数生成
 DO_VM86_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->eip)
 #ifndef CONFIG_KPROBES
 DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
@@ -943,6 +948,12 @@ void __init trap_init_f00f_bug(void)
 }
 #endif
 
+/* gate_addr: idt_table+异常编号
+ * type: 4位
+ * dpl: 2位，0或3
+ * addr: 函数地址
+ * seg: __KERNEL_CS
+ * */
 #define _set_gate(gate_addr,type,dpl,addr,seg) \
 do { \
   int __d0, __d1; \
@@ -992,7 +1003,7 @@ static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
 }
 
 
-void __init trap_init(void)
+void __init trap_init(void)         // 初始化异常
 {
 #ifdef CONFIG_EISA
 	void __iomem *p = ioremap(0x0FFFD9, 4);
@@ -1005,7 +1016,13 @@ void __init trap_init(void)
 #ifdef CONFIG_X86_LOCAL_APIC
 	init_apic_mappings();
 #endif
-
+    /* 5种门描述符
+     * 中断门
+     * 系统门
+     * 系统中断门
+     * 陷阱门
+     * 任务门
+     * */
 	set_trap_gate(0,&divide_error);
 	set_intr_gate(1,&debug);
 	set_intr_gate(2,&nmi);
@@ -1020,7 +1037,7 @@ void __init trap_init(void)
 	set_trap_gate(11,&segment_not_present);
 	set_trap_gate(12,&stack_segment);
 	set_trap_gate(13,&general_protection);
-	set_intr_gate(14,&page_fault);
+	set_intr_gate(14,&page_fault);      // 页面故障
 	set_trap_gate(15,&spurious_interrupt_bug);
 	set_trap_gate(16,&coprocessor_error);
 	set_trap_gate(17,&alignment_check);
@@ -1029,6 +1046,7 @@ void __init trap_init(void)
 #endif
 	set_trap_gate(19,&simd_coprocessor_error);
 
+	// 系统调用
 	set_system_gate(SYSCALL_VECTOR,&system_call);
 
 	/*
