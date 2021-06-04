@@ -626,11 +626,13 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	return prev_p;
 }
 
+// fork
 asmlinkage int sys_fork(struct pt_regs regs)
 {
 	return do_fork(SIGCHLD, regs.esp, &regs, 0, NULL, NULL);
 }
 
+// clone
 asmlinkage int sys_clone(struct pt_regs regs)
 {
 	unsigned long clone_flags;
@@ -656,6 +658,7 @@ asmlinkage int sys_clone(struct pt_regs regs)
  * do not have enough call-clobbered registers to hold all
  * the information you need.
  */
+// vfork
 asmlinkage int sys_vfork(struct pt_regs regs)
 {
 	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.esp, &regs, 0, NULL, NULL);
@@ -669,13 +672,13 @@ asmlinkage int sys_execve(struct pt_regs regs)
 	int error;
 	char * filename;
 
-	filename = getname((char __user *) regs.ebx);
+	filename = getname((char __user *) regs.ebx);       // regs.ebx为文件名地址，从用户空间复制过来，放到一个page大小的空间上
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
 	error = do_execve(filename,
-			(char __user * __user *) regs.ecx,
-			(char __user * __user *) regs.edx,
+			(char __user * __user *) regs.ecx,         // regs.ecx为命令行参数地址
+			(char __user * __user *) regs.edx,         // egs.edx为环境变量地址
 			&regs);
 	if (error == 0) {
 		task_lock(current);
