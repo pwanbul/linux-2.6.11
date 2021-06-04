@@ -81,18 +81,18 @@ VM_MASK		= 0x00020000
 #define resume_kernel		restore_all
 #endif
 
-#define SAVE_ALL \
+#define SAVE_ALL \		// 按照特定顺序入栈
 	cld; \
 	pushl %es; \
 	pushl %ds; \
 	pushl %eax; \
 	pushl %ebp; \
-	pushl %edi; \
-	pushl %esi; \
-	pushl %edx; \
-	pushl %ecx; \
-	pushl %ebx; \
-	movl $(__USER_DS), %edx; \
+	pushl %edi; \		// arg4
+	pushl %esi; \		// arg3
+	pushl %edx; \		// arg2
+	pushl %ecx; \		// arg1
+	pushl %ebx; \		// arg0
+	movl $(__USER_DS), %edx; \		// 设置好用户空间的段选择符
 	movl %edx, %ds; \
 	movl %edx, %es;
 
@@ -123,9 +123,9 @@ VM_MASK		= 0x00020000
 
 
 #define RESTORE_ALL	\
-	RESTORE_REGS	\
+	RESTORE_REGS	\		// 恢复保存在内核栈中值到寄存器
 	addl $4, %esp;	\
-1:	iret;		\
+1:	iret;		\		// 返回用户空间
 .section .fixup,"ax";   \
 2:	sti;		\
 	movl $(__USER_DS), %edx; \
@@ -237,33 +237,35 @@ sysenter_past_esp:
 	sysexit
 
 
-	# system call handler stub
+// system call handler stub
+// TI_flags 为flags在struct thread_info中偏移量
 ENTRY(system_call)
-	pushl %eax			# save orig_eax
+	pushl %eax			// save orig_eax
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
 					# system call tracing in operation
-	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)		// 被跟踪或者被审计
 	jnz syscall_trace_entry
-	cmpl $(nr_syscalls), %eax
+	cmpl $(nr_syscalls), %eax		// 检查调用号是否越界
 	jae syscall_badsys
 syscall_call:
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)		# store the return value
 syscall_exit:
-	cli				# make sure we don't miss an interrupt
+	cli				# make sure we don't miss an interrupt		// 关闭本地中断
 					# setting need_resched or sigpending
 					# between sampling and the iret
 	movl TI_flags(%ebp), %ecx
+	// 当TI_flags(%ebp)中的低16位全部为0，那么执行restore_all，存在置1的位，就跳转到syscall_exit_work
 	testw $_TIF_ALLWORK_MASK, %cx	# current->work
-	jne syscall_exit_work
+	jne syscall_exit_work		// jnz syscall_exit_work
 restore_all:
 	RESTORE_ALL
 
 	# perform work that needs to be done immediately before resumption
 	ALIGN
 work_pending:
-	testb $_TIF_NEED_RESCHED, %cl
+	testb $_TIF_NEED_RESCHED, %cl		// 如果置1，则work_resched
 	jz work_notifysig
 work_resched:
 	call schedule
@@ -271,10 +273,10 @@ work_resched:
 					# setting need_resched or sigpending
 					# between sampling and the iret
 	movl TI_flags(%ebp), %ecx
-	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done other
+	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done other		/*检查是否还有其它的事要做*/
 					# than syscall tracing?
-	jz restore_all
-	testb $_TIF_NEED_RESCHED, %cl
+	jz restore_all		// 没有其它的事,则恢复处理器状态
+	testb $_TIF_NEED_RESCHED, %cl		// 如果need_resched再次置位,则继续调度
 	jnz work_resched
 
 work_notifysig:				# deal with pending signals and
@@ -300,7 +302,7 @@ work_notifysig_v86:
 	# perform syscall exit tracing
 	ALIGN
 syscall_trace_entry:
-	movl $-ENOSYS,EAX(%esp)
+	movl $-ENOSYS,EAX(%esp)			/* Function not implemented */
 	movl %esp, %eax
 	xorl %edx,%edx
 	call do_syscall_trace
@@ -312,7 +314,7 @@ syscall_trace_entry:
 	# perform syscall exit tracing
 	ALIGN
 syscall_exit_work:
-	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP), %cl
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP), %cl	// 3位中存在置1的情况，就执行do_syscall_trace
 	jz work_pending
 	sti				# could let do_syscall_trace() call
 					# schedule() instead
@@ -330,7 +332,7 @@ syscall_fault:
 	jmp resume_userspace
 
 	ALIGN
-syscall_badsys:
+syscall_badsys:		// 调用号越界
 	movl $-ENOSYS,EAX(%esp)
 	jmp resume_userspace
 
@@ -572,7 +574,7 @@ ENTRY(spurious_interrupt_bug)
 	jmp error_code
 
 .data
-ENTRY(sys_call_table)
+ENTRY(sys_call_table)		// 服务例程数组
 	.long sys_restart_syscall	/* 0 - old "setup()" system call, used for restarting */
 	.long sys_exit
 	.long sys_fork
@@ -663,7 +665,7 @@ ENTRY(sys_call_table)
 	.long sys_swapon
 	.long sys_reboot
 	.long old_readdir
-	.long old_mmap		/* 90 */
+	.long old_mmap		/* 90 特例没有使用sys开头*/
 	.long sys_munmap
 	.long sys_truncate
 	.long sys_ftruncate
@@ -765,7 +767,7 @@ ENTRY(sys_call_table)
 	.long sys_ni_syscall	/* reserved for streams2 */
 	.long sys_vfork		/* 190 */
 	.long sys_getrlimit
-	.long sys_mmap2
+	.long sys_mmap2		// 还有一个old_mmap
 	.long sys_truncate64
 	.long sys_ftruncate64
 	.long sys_stat64	/* 195 */
@@ -863,4 +865,4 @@ ENTRY(sys_call_table)
 	.long sys_request_key
 	.long sys_keyctl
 
-syscall_table_size=(.-sys_call_table)
+syscall_table_size=(.-sys_call_table)		// 服务例程数组大小
