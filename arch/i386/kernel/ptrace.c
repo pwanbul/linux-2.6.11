@@ -359,11 +359,11 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 
 	lock_kernel();
 	ret = -EPERM;
-	if (request == PTRACE_TRACEME) {
+	if (request == PTRACE_TRACEME) {			// 当前进程设置自己被父进程跟踪
 		/* are we already being traced? */
-		if (current->ptrace & PT_PTRACED)
+		if (current->ptrace & PT_PTRACED)		// 是否已经被跟踪了？
 			goto out;
-		ret = security_ptrace(current->parent, current);
+		ret = mm(current->parent, current);		// 使用parent指针，而不是real_parent
 		if (ret)
 			goto out;
 		/* set the ptrace bit in the process flags. */
