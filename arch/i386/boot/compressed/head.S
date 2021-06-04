@@ -21,13 +21,14 @@
 /*
  * High loaded stuff by Hans Lermen & Werner Almesberger, Feb. 1996
  */
-.text
+.text       // 正文段开始
 
 #include <linux/linkage.h>
 #include <asm/segment.h>
 
-	.globl startup_32
-	
+	.globl startup_32	    // 全局符号
+
+// startup_32过程
 startup_32:
 	cld
 	cli
@@ -37,7 +38,7 @@ startup_32:
 	movl %eax,%fs
 	movl %eax,%gs
 
-	lss stack_start,%esp
+	lss stack_start,%esp        # stack_start的低16位传入%esp，高16位传入ss
 	xorl %eax,%eax
 1:	incl %eax		# check that A20 really IS enabled
 	movl %eax,0x000000	# loop forever if it isn't

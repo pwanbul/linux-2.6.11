@@ -1,3 +1,5 @@
+# 顶层Makefile
+
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 11
@@ -499,10 +501,7 @@ else
 include/linux/autoconf.h: ;
 endif
 
-# The all: target is the default when no target is given on the
-# command line.
-# This allow a user to issue only 'make' to build a kernel including modules
-# Defaults vmlinux but it is usually overriden in the arch makefile
+# 当命令行中未指定目标时，all：target是默认设置。这允许用户仅发出“ make”来构建包含模块的内核默认为vmlinux，但通常会在arch makefile中覆盖
 all: vmlinux
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
@@ -582,10 +581,9 @@ libs-y		:= $(libs-y1) $(libs-y2)
 
 # Build vmlinux
 # ---------------------------------------------------------------------------
-# vmlinux is build from the objects selected by $(vmlinux-init) and
-# $(vmlinux-main). Most are built-in.o files from top-level directories
-# in the kernel tree, others are specified in arch/$(ARCH)Makefile.
-# Ordering when linking is important, and $(vmlinux-init) must be first.
+# vmlinux是由（vmlinux-init）和（vmlinux-main）选择的对象构建的。
+# 大多数是来自内核树顶级目录的内置.o文件，其他是在arch（ARCH）Makefile中指定的。
+# 链接时的顺序很重要，必须首先（vmlinux-init）。
 #
 # vmlinux
 #   ^
@@ -724,6 +722,7 @@ $(KALLSYMS): scripts ;
 endif # ifdef CONFIG_KALLSYMS
 
 # vmlinux image - including updated kernel symbols
+# vmlinux由vmlinux-lds、vmlinux-init和vmlinux-main两个变量中的对象、外加kallsym.o链接而成
 vmlinux: $(vmlinux-lds) $(vmlinux-init) $(vmlinux-main) $(kallsyms.o) FORCE
 	$(call if_changed_rule,vmlinux__)
 

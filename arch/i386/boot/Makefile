@@ -34,10 +34,10 @@ hostprogs-y	:= tools/build
 HOSTCFLAGS_build.o := $(LINUXINCLUDE)
 
 # ---------------------------------------------------------------------------
-
-$(obj)/zImage:  IMAGE_OFFSET := 0x1000
+# $(obj)是目标文件存放的相对路径
+$(obj)/zImage:  IMAGE_OFFSET := 0x1000				# 小内核映像，低端装载
 $(obj)/zImage:  EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK)
-$(obj)/bzImage: IMAGE_OFFSET := 0x100000
+$(obj)/bzImage: IMAGE_OFFSET := 0x100000			# 大内核映像，高端装载
 $(obj)/bzImage: EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK) -D__BIG_KERNEL__
 $(obj)/bzImage: BUILDFLAGS   := -b
 

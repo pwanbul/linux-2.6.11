@@ -54,6 +54,7 @@
  * any particular GDT layout, because we load our own as soon as we
  * can.
  */
+// startup_32
 ENTRY(startup_32)
 
 /*
@@ -324,7 +325,7 @@ is386:	movl $2,%ecx		# set MP
 	jmp L6
 1:
 #endif /* CONFIG_SMP */
-	call start_kernel
+	call start_kernel       // UP中调用start_kernel
 L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
@@ -421,6 +422,7 @@ ENTRY(empty_zero_page)
  * This starts the data section.
  */
 .data
+
 
 ENTRY(stack_start)
 	.long init_thread_union+THREAD_SIZE

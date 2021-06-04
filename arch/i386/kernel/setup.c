@@ -604,7 +604,7 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 {
 	/* Only one memory region (or negative)? Ignore it */
-	if (nr_map < 2)
+	if (nr_map < 2)     // 至少BIOS与RAM不是一个内存段的，所以nr_map < 2肯定是不对的
 		return -1;
 
 	do {
@@ -620,11 +620,15 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 		/*
 		 * Some BIOSes claim RAM in the 640k - 1M region.
 		 * Not right. Fix it up.
+		 * 如果类型为E820_RAM，即可用内存，判断这个范围是否覆盖 640KB～1MB，
+		 * 这段需要为ISA图形卡等保留的，所以这段要保留，如果谁覆盖了这段需要把这段抠除。
+		 * 物理地址从0x000a0000到 0x000fffff的范围通常留给BIOS例程，并且映射ISA图形卡上的内部内存。
+		 * 这个区域就是所有的IBM兼容PC上从640KB～1MB之间著名的空洞：物理地址存在但被保留，对应的页框不能由操作系统使用。
 		 */
 		if (type == E820_RAM) {
-			if (start < 0x100000ULL && end > 0xA0000ULL) {
+			if (start < 0x100000ULL/*1MB*/ && end > 0xA0000ULL/*640KB*/) {
 				if (start < 0xA0000ULL)
-					add_memory_region(start, 0xA0000ULL-start, type);
+					add_memory_region(start, 0xA0000ULL-start, type);       // 将E820图填充到struct e820map结构中
 				if (end <= 0x100000ULL)
 					continue;
 				start = 0x100000ULL;
@@ -1038,7 +1042,7 @@ static unsigned long __init setup_memory(void)
 
 	find_max_pfn();
 
-	max_low_pfn = find_max_low_pfn();
+	max_low_pfn = find_max_low_pfn();       //
 
 #ifdef CONFIG_HIGHMEM
 	highstart_pfn = highend_pfn = max_pfn;
@@ -1397,7 +1401,7 @@ void __init setup_arch(char **cmdline_p)
 		efi_init();
 	else {
 		printk(KERN_INFO "BIOS-provided physical RAM map:\n");
-		print_memory_map(machine_specific_memory_setup());
+		print_memory_map(machine_specific_memory_setup());          // 特定与机器的内存设置。创建一个列表，包括系统占据的内存区和空闲内存区
 	}
 
 	copy_edd();
@@ -1414,9 +1418,18 @@ void __init setup_arch(char **cmdline_p)
 	data_resource.start = virt_to_phys(_etext);
 	data_resource.end = virt_to_phys(_edata)-1;
 
+	/* 分析命令行，主要关注类似mem=XXX[KkmM]、highmem=XXX[kKmM]或memmap=XXX[KkmM]" "@XXX[KkmM]之类的参数
+	 * */
 	parse_cmdline_early(cmdline_p);
 
-	max_low_pfn = setup_memory();
+	/* 计算物理内存数量小于896 MiB的系统上内存页的数目.
+	 * 该函数有两个版本。一个用于连续内存系统（在arch/x86/kernel/setup_32.c），另一个用于不连续内存系统（在arch/x86/mm/discontig_32.c）。
+	 * 尽管实现不同，但二者的效果相同。
+	 * 1. 确定（每个结点）可用的物理内存页的数目。
+	 * 2. 初始化bootmem分配器。
+	 * 3. 接下来分配各种内存区，例如，运行第一个用户空间过程所需的最初的RAM磁盘。
+	 * */
+	max_low_pfn = setup_memory()
 
 	/*
 	 * NOTE: before this point _nobody_ is allowed to allocate
@@ -1431,7 +1444,7 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_SMP
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
-	paging_init();
+	paging_init();          // paging_init初始化内核页表并启用内存分页，因为IA-32计算机上默认情况下分页是禁用的。
 
 	/*
 	 * NOTE: at this point the bootmem allocator is fully available.

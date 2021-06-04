@@ -34,6 +34,8 @@ union thread_union init_thread_union
  *
  * All other task structs will be allocated on slabs in fork.c
  */
+// 1号进程，手工初始化，全局变量
+// 注意这总初始化的方式
 struct task_struct init_task = INIT_TASK(init_task);
 
 EXPORT_SYMBOL(init_task);

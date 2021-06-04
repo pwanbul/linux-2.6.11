@@ -23,3 +23,8 @@ LDFLAGS_piggy.o := -r --format binary --oformat elf32-i386 -T
 
 $(obj)/piggy.o: $(obj)/vmlinux.scr $(obj)/vmlinux.bin.gz FORCE
 	$(call if_changed,ld)
+
+# piggy.o 其实是直接把 arch/i386/boot/compressed/vmlinux.bin.gz
+# 这个gzip压缩文件作为一个二进制格式链接起来，关键是boot/compressed/vmlinux.scr 这个文件，
+# 出了指定二进制数据外还导出了input_len， input_data，两个可重定位的变量。
+# 后面解压的代码根据这两个变量可以知道压缩的内核所在的地址和长度，然后能够正确解压内核。
