@@ -294,56 +294,61 @@ loader_ok:
 	movl	%eax, (0x1e0)
 #ifndef STANDARD_MEMORY_BIOS_CALL
 	movb	%al, (E820NR)
-# Try three different memory detection schemes.  First, try
-# e820h, which lets us assemble a memory map, then try e801h,
-# which returns a 32-bit memory size, and finally 88h, which
-# returns 0-64m
+# 尝试三种不同的内存检测方案。
+# 首先尝试e820h，它可以让我们组装一个内存映射，
+# 然后尝试e801h，它返回一个32位的内存大小，
+# 最后是88h，它返回0-64m。
 
-# method E820H:
-# the memory map from hell.  e820h returns memory classified into
-# a whole bunch of different types, and allows memory holes and
-# everything.  We scan through this memory map and build a list
-# of the first 32 memory areas, which we return at [E820MAP].
-# This is documented at http://www.acpi.info/, in the ACPI 2.0 specification.
+# E820H模式:
+# 来自地狱的记忆地图。 e820h 返回分类为一大堆不同类型的内存，
+# 并允许内存漏洞和所有内容。我们扫描此内存映射并构建前32个内存区域的列表，
+# 我们在 [E820MAP] 处返回该列表。这在 http:www.acpi.info 中的 ACPI 2.0 规范中有记录。
+# 参见 https://blog.csdn.net/chengbeng1745/article/details/84965260
 
 #define SMAP  0x534d4150
 
 meme820:
-	xorl	%ebx, %ebx			# continuation counter
+    # 1. setup.S代码被搬移到0x90000处。此时CS=DS=0x9000，处于实模式
+	xorl	%ebx, %ebx			# 连续计数器清0
+	# 2. 将0x9000:0x2d0(物理地址0x902d0)，赋值给di，结果将会保存在这里
 	movw	$E820MAP, %di			# point into the whitelist
 						# so we can have the bios
 						# directly write into it.
 
 jmpe820:
-	movl	$0x0000e820, %eax		# e820, upper word zeroed
+    # 3. 调用BIOS查询820内存中断，然后将查询的值放到di寄存器指向的地址，也就是把返回的查询值放入到物理地址0x902d0中。
+	movl	$0x0000e820, %eax		# e820, 高位归零
 	movl	$SMAP, %edx			# ascii 'SMAP'
-	movl	$20, %ecx			# size of the e820rec
-	pushw	%ds				# data record.
+	movl	$20, %ecx			# 每条记录20字节
+	pushw	%ds				# 数据记录
 	popw	%es
 	int	$0x15				# make the call
-	jc	bail820				# fall to e801 if it fails
+	jc	bail820				# 如果失败则使用e801模式
 
 	cmpl	$SMAP, %eax			# check the return is `SMAP'
-	jne	bail820				# fall to e801 if it fails
+	jne	bail820				# 如果失败则使用e801模式
 
 #	cmpl	$1, 16(%di)			# is this usable memory?
 #	jne	again820
 
-	# If this is usable memory, we save it by simply advancing %di by
-	# sizeof(e820rec).
-	#
-good820:
-	movb	(E820NR), %al			# up to 32 entries
-	cmpb	$E820MAX, %al
+	# 如果这是可用内存，我们只需将 %di 推进 sizeof(e820rec) 来保存它。
+good820:        # 成功
+    # 4. 返回的记录数放在E820NR地址上，通过 movb (E820NR), %al语句，将长度值返回到物理地址0x901e8中。
+	movb	(E820NR), %al			# 最多 32 个条目
+	cmpb	$E820MAX, %al       # 检查是否超多32项
 	jnl	bail820
 
-	incb	(E820NR)
+	incb	(E820NR)        # E820NR += 1
 	movw	%di, %ax
 	addw	$20, %ax
 	movw	%ax, %di
+ # 执行完上面的代码后，内存信息被分为多条信息放在E820MAP位置处，
+ # 每个信息条目长20字节，包含一个内存区间的信息，条目数放在E820NR处。
+ # 即实际上条目信息被放到了empty_zero_page的偏移为E820MAP(即0x2d0)处，条目数被放到偏移为E820NR(即0x1e8)处。
+ # 放回的结果放入struct e820map，其中记录20字节放入struct e820entry，8+8+4=20，分别表示地址，大小和类型
 again820:
-	cmpl	$0, %ebx			# check to see if
-	jne	jmpe820				# %ebx is set to EOF
+	cmpl	$0, %ebx			# 检查是否相等
+	jne	jmpe820				# %ebx 设置为 EOF
 bail820:
 
 
