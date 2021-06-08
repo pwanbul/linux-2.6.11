@@ -417,15 +417,14 @@ static void __init print_memory_map(char *who)
 }
 
 /*
- * Sanitize the BIOS e820 map.
+ * 清理 BIOS e820 映射。
  *
- * Some e820 responses include overlapping entries.  The following 
- * replaces the original e820 map with a new one, removing overlaps.
+ * 一些 e820 响应包含重叠条目。下面用一张新的地图替换原来的 e820 地图，去除重叠。
  *
  */
 struct change_member {
-	struct e820entry *pbios; /* pointer to original bios entry */
-	unsigned long long addr; /* address for this change point */
+	struct e820entry *pbios; /* 指向原始 bios 条目的指针 */
+	unsigned long long addr; /* 此更改点(change_point)的地址 */
 };
 struct change_member change_point_list[2*E820MAX] __initdata;
 struct change_member *change_point[2*E820MAX] __initdata;
@@ -444,7 +443,7 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 	int i;
 
 	/*
-		Visually we're performing the following (1,2,3,4 = memory types)...
+		从视觉上看，我们正在执行以下操作（1,2,3,4 = 内存类型）...
 
 		Sample memory map (w/overlaps):
 		   ____22__________________
@@ -479,45 +478,44 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 		   ______________________4_
 	*/
 
-	/* if there's only one memory region, don't bother */
+	/* 如果只有一个内存区域，请不要打扰，    至少2个，0-640K和1M以上 */
 	if (*pnr_map < 2)
 		return -1;
 
 	old_nr = *pnr_map;
 
-	/* bail out if we find any unreasonable addresses in bios map */
+	/* 如果我们在bios地图中发现任何不合理的地址，请出手 */
 	for (i=0; i<old_nr; i++)
 		if (biosmap[i].addr + biosmap[i].size < biosmap[i].addr)
 			return -1;
 
-	/* create pointers for initial change-point information (for sorting) */
-	for (i=0; i < 2*old_nr; i++)
+	/* 为初始变化点（change_point）信息创建指针（用于排序） */
+	for (i=0; i < 2*old_nr; i++)        // 每一条记录需要两个change_point
 		change_point[i] = &change_point_list[i];
 
-	/* record all known change-points (starting and ending addresses),
-	   omitting those that are for empty memory regions */
+	/* 记录所有已知的变化点（起始和结束地址），省略那些用于空内存区域的变化点 */
 	chgidx = 0;
 	for (i=0; i < old_nr; i++)	{
 		if (biosmap[i].size != 0) {
-			change_point[chgidx]->addr = biosmap[i].addr;
+			change_point[chgidx]->addr = biosmap[i].addr;   // 起始地址
 			change_point[chgidx++]->pbios = &biosmap[i];
-			change_point[chgidx]->addr = biosmap[i].addr + biosmap[i].size;
+			change_point[chgidx]->addr = biosmap[i].addr + biosmap[i].size;     // 结束地址
 			change_point[chgidx++]->pbios = &biosmap[i];
 		}
 	}
-	chg_nr = chgidx;    	/* true number of change-points */
+	chg_nr = chgidx;    	/* 真实的change-points */
 
 	/* sort change-point list by memory addresses (low -> high) */
 	still_changing = 1;
 	while (still_changing)	{
 		still_changing = 0;
 		for (i=1; i < chg_nr; i++)  {
-			/* if <current_addr> > <last_addr>, swap */
-			/* or, if current=<start_addr> & last=<end_addr>, swap */
+			/* if <current_addr> > <last_addr>, swap 地址小的放前面 */
+			/* or, if current = <start_addr> & last = <end_addr>, swap 地址相等时，作为起始地址放前面*/
 			if ((change_point[i]->addr < change_point[i-1]->addr) ||
-				((change_point[i]->addr == change_point[i-1]->addr) &&
-				 (change_point[i]->addr == change_point[i]->pbios->addr) &&
-				 (change_point[i-1]->addr != change_point[i-1]->pbios->addr))
+				((change_point[i]->addr == change_point[i-1]->addr) &&      // change_point[i]和change_point[i-1]相等
+				 (change_point[i]->addr == change_point[i]->pbios->addr) &&     // change_point[i]为起始地址
+				 (change_point[i-1]->addr != change_point[i-1]->pbios->addr))   // change_point[i-1]为结束地址
 			   )
 			{
 				change_tmp = change_point[i];
@@ -528,23 +526,23 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 		}
 	}
 
-	/* create a new bios memory map, removing overlaps */
-	overlap_entries=0;	 /* number of entries in the overlap table */
-	new_bios_entry=0;	 /* index for creating new bios map entries */
-	last_type = 0;		 /* start with undefined memory type */
-	last_addr = 0;		 /* start with 0 as last starting address */
-	/* loop through change-points, determining affect on the new bios map */
+	/* 创建一个新的 bios 内存映射，删除重叠 */
+	overlap_entries=0;	 /* 重叠表中的记录数 */
+	new_bios_entry=0;	 /* 用于创建新 bios 映射记录的索引 */
+	last_type = 0;		 /* 以未定义的内存类型开始 */
+	last_addr = 0;		 /* 从 0 开始作为最后的起始地址 */
+	/* 循环变化点，确定对新 bios 地图的影响 */
 	for (chgidx=0; chgidx < chg_nr; chgidx++)
 	{
-		/* keep track of all overlapping bios entries */
+		/* 跟踪所有重叠的bios记录 */
 		if (change_point[chgidx]->addr == change_point[chgidx]->pbios->addr)
 		{
-			/* add map entry to overlap list (> 1 entry implies an overlap) */
+			/* 将map记录添加到重叠列表（> 1 个条目意味着重叠） */
 			overlap_list[overlap_entries++]=change_point[chgidx]->pbios;
 		}
 		else
 		{
-			/* remove entry from list (order independent, so swap with last) */
+			/* 从列表中删除记录（顺序无关，因此与最后一个交换） */
 			for (i=0; i<overlap_entries; i++)
 			{
 				if (overlap_list[i] == change_point[chgidx]->pbios)
@@ -552,21 +550,21 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 			}
 			overlap_entries--;
 		}
-		/* if there are overlapping entries, decide which "type" to use */
-		/* (larger value takes precedence -- 1=usable, 2,3,4,4+=unusable) */
+		/* 如果有重叠记录，请决定使用哪种“类型” */
+		/* （较大的值优先——1=可用，2、3、4、4+=不可用）*/
 		current_type = 0;
 		for (i=0; i<overlap_entries; i++)
 			if (overlap_list[i]->type > current_type)
 				current_type = overlap_list[i]->type;
-		/* continue building up new bios map based on this information */
+		/* 继续根据此信息构建新的bios map */
 		if (current_type != last_type)	{
 			if (last_type != 0)	 {
 				new_bios[new_bios_entry].size =
 					change_point[chgidx]->addr - last_addr;
-				/* move forward only if the new size was non-zero */
+				/* 仅当新大小不为零时才向前移动 */
 				if (new_bios[new_bios_entry].size != 0)
 					if (++new_bios_entry >= E820MAX)
-						break; 	/* no more space left for new bios entries */
+						break; 	/* 没有更多空间可用于新的 bios 记录 */
 			}
 			if (current_type != 0)	{
 				new_bios[new_bios_entry].addr = change_point[chgidx]->addr;
@@ -576,9 +574,9 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 			last_type = current_type;
 		}
 	}
-	new_nr = new_bios_entry;   /* retain count for new bios entries */
+	new_nr = new_bios_entry;   /* 保留新 bios 记录的计数 */
 
-	/* copy new bios mapping into original location */
+	/* 将新的 bios 映射复制到原始位置 */
 	memcpy(biosmap, new_bios, new_nr*sizeof(struct e820entry));
 	*pnr_map = new_nr;
 
@@ -586,20 +584,18 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 }
 
 /*
- * Copy the BIOS e820 map into a safe place.
+ * 将BIOS e820映射复制到安全的地方.
  *
- * Sanity-check it while we're at it..
+ * 在我们处理时检查它的完整性。
  *
- * If we're lucky and live on a modern system, the setup code
- * will have given us a memory map that we can use to properly
- * set up memory.  If we aren't, we'll fake a memory map.
+ * 如果我们幸运并且生活在现代系统上，设置代码将为我们提供一个内存映射，
+ * 我们可以使用它来正确设置内存。如果不是，我们将伪造内存映射。
  *
- * We check to see that the memory map contains at least 2 elements
- * before we'll use it, because the detection code in setup.S may
- * not be perfect and most every PC known to man has two memory
- * regions: one from 0 to 640k, and one from 1mb up.  (The IBM
- * thinkpad 560x, for example, does not cooperate with the memory
- * detection code.)
+ * 在使用之前，我们会检查内存映射是否至少包含2个元素，
+ * 因为setup.S中的检测代码可能并不完美，而且大多数人类已知的PC都有两个内存区域：
+ *      一个从0到640k，
+ *      和一个从1mb起。
+ * (例如，IBM thinkpad 560x 不配合内存检测代码。）
  */
 static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 {
