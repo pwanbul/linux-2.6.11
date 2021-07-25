@@ -34,6 +34,7 @@
  *
  * Do NOT pass the kfifo to kfifo_free() after use ! Simply free the
  * struct kfifo with kfree().
+ * 动态初始化
  */
 struct kfifo *kfifo_init(unsigned char *buffer, unsigned int size,
 			 int gfp_mask, spinlock_t *lock)
@@ -41,14 +42,15 @@ struct kfifo *kfifo_init(unsigned char *buffer, unsigned int size,
 	struct kfifo *fifo;
 
 	/* size must be a power of 2 */
-	BUG_ON(size & (size - 1));
+	BUG_ON(size & (size - 1));  // 等于0时才是2的幂
 
+	// 为kfifo分配内存
 	fifo = kmalloc(sizeof(struct kfifo), gfp_mask);
 	if (!fifo)
 		return ERR_PTR(-ENOMEM);
 
-	fifo->buffer = buffer;
-	fifo->size = size;
+	fifo->buffer = buffer;      // kfifo不维护buffer
+	fifo->size = size;          // buffer的size必须是2的幂
 	fifo->in = fifo->out = 0;
 	fifo->lock = lock;
 
@@ -70,18 +72,19 @@ struct kfifo *kfifo_alloc(unsigned int size, int gfp_mask, spinlock_t *lock)
 	struct kfifo *ret;
 
 	/*
-	 * round up to the next power of 2, since our 'let the indices
-	 * wrap' tachnique works only in this case.
+	 * 向上取整到 2 的下一个幂，因为我们的“让索引环绕”技术仅适用于这种情况。
 	 */
 	if (size & (size - 1)) {
 		BUG_ON(size > 0x80000000);
-		size = roundup_pow_of_two(size);
+		size = roundup_pow_of_two(size);    // 7->8,15->16
 	}
 
+	// 分配buffer空间
 	buffer = kmalloc(size, gfp_mask);
 	if (!buffer)
 		return ERR_PTR(-ENOMEM);
 
+	// 初始化kfifo
 	ret = kfifo_init(buffer, size, gfp_mask, lock);
 
 	if (IS_ERR(ret))
@@ -94,6 +97,7 @@ EXPORT_SYMBOL(kfifo_alloc);
 /*
  * kfifo_free - frees the FIFO
  * @fifo: the fifo to be freed.
+ * 使用kfifo生成的kfifo，才能使用该接口释放
  */
 void kfifo_free(struct kfifo *fifo)
 {
@@ -108,18 +112,15 @@ EXPORT_SYMBOL(kfifo_free);
  * @buffer: the data to be added.
  * @len: the length of the data to be added.
  *
- * This function copies at most 'len' bytes from the 'buffer' into
- * the FIFO depending on the free space, and returns the number of
- * bytes copied.
+ * 此函数根据可用空间最多将“缓冲区”中的“len”字节复制到 FIFO 中，并返回复制的字节数。
  *
- * Note that with only one concurrent reader and one concurrent
- * writer, you don't need extra locking to use these functions.
+ * 请注意，只有一个并发读取器和一个并发写入器，您不需要额外的锁定来使用这些函数。
  */
 unsigned int __kfifo_put(struct kfifo *fifo,
 			 unsigned char *buffer, unsigned int len)
 {
 	unsigned int l;
-
+    // 要保证len的大小不会超过buffer的size，多出的部分不会放入buffer中
 	len = min(len, fifo->size - fifo->in + fifo->out);
 
 	/* first put the data starting from fifo->in to buffer end */
@@ -141,11 +142,9 @@ EXPORT_SYMBOL(__kfifo_put);
  * @buffer: where the data must be copied.
  * @len: the size of the destination buffer.
  *
- * This function copies at most 'len' bytes from the FIFO into the
- * 'buffer' and returns the number of copied bytes.
+ * 此函数最多将 'len' 个字节从 FIFO 复制到 'buffer' 并返回复制的字节数。
  *
- * Note that with only one concurrent reader and one concurrent
- * writer, you don't need extra locking to use these functions.
+ * 请注意，只有一个并发读取器和一个并发写入器，您不需要额外的锁定来使用这些函数。
  */
 unsigned int __kfifo_get(struct kfifo *fifo,
 			 unsigned char *buffer, unsigned int len)
