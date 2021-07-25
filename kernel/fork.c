@@ -560,6 +560,7 @@ static int count_open_files(struct files_struct *files, int size)
 	return i;
 }
 
+// 复制打开的文件描述符表
 static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 {
 	struct files_struct *oldf, *newf;
@@ -585,16 +586,17 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 	 */
 	tsk->files = NULL;
 	error = -ENOMEM;
+	// 使用专用接口分配内存空间
 	newf = kmem_cache_alloc(files_cachep, SLAB_KERNEL);
 	if (!newf) 
 		goto out;
 
-	atomic_set(&newf->count, 1);
+	atomic_set(&newf->count, 1);        // 引用计数置1
 
 	spin_lock_init(&newf->file_lock);
 	newf->next_fd	    = 0;
 	newf->max_fds	    = NR_OPEN_DEFAULT;
-	newf->max_fdset	    = __FD_SETSIZE;
+	newf->max_fdset	    = __FD_SETSIZE;         // sys_select
 	newf->close_on_exec = &newf->close_on_exec_init;
 	newf->open_fds	    = &newf->open_fds_init;
 	newf->fd	    = &newf->fd_array[0];
@@ -929,6 +931,7 @@ static task_t *copy_process(
 	/* copy all the process information */
 	if ((retval = copy_semundo(clone_flags, p)))
 		goto bad_fork_cleanup_audit;
+	// 复制打开的文件描述符表
 	if ((retval = copy_files(clone_flags, p)))
 		goto bad_fork_cleanup_semundo;
 	if ((retval = copy_fs(clone_flags, p)))
