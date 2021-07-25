@@ -44,17 +44,15 @@ struct poll_table_page {
 	((unsigned long)((table)->entry+1) > PAGE_SIZE + (unsigned long)(table))
 
 /*
- * Ok, Peter made a complicated, but straightforward multiple_wait() function.
- * I have rewritten this, taking some shortcuts: This code may not be easy to
- * follow, but it should be free of race-conditions, and it's practical. If you
- * understand what I'm doing here, then you understand how the linux
- * sleep/wakeup mechanism works.
+ * 好的，Peter 做了一个复杂但简单的 multiple_wait() 函数。
+ * 我已经重写了这个，采取了一些捷径：这段代码可能不容易遵循，但它应该没有竞争条件，而且很实用。
+ * 如果您了解我在这里所做的事情，那么您就会了解 linux sleep/wakeup 机制是如何工作的。
  *
- * Two very simple procedures, poll_wait() and poll_freewait() make all the
- * work.  poll_wait() is an inline-function defined in <linux/poll.h>,
- * as all select/poll functions have to call it to add an entry to the
- * poll table.
+ * 两个非常简单的过程， poll_wait() 和 poll_freewait() 完成所有工作。
+ * poll_wait() 是在 <linux/poll.h> 中定义的内联函数，因为所有 select/poll
+ * 函数都必须调用它来向轮询表添加条目。
  */
+// 前置声明
 void __pollwait(struct file *filp, wait_queue_head_t *wait_address, poll_table *p);
 
 void poll_initwait(struct poll_wqueues *pwq)
@@ -131,7 +129,7 @@ static int max_select_fd(unsigned long n, fd_set_bits *fds)
 	unsigned long set;
 	int max;
 
-	/* handle last in-complete long-word first */
+	/* 先处理最后一个不完整的长字 */
 	set = ~(~0UL << (n & (__NFDBITS-1)));
 	n /= __NFDBITS;
 	open_fds = current->files->open_fds->fds_bits+n;
@@ -174,10 +172,11 @@ get_max:
 #define POLLOUT_SET (POLLWRBAND | POLLWRNORM | POLLOUT | POLLERR)
 #define POLLEX_SET (POLLPRI)
 
+// select核心
 int do_select(int n, fd_set_bits *fds, long *timeout)
 {
 	struct poll_wqueues table;
-	poll_table *wait;
+	poll_table *wait;   // 指向函数的指针的指针
 	int retval, i;
 	long __timeout = *timeout;
 
@@ -189,7 +188,7 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 		return retval;
 	n = retval;
 
-	poll_initwait(&table);
+	poll_initwait(&table);  // 初始化轮询表
 	wait = &table.pt;
 	if (!__timeout)
 		wait = NULL;
@@ -208,21 +207,22 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 			struct file_operations *f_op = NULL;
 			struct file *file = NULL;
 
+			// 每32位为一组
 			in = *inp++; out = *outp++; ex = *exp++;
 			all_bits = in | out | ex;
 			if (all_bits == 0) {
 				i += __NFDBITS;
 				continue;
 			}
-
+            // 按组来处理
 			for (j = 0; j < __NFDBITS; ++j, ++i, bit <<= 1) {
 				if (i >= n)
 					break;
 				if (!(bit & all_bits))
 					continue;
-				file = fget(i);
+				file = fget(i);     // 文件描述符i有需要处理的
 				if (file) {
-					f_op = file->f_op;
+					f_op = file->f_op;      // struct file_operations*
 					mask = DEFAULT_POLLMASK;
 					if (f_op && f_op->poll)
 						mask = (*f_op->poll)(file, retval ? NULL : wait);
@@ -280,9 +280,7 @@ static void select_bits_free(void *bits, int size)
 }
 
 /*
- * We can actually return ERESTARTSYS instead of EINTR, but I'd
- * like to be certain this leads to no problems. So I return
- * EINTR just for safety.
+ * 我们实际上可以返回 ERESTARTSYS 而不是 EINTR，但我想确定这不会导致任何问题。所以我返回 EINTR 只是为了安全。
  *
  * Update: ERESTARTSYS breaks at least the xview clock binary, so
  * I'm trying ERESTARTNOHAND which restart only when you want to.
@@ -293,15 +291,16 @@ static void select_bits_free(void *bits, int size)
 asmlinkage long
 sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, struct timeval __user *tvp)
 {
-	fd_set_bits fds;
+	fd_set_bits fds;        // 用于处理3个传进来的值-结果参数
 	char *bits;
 	long timeout;
 	int ret, size, max_fdset;
 
-	timeout = MAX_SCHEDULE_TIMEOUT;
-	if (tvp) {
+	timeout = MAX_SCHEDULE_TIMEOUT;     // 超时时间，滴答时间
+	if (tvp) {      // tvp非NULL表示立即返回或者等待一段时间
 		time_t sec, usec;
 
+        // 检查用户空间的参数，并复制到内存空间
 		if ((ret = verify_area(VERIFY_READ, tvp, sizeof(*tvp)))
 		    || (ret = __get_user(sec, &tvp->tv_sec))
 		    || (ret = __get_user(usec, &tvp->tv_usec)))
@@ -311,6 +310,7 @@ sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, s
 		if (sec < 0 || usec < 0)
 			goto out_nofds;
 
+		// 转成滴答时间
 		if ((unsigned long) sec < MAX_SELECT_SECONDS) {
 			timeout = ROUND_UP(usec, 1000000/HZ);
 			timeout += sec * (unsigned long) HZ;
@@ -321,7 +321,11 @@ sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, s
 	if (n < 0)
 		goto out_nofds;
 
-	/* max_fdset can increase, so grab it once to avoid race */
+	/* max_fdset 可以增加，所以抓住它一次以避免竞争
+	 * n为3个集合最大值加1，但最多不超过1024，current->files->max_fdset
+	 * 在copy_files中被初始化1024
+	 * 想想为什么要做这个限制
+	 * */
 	max_fdset = current->files->max_fdset;
 	if (n > max_fdset)
 		n = max_fdset;
@@ -332,10 +336,11 @@ sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, s
 	 * long-words. 
 	 */
 	ret = -ENOMEM;
-	size = FDS_BYTES(n);
-	bits = select_bits_alloc(size);
+	size = FDS_BYTES(n);        // 返回需要的字节大小，如n取0-31，则需要返回4，取32-63，返回8
+	bits = select_bits_alloc(size);     // bits = 6 * size
 	if (!bits)
 		goto out_nofds;
+	// 每个成员均有size大小的空间
 	fds.in      = (unsigned long *)  bits;
 	fds.out     = (unsigned long *) (bits +   size);
 	fds.ex      = (unsigned long *) (bits + 2*size);
@@ -343,15 +348,17 @@ sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, s
 	fds.res_out = (unsigned long *) (bits + 4*size);
 	fds.res_ex  = (unsigned long *) (bits + 5*size);
 
+	// glic中的fd_set使用的是固定大小的数组，long arr[32]
 	if ((ret = get_fd_set(n, inp, fds.in)) ||
 	    (ret = get_fd_set(n, outp, fds.out)) ||
 	    (ret = get_fd_set(n, exp, fds.ex)))
 		goto out;
+	// 清空输出
 	zero_fd_set(n, fds.res_in);
 	zero_fd_set(n, fds.res_out);
 	zero_fd_set(n, fds.res_ex);
 
-	ret = do_select(n, &fds, &timeout);
+	ret = do_select(n, &fds, &timeout);         // 核心
 
 	if (tvp && !(current->personality & STICKY_TIMEOUTS)) {
 		time_t sec = 0, usec = 0;

@@ -14,7 +14,7 @@
 struct poll_table_struct;
 
 /* 
- * structures and helpers for f_op->poll implementations
+ * f_op->poll 实现的结构和助手
  */
 typedef void (*poll_queue_proc)(struct file *, wait_queue_head_t *, struct poll_table_struct *);
 
@@ -34,7 +34,7 @@ static inline void init_poll_funcptr(poll_table *pt, poll_queue_proc qproc)
 }
 
 /*
- * Structures and helpers for sys_poll/sys_poll
+ * sys_pollsys_poll 的结构和帮助程序
  */
 struct poll_wqueues {
 	poll_table pt;
@@ -46,7 +46,7 @@ extern void poll_initwait(struct poll_wqueues *pwq);
 extern void poll_freewait(struct poll_wqueues *pwq);
 
 /*
- * Scaleable version of the fd_set.
+ * fd_set 的可扩展版本。
  */
 
 typedef struct {
@@ -56,16 +56,17 @@ typedef struct {
 
 /*
  * How many longwords for "nr" bits?
+ * 计算nr需要多个bitmap来表示，每个bitmap32位
  */
 #define FDS_BITPERLONG	(8*sizeof(long))
 #define FDS_LONGS(nr)	(((nr)+FDS_BITPERLONG-1)/FDS_BITPERLONG)
 #define FDS_BYTES(nr)	(FDS_LONGS(nr)*sizeof(long))
 
 /*
- * We do a VERIFY_WRITE here even though we are only reading this time:
- * we'll write to it eventually..
+ * 我们在这里执行 VERIFY_WRITE，即使我们这次只是在阅读：
+ * 我们最终会写信给它..
  *
- * Use "unsigned long" accesses to let user-mode fd_set's be long-aligned.
+ * 使用“无符号长”访问让用户模式 fd_set 长对齐。
  */
 static inline
 int get_fd_set(unsigned long nr, void __user *ufdset, unsigned long *fdset)
@@ -74,7 +75,7 @@ int get_fd_set(unsigned long nr, void __user *ufdset, unsigned long *fdset)
 	if (ufdset) {
 		int error;
 		error = verify_area(VERIFY_WRITE, ufdset, nr);
-		if (!error && __copy_from_user(fdset, ufdset, nr))
+		if (!error && __copy_from_user(fdset, ufdset, nr))      // from ufdset to fdset
 			error = -EFAULT;
 		return error;
 	}

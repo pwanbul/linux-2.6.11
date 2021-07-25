@@ -732,7 +732,7 @@ ENTRY(sys_call_table)		// 服务例程数组
 	.long sys_setfsgid16
 	.long sys_llseek	/* 140 */
 	.long sys_getdents
-	.long sys_select
+	.long sys_select                // 多路IO复用 select
 	.long sys_flock
 	.long sys_msync
 	.long sys_readv		/* 145 */
