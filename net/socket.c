@@ -1881,7 +1881,10 @@ out:
 
 #ifdef __ARCH_WANT_SYS_SOCKETCALL
 
-/* Argument list sizes for sys_socketcall */
+/* sys_socketcall 的参数列表大小
+ * 参数大小被写死，没有可变长参数
+ * 至少2个参数，最多6参数
+ * */
 #define AL(x) ((x) * sizeof(unsigned long))
 static unsigned char nargs[18]={AL(0),AL(3),AL(3),AL(3),AL(2),AL(3),
 				AL(3),AL(3),AL(4),AL(4),AL(4),AL(6),
@@ -1893,12 +1896,16 @@ static unsigned char nargs[18]={AL(0),AL(3),AL(3),AL(3),AL(2),AL(3),
  *
  *	Argument checking cleaned up. Saved 20% in size.
  *  This function doesn't need to set the kernel lock because
- *  it is set by the callees. 
+ *  it is set by the callees.
+ *
+ *  socket相关的接口，需要3次跳转
+ *  call为子调用号
+ *  args为最左边参数的地址
  */
 
 asmlinkage long sys_socketcall(int call, unsigned long __user *args)
 {
-	unsigned long a[6];
+	unsigned long a[6];     // 最多6个参数
 	unsigned long a0,a1;
 	int err;
 
