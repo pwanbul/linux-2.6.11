@@ -214,7 +214,7 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 				i += __NFDBITS;
 				continue;
 			}
-            // 按组来处理
+			// 按组来处理
 			for (j = 0; j < __NFDBITS; ++j, ++i, bit <<= 1) {
 				if (i >= n)
 					break;
@@ -227,6 +227,7 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 					if (f_op && f_op->poll)
 						mask = (*f_op->poll)(file, retval ? NULL : wait);
 					fput(file);
+					// 注意是3个if，而不是else if，返回值可理解为达成的事件的个数
 					if ((mask & POLLIN_SET) && (in & bit)) {
 						res_in |= bit;
 						retval++;
@@ -250,6 +251,11 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 				*rexp = res_ex;
 		}
 		wait = NULL;
+		/* 3种情况会返回
+		 * 1. 返回值非0
+		 * 2. 超时时间为0
+		 * 3. 有未决的信号
+		 * */
 		if (retval || !__timeout || signal_pending(current))
 			break;
 		if(table.error) {
@@ -288,6 +294,10 @@ static void select_bits_free(void *bits, int size)
 #define MAX_SELECT_SECONDS \
 	((unsigned long) (MAX_SCHEDULE_TIMEOUT / HZ)-1)
 
+/* select系统调用
+ * fd_set在glibc中实现的时使用的定长大小的数组
+ * 如果n取最大值FD_SETSZIE，那么数组会完整的拷贝过来
+ * */
 asmlinkage long
 sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, struct timeval __user *tvp)
 {
@@ -302,8 +312,8 @@ sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, s
 
         // 检查用户空间的参数，并复制到内存空间
 		if ((ret = verify_area(VERIFY_READ, tvp, sizeof(*tvp)))
-		    || (ret = __get_user(sec, &tvp->tv_sec))
-		    || (ret = __get_user(usec, &tvp->tv_usec)))
+		    || (ret = __get_user(sec, &tvp->tv_sec))		// 秒
+		    || (ret = __get_user(usec, &tvp->tv_usec)))		// 微秒
 			goto out_nofds;
 
 		ret = -EINVAL;
@@ -324,7 +334,8 @@ sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, s
 	/* max_fdset 可以增加，所以抓住它一次以避免竞争
 	 * n为3个集合最大值加1，但最多不超过1024，current->files->max_fdset
 	 * 在copy_files中被初始化1024
-	 * 想想为什么要做这个限制
+	 *
+	 * 由于fd_set在glibc中的实现，fd的最大值不能超过1023
 	 * */
 	max_fdset = current->files->max_fdset;
 	if (n > max_fdset)
@@ -396,11 +407,10 @@ struct poll_list {
 	int len;
 	struct pollfd entries[0];
 };
-
+// 每个页面上去掉sizeof(struct poll_list)后还能放POLLFD_PER_PAGE个struct pollfd结构
 #define POLLFD_PER_PAGE  ((PAGE_SIZE-sizeof(struct poll_list)) / sizeof(struct pollfd))
 
-static void do_pollfd(unsigned int num, struct pollfd * fdpage,
-	poll_table ** pwait, int *count)
+static void do_pollfd(unsigned int num, struct pollfd * fdpage, poll_table ** pwait, int *count)
 {
 	int i;
 
@@ -410,7 +420,7 @@ static void do_pollfd(unsigned int num, struct pollfd * fdpage,
 		struct pollfd *fdp;
 
 		mask = 0;
-		fdp = fdpage+i;
+		fdp = fdpage+i;			// 获取struct pollfd
 		fd = fdp->fd;
 		if (fd >= 0) {
 			struct file * file = fget(fd);
@@ -419,6 +429,7 @@ static void do_pollfd(unsigned int num, struct pollfd * fdpage,
 				mask = DEFAULT_POLLMASK;
 				if (file->f_op && file->f_op->poll)
 					mask = file->f_op->poll(file, *pwait);
+				// https://blog.csdn.net/SUKHOI27SMK/article/details/48287137
 				mask &= fdp->events | POLLERR | POLLHUP;
 				fput(file);
 			}
@@ -430,14 +441,13 @@ static void do_pollfd(unsigned int num, struct pollfd * fdpage,
 		fdp->revents = mask;
 	}
 }
-
-static int do_poll(unsigned int nfds,  struct poll_list *list,
-			struct poll_wqueues *wait, long timeout)
+// poll核心
+static int do_poll(unsigned int nfds,  struct poll_list *list, struct poll_wqueues *wait, long timeout)
 {
 	int count = 0;
 	poll_table* pt = &wait->pt;
 
-	if (!timeout)
+	if (!timeout)		// 永久阻塞
 		pt = NULL;
  
 	for (;;) {
@@ -459,7 +469,13 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 	__set_current_state(TASK_RUNNING);
 	return count;
 }
-
+/* poll系统调用
+ * ufds是指向struct pollfd数组的指针
+ * nfds是数组的大小
+ *
+ * 这样设计就可以避免select中的
+ * 把定长数组全部拷贝过来的问题
+ * */
 asmlinkage long sys_poll(struct pollfd __user * ufds, unsigned int nfds, long timeout)
 {
 	struct poll_wqueues table;
@@ -468,12 +484,15 @@ asmlinkage long sys_poll(struct pollfd __user * ufds, unsigned int nfds, long ti
 	struct poll_list *head;
  	struct poll_list *walk;
 
-	/* Do a sanity check on nfds ... */
+	/* 对 nfds 进行健全性检查 ...
+	 *
+	 * 相对于select，poll不限制最大描述符的取值，但是限制个数
+	 * */
 	if (nfds > current->files->max_fdset && nfds > OPEN_MAX)
 		return -EINVAL;
 
-	if (timeout) {
-		/* Careful about overflow in the intermediate values */
+	if (timeout) {		// 毫秒
+		/* 小心中间值的溢出 */
 		if ((unsigned long) timeout < MAX_SCHEDULE_TIMEOUT / HZ)
 			timeout = (unsigned long)(timeout*HZ+999)/1000+1;
 		else /* Negative or overflow */
@@ -482,34 +501,32 @@ asmlinkage long sys_poll(struct pollfd __user * ufds, unsigned int nfds, long ti
 
 	poll_initwait(&table);
 
-	head = NULL;
+	head = NULL;		// 指向第一个块的指针
 	walk = NULL;
 	i = nfds;
 	err = -ENOMEM;
 	while(i!=0) {
+		// 分配一个连续分段的空间，每个块最多POLLFD_PER_PAGE个struct pollfd，超出就需要重新分配块
 		struct poll_list *pp;
-		pp = kmalloc(sizeof(struct poll_list)+
-				sizeof(struct pollfd)*
-				(i>POLLFD_PER_PAGE?POLLFD_PER_PAGE:i),
-					GFP_KERNEL);
+		pp = kmalloc(sizeof(struct poll_list)+sizeof(struct pollfd)*(i>POLLFD_PER_PAGE?POLLFD_PER_PAGE:i), GFP_KERNEL);
 		if(pp==NULL)
 			goto out_fds;
 		pp->next=NULL;
-		pp->len = (i>POLLFD_PER_PAGE?POLLFD_PER_PAGE:i);
+		pp->len = (i>POLLFD_PER_PAGE?POLLFD_PER_PAGE:i);		// len不含struct poll_list中固定部分的大小
 		if (head == NULL)
 			head = pp;
 		else
 			walk->next = pp;
 
-		walk = pp;
-		if (copy_from_user(pp->entries, ufds + nfds-i, 
-				sizeof(struct pollfd)*pp->len)) {
+		walk = pp;		// 执行当前块的指针
+		// 从用户空间拷贝数据
+		if (copy_from_user(pp->entries, ufds + nfds-i,sizeof(struct pollfd)*pp->len)) {
 			err = -EFAULT;
 			goto out_fds;
 		}
 		i -= pp->len;
 	}
-	fdcount = do_poll(nfds, head, &table, timeout);
+	fdcount = do_poll(nfds, head, &table, timeout);		// poll核心
 
 	/* OK, now copy the revents fields back to user space. */
 	walk = head;
