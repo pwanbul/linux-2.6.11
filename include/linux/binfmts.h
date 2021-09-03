@@ -6,11 +6,10 @@
 struct pt_regs;
 
 /*
- * MAX_ARG_PAGES defines the number of pages allocated for arguments
- * and envelope for the new program. 32 should suffice, this gives
- * a maximum env+arg of 128kB w/4KB pages!
+ * MAX_ARG_PAGES 定义为新程序的参数和信封分配的页数。
+ * 32应该就足够了，这给出了 128kB w/4KB 页面的最大 env+arg！
  */
-#define MAX_ARG_PAGES 32
+#define MAX_ARG_PAGES 32		// 命令行参数和环境变量所占用的页面数
 
 /* sizeof(linux_binprm->buf) */
 #define BINPRM_BUF_SIZE 128
@@ -18,17 +17,18 @@ struct pt_regs;
 #ifdef __KERNEL__
 
 /*
- * This structure is used to hold the arguments that are used when loading binaries.
+ * 此结构用于保存加载二进制文件时使用的参数。
+ * 打包二进制程序的参数
  */
 struct linux_binprm{
-	char buf[BINPRM_BUF_SIZE];
-	struct page *page[MAX_ARG_PAGES];
+	char buf[BINPRM_BUF_SIZE];      // 保存可执行文件的头128字节
+	struct page *page[MAX_ARG_PAGES];       // 参数页
 	struct mm_struct *mm;
-	unsigned long p; /* current top of mem */
+	unsigned long p; /* current top of mem 当前内存页最高地址*/
 	int sh_bang;
 	struct file * file;
 	int e_uid, e_gid;
-	kernel_cap_t cap_inheritable, cap_permitted, cap_effective;
+	kernel_cap_t cap_inheritable, cap_permitted, cap_effective;		// 权能
 	void *security;
 	int argc, envc;
 	char * filename;	/* Name of binary as seen by procps */
@@ -49,8 +49,8 @@ struct linux_binprm{
 
 
 /*
- * This structure defines the functions that are used to load the binary formats that
- * linux accepts.
+ * 此结构定义了用于加载 linux 接受的二进制格式的函数。
+ * 二进制格式支持，如elf,a.out等
  */
 struct linux_binfmt {
 	struct linux_binfmt * next;
@@ -69,10 +69,10 @@ extern void remove_arg_zero(struct linux_binprm *);
 extern int search_binary_handler(struct linux_binprm *,struct pt_regs *);
 extern int flush_old_exec(struct linux_binprm * bprm);
 
-/* Stack area protections */
-#define EXSTACK_DEFAULT   0	/* Whatever the arch defaults to */
-#define EXSTACK_DISABLE_X 1	/* Disable executable stacks */
-#define EXSTACK_ENABLE_X  2	/* Enable executable stacks */
+/* 堆栈区域保护 */
+#define EXSTACK_DEFAULT   0	/* 任何arch默认设置为 */
+#define EXSTACK_DISABLE_X 1	/* 禁用可执行堆栈 */
+#define EXSTACK_ENABLE_X  2	/* 启用可执行堆栈 */
 
 extern int setup_arg_pages(struct linux_binprm * bprm,
 			   unsigned long stack_top,

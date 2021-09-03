@@ -53,13 +53,9 @@
  *	virt_to_phys	-	map virtual addresses to physical
  *	@address: address to remap
  *
- *	The returned physical address is the physical (CPU) mapping for
- *	the memory address given. It is only valid to use this function on
- *	addresses directly mapped or allocated via kmalloc. 
+ *	返回的物理地址是给定内存地址的物理 (CPU) 映射。仅在通过 kmalloc 直接映射或分配的地址上使用此函数才有效。
  *
- *	This function does not give bus mappings for DMA transfers. In
- *	almost all conceivable cases a device driver should not be using
- *	this function
+ *	此函数不提供 DMA 传输的总线映射。在几乎所有可以想到的情况下，设备驱动程序不应该使用此功能
  */
  
 static inline unsigned long virt_to_phys(volatile void * address)
@@ -71,13 +67,9 @@ static inline unsigned long virt_to_phys(volatile void * address)
  *	phys_to_virt	-	map physical address to virtual
  *	@address: address to remap
  *
- *	The returned virtual address is a current CPU mapping for
- *	the memory address given. It is only valid to use this function on
- *	addresses that have a kernel mapping
+ *	返回的虚拟地址是给定内存地址的当前CPU映射。仅在具有内核映射的地址上使用此函数才有效
  *
- *	This function does not handle bus mappings for DMA transfers. In
- *	almost all conceivable cases a device driver should not be using
- *	this function
+ *	此函数不处理DMA传输的总线映射。在几乎所有可以想到的情况下，设备驱动程序不应该使用此功能
  */
 
 static inline void * phys_to_virt(unsigned long address)

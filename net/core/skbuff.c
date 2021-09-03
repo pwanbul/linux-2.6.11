@@ -124,6 +124,8 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *
  *	Buffers may only be allocated from interrupts using a @gfp_mask of
  *	%GFP_ATOMIC.
+ *
+ *	分配套接字缓存区
  */
 struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 {
@@ -131,8 +133,7 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 	u8 *data;
 
 	/* Get the HEAD */
-	skb = kmem_cache_alloc(skbuff_head_cache,
-			       gfp_mask & ~__GFP_DMA);
+	skb = kmem_cache_alloc(skbuff_head_cache, gfp_mask & ~__GFP_DMA);
 	if (!skb)
 		goto out;
 

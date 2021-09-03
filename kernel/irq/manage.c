@@ -147,8 +147,7 @@ int can_request_irq(unsigned int irq, unsigned long irqflags)
 }
 
 /*
- * Internal function to register an irqaction - typically used to
- * allocate special interrupts that are part of the architecture.
+ * 注册 irq action 的内部函数 - 通常用于分配作为架构一部分的特殊中断。
  */
 int setup_irq(unsigned int irq, struct irqaction * new)
 {
@@ -218,6 +217,8 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 }
 
 /**
+ *  删除一个中断处理函数
+ *
  *	free_irq - free an interrupt
  *	@irq: Interrupt line to free
  *	@dev_id: Device identity to free
@@ -279,6 +280,8 @@ void free_irq(unsigned int irq, void *dev_id)
 EXPORT_SYMBOL(free_irq);
 
 /**
+ *  由驱动程序调用，注册一个中断处理函数
+ *
  *	request_irq - allocate an interrupt line
  *	@irq: Interrupt line to allocate
  *	@handler: Function to be called when the IRQ occurs
@@ -286,19 +289,14 @@ EXPORT_SYMBOL(free_irq);
  *	@devname: An ascii name for the claiming device
  *	@dev_id: A cookie passed back to the handler function
  *
- *	This call allocates interrupt resources and enables the
- *	interrupt line and IRQ handling. From the point this
- *	call is made your handler function may be invoked. Since
- *	your handler function must clear any interrupt the board
- *	raises, you must take care both to initialise your hardware
- *	and to set up the interrupt handler in the right order.
+ *	此调用分配中断资源并启用中断线和 IRQ 处理。从这个调用开始，
+ *	您的处理程序函数可能会被调用。由于您的处理程序函数必须清除电路板
+ *	引发的任何中断，您必须注意初始化您的硬件并以正确的顺序设置中断处理程序。
  *
- *	Dev_id must be globally unique. Normally the address of the
- *	device data structure is used as the cookie. Since the handler
- *	receives this value it makes sense to use it.
+ *	Dev_id 必须是全局唯一的。通常，设备数据结构的地址用作 cookie。
+ *	由于处理程序接收此值，因此使用它是有意义的。
  *
- *	If your interrupt is shared you must pass a non NULL dev_id
- *	as this is required when freeing the interrupt.
+ *	如果您的中断是共享的，您必须传递一个非空的 dev_id，因为这是释放中断时所必需的。
  *
  *	Flags:
  *

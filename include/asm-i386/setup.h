@@ -1,6 +1,5 @@
 /*
- *	Just a place holder. We don't want to have to test x86 before
- *	we include stuff
+ *	只是一个占位符。我们不想在包含内容之前先测试x86
  */
 
 #ifndef _i386_SETUP_H
@@ -27,16 +26,17 @@
 
 #ifndef __ASSEMBLY__
 /*
- * This is set up by the setup-routine at boot-time
+ * 这是在启动时由setup-routine设置的
  */
 extern unsigned char boot_params[PARAM_SIZE];
 
 #define PARAM	(boot_params)
+// 各个参数在boot_params的偏移量
 #define SCREEN_INFO (*(struct screen_info *) (PARAM+0))
 #define EXT_MEM_K (*(unsigned short *) (PARAM+2))
 #define ALT_MEM_K (*(unsigned long *) (PARAM+0x1e0))
-#define E820_MAP_NR (*(char*) (PARAM+E820NR))
-#define E820_MAP    ((struct e820entry *) (PARAM+E820MAP))
+#define E820_MAP_NR (*(char*) (PARAM+E820NR))                   // e820map
+#define E820_MAP    ((struct e820entry *) (PARAM+E820MAP))      // e820map
 #define APM_BIOS_INFO (*(struct apm_bios_info *) (PARAM+0x40))
 #define IST_INFO   (*(struct ist_info *) (PARAM+0x60))
 #define DRIVE_INFO (*(struct drive_info_struct *) (PARAM+0x80))

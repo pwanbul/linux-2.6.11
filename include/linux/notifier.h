@@ -1,21 +1,22 @@
 /*
- *	Routines to manage notifier chains for passing status changes to any
- *	interested routines. We need this instead of hard coded call lists so
- *	that modules can poke their nose into the innards. The network devices
- *	needed them so here they are for the rest of you.
+ *	管理通知链的例程，以将状态更改传递给任何感兴趣的例程。
+ *	我们需要这个而不是硬编码的调用列表，以便模块可以深入了解内部。
+ *	网络设备需要它们，所以在这里它们是为你们其他人准备的。
  *
  *				Alan Cox <Alan.Cox@linux.org>
  */
- 
+
+// 通知链机制 https://www.cnblogs.com/pengdonglin137/articles/4075148.html
+
 #ifndef _LINUX_NOTIFIER_H
 #define _LINUX_NOTIFIER_H
 #include <linux/errno.h>
 
 struct notifier_block
 {
-	int (*notifier_call)(struct notifier_block *self, unsigned long, void *);
-	struct notifier_block *next;
-	int priority;
+	int (*notifier_call)(struct notifier_block *self, unsigned long, void *);  // callback，由被通知方提供
+	struct notifier_block *next;        // 链表指针
+	int priority;       // 优先级
 };
 
 
@@ -25,14 +26,15 @@ extern int notifier_chain_register(struct notifier_block **list, struct notifier
 extern int notifier_chain_unregister(struct notifier_block **nl, struct notifier_block *n);
 extern int notifier_call_chain(struct notifier_block **n, unsigned long val, void *v);
 
-#define NOTIFY_DONE		0x0000		/* Don't care */
-#define NOTIFY_OK		0x0001		/* Suits me */
-#define NOTIFY_STOP_MASK	0x8000		/* Don't call further */
-#define NOTIFY_BAD		(NOTIFY_STOP_MASK|0x0002)	/* Bad/Veto action	*/
+#define NOTIFY_DONE		0x0000		/* 对事件视而不见 Don't care */
+#define NOTIFY_OK		0x0001		/* 事件正确处理 Suits me */
+#define NOTIFY_STOP_MASK	0x8000		/* 由notifier_call_chain检查，看继续调用回调函数，
+ * 还是停止，_BAD和_STOP中包含该标志 Don't call further */
+#define NOTIFY_BAD		(NOTIFY_STOP_MASK|0x0002)	/* 事件处理出错，不再继续调用回调函数 Bad/Veto action	*/
 /*
- * Clean way to return from the notifier and stop further calls.
+ * 从通知程序返回并停止进一步调用的清洁方式。
  */
-#define NOTIFY_STOP		(NOTIFY_OK|NOTIFY_STOP_MASK)
+#define NOTIFY_STOP		(NOTIFY_OK|NOTIFY_STOP_MASK)    // 回调出错，不再继续调用该事件回调函数
 
 /*
  *	Declared notifiers so far. I can imagine quite a few more chains

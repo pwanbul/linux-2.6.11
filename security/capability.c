@@ -97,7 +97,7 @@ static void __exit capability_exit (void)
 	}
 }
 
-security_initcall (capability_init);
+security_initcall (capability_init);		// 在initcall中第二个调用
 module_exit (capability_exit);
 
 MODULE_DESCRIPTION("Standard Linux Capabilities Security Module");

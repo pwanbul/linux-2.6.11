@@ -40,7 +40,9 @@ asmlinkage int sys_pipe(unsigned long __user * fildes)
 	return error;
 }
 
-/* common code for old and new mmaps */
+/* 新旧mmap通用代码
+ * old_mmap和sys_mmap2都会走到这里
+ * */
 static inline long do_mmap2(
 	unsigned long addr, unsigned long len,
 	unsigned long prot, unsigned long flags,
@@ -49,23 +51,24 @@ static inline long do_mmap2(
 	int error = -EBADF;
 	struct file * file = NULL;
 
-	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
-	if (!(flags & MAP_ANONYMOUS)) {
-		file = fget(fd);
+	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);		// 在用户空间被忽略，这里必定设置进去
+	if (!(flags & MAP_ANONYMOUS)) {			// 非匿名映射,如果设置MAP_ANONYMOUS，则忽略fd和pgoff
+		file = fget(fd);		// 打开文件
 		if (!file)
 			goto out;
 	}
 
-	down_write(&current->mm->mmap_sem);
-	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
-	up_write(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);		// 对mm加写锁
+	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);		// fd变为了struct file*
+	up_write(&current->mm->mmap_sem);		// 释放mm的写锁
 
 	if (file)
 		fput(file);
 out:
 	return error;
 }
-
+/* mmap系统调用的服务例程
+ * */
 asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,
 	unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long pgoff)

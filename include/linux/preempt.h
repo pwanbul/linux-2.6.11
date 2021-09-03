@@ -13,8 +13,8 @@
   extern void fastcall add_preempt_count(int val);
   extern void fastcall sub_preempt_count(int val);
 #else
-# define add_preempt_count(val)	do { preempt_count() += (val); } while (0)
-# define sub_preempt_count(val)	do { preempt_count() -= (val); } while (0)
+# define add_preempt_count(val)	do { preempt_count() += (val); } while (0)		// preempt_count的第val位加1，可能会导致进位
+# define sub_preempt_count(val)	do { preempt_count() -= (val); } while (0)		// preempt_count的第val位减1
 #endif
 
 #define inc_preempt_count() add_preempt_count(1)
@@ -22,7 +22,7 @@
 
 #define preempt_count()	(current_thread_info()->preempt_count)
 
-#ifdef CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPT		// 配置成支持抢占
 
 asmlinkage void preempt_schedule(void);
 
@@ -50,7 +50,7 @@ do { \
 	preempt_check_resched(); \
 } while (0)
 
-#else
+#else		// 不支持抢占
 
 #define preempt_disable()		do { } while (0)
 #define preempt_enable_no_resched()	do { } while (0)

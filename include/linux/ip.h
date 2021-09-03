@@ -173,26 +173,26 @@ static inline void inet_sk_copy_descendant(struct sock *sk_to,
 }
 #endif
 #endif
-
+// ipv4首部
 struct iphdr {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
 	__u8	ihl:4,
 		version:4;
 #elif defined (__BIG_ENDIAN_BITFIELD)
-	__u8	version:4,
-  		ihl:4;
+	__u8	version:4,		// 版本
+  		ihl:4;			// 首部长度，4字节对齐
 #else
 #error	"Please fix <asm/byteorder.h>"
 #endif
-	__u8	tos;
-	__u16	tot_len;
-	__u16	id;
-	__u16	frag_off;
-	__u8	ttl;
-	__u8	protocol;
-	__u16	check;
-	__u32	saddr;
-	__u32	daddr;
+	__u8	tos;		// 服务类型
+	__u16	tot_len;	// 总长度，首部+数据
+	__u16	id;			// 标识符
+	__u16	frag_off;	// 片偏移
+	__u8	ttl;		// time to live
+	__u8	protocol;	// 传输层协议号
+	__u16	check;		// 首部校验和
+	__u32	saddr;		// 源IP地址
+	__u32	daddr;		// 目的IP地址
 	/*The options start here. */
 };
 

@@ -7,8 +7,8 @@
 #include <asm/system.h>
 
 /*
- * We put the hardirq and softirq counter into the preemption
- * counter. The bitmask has the following meaning:
+ * 我们将hardirq和softirq计数器放入抢占计数器中。位掩码具有以下含义：
+ * 注意：位是从0开始算的
  *
  * - bits 0-7 are the preemption count (max preemption depth: 256)
  * - bits 8-15 are the softirq count (max # of softirqs: 256)
@@ -50,17 +50,17 @@
 #define SOFTIRQ_OFFSET	(1UL << SOFTIRQ_SHIFT)
 #define HARDIRQ_OFFSET	(1UL << HARDIRQ_SHIFT)
 
-#define hardirq_count()	(preempt_count() & HARDIRQ_MASK)
-#define softirq_count()	(preempt_count() & SOFTIRQ_MASK)
-#define irq_count()	(preempt_count() & (HARDIRQ_MASK | SOFTIRQ_MASK))
+#define hardirq_count()	(preempt_count() & HARDIRQ_MASK)		// 获取硬中断次数
+#define softirq_count()	(preempt_count() & SOFTIRQ_MASK)		// 获取软中断次数
+#define irq_count()	(preempt_count() & (HARDIRQ_MASK | SOFTIRQ_MASK))		// 获取中断次数
 
 /*
  * Are we doing bottom half or hardware interrupt processing?
  * Are we in a softirq context? Interrupt context?
  */
-#define in_irq()		(hardirq_count())
-#define in_softirq()		(softirq_count())
-#define in_interrupt()		(irq_count())
+#define in_irq()		(hardirq_count())		// 是否存在硬中断中
+#define in_softirq()		(softirq_count())		// 是否存在软中断中
+#define in_interrupt()		(irq_count())			// 是否存在中断中
 
 #if defined(CONFIG_PREEMPT) && !defined(CONFIG_PREEMPT_BKL)
 # define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())

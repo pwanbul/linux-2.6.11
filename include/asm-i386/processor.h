@@ -299,12 +299,12 @@ extern int bootloader_type;
 /*
  * User space process size: 3GB (default).
  */
-#define TASK_SIZE	(PAGE_OFFSET)
+#define TASK_SIZE	(PAGE_OFFSET)		// 0xc0000000
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
+#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))		// 0x40000000 current->mm->mmap_base
 
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
 
@@ -366,6 +366,7 @@ union i387_union {
 	struct i387_soft_struct soft;
 };
 
+// 内存段
 typedef struct {
 	unsigned long seg;
 } mm_segment_t;

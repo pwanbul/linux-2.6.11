@@ -1119,9 +1119,7 @@ static int __sock_create(int family, int type, int protocol, struct socket **res
 	}
 
 /*
- *	Allocate the socket and allow the family to set things up. if
- *	the protocol is 0, the family is instructed to select an appropriate
- *	default.
+ * 分配套接字并允许族进行设置。如果协议为 0，则指示族选择适当的默认值。
  */
 
 	if (!(sock = sock_alloc())) {
@@ -1134,8 +1132,7 @@ static int __sock_create(int family, int type, int protocol, struct socket **res
 	sock->type  = type;
 
 	/*
-	 * We will call the ->create function, that possibly is in a loadable
-	 * module, so we have to bump that loadable module refcnt first.
+	 * 我们将调用 ->create 函数，该函数可能位于可加载模块中，因此我们必须先碰撞该可加载模块 refcnt。
 	 */
 	err = -EAFNOSUPPORT;
 	if (!try_module_get(net_families[family]->owner))
@@ -1179,6 +1176,7 @@ int sock_create_kern(int family, int type, int protocol, struct socket **res)
 	return __sock_create(family, type, protocol, res, 1);
 }
 
+// 创建监听套接字
 asmlinkage long sys_socket(int family, int type, int protocol)
 {
 	int retval;

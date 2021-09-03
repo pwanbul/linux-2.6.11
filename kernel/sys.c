@@ -93,25 +93,26 @@ DEFINE_RWLOCK(notifier_lock);
 
 /**
  *	notifier_chain_register	- Add notifier to a notifier chain
- *	@list: Pointer to root list pointer
- *	@n: New entry in notifier chain
+ *	@list: 指向根列表指针的指针
+ *	@n: 通知链中的新条目
  *
  *	Adds a notifier to a notifier chain.
  *
  *	Currently always returns zero.
+ *	将n加入到list中
  */
  
 int notifier_chain_register(struct notifier_block **list, struct notifier_block *n)
 {
 	write_lock(&notifier_lock);
-	while(*list)
+	while(*list)    // 按优先级顺序存放
 	{
 		if(n->priority > (*list)->priority)
 			break;
 		list= &((*list)->next);
 	}
-	n->next = *list;
-	*list=n;
+	n->next = *list;		// 头插，高优先级在前
+	*list=n;		// 全局指针只
 	write_unlock(&notifier_lock);
 	return 0;
 }
@@ -126,6 +127,7 @@ EXPORT_SYMBOL(notifier_chain_register);
  *	Removes a notifier from a notifier chain.
  *
  *	Returns zero on success, or %-ENOENT on failure.
+ *	从nl中把n删除
  */
  
 int notifier_chain_unregister(struct notifier_block **nl, struct notifier_block *n)
@@ -153,14 +155,11 @@ EXPORT_SYMBOL(notifier_chain_unregister);
  *	@val: Value passed unmodified to notifier function
  *	@v: Pointer passed unmodified to notifier function
  *
- *	Calls each function in a notifier chain in turn.
+ * 依次调用通知链中的每个函数。
  *
- *	If the return value of the notifier can be and'd
- *	with %NOTIFY_STOP_MASK, then notifier_call_chain
- *	will return immediately, with the return value of
- *	the notifier function which halted execution.
- *	Otherwise, the return value is the return value
- *	of the last notifier function called.
+ *	如果通知程序的返回值可以用 %NOTIFY_STOP_MASK 和'd，
+ *	则 notifier_call_chain 将立即返回，并返回停止执行的
+ *	通知程序函数的返回值。否则，返回值是最后调用的通知程序函数的返回值。
  */
  
 int notifier_call_chain(struct notifier_block **n, unsigned long val, void *v)
@@ -170,8 +169,8 @@ int notifier_call_chain(struct notifier_block **n, unsigned long val, void *v)
 
 	while(nb)
 	{
-		ret=nb->notifier_call(nb,val,v);
-		if(ret&NOTIFY_STOP_MASK)
+		ret=nb->notifier_call(nb,val,v);        // 调用该chain下block的callback
+		if(ret&NOTIFY_STOP_MASK)        // 判断是否停止
 		{
 			return ret;
 		}
@@ -856,7 +855,7 @@ asmlinkage long sys_setfsuid(uid_t uid)
 }
 
 /*
- * Samma p� svenska..
+ * Samma p� svenska..
  */
 asmlinkage long sys_setfsgid(gid_t gid)
 {

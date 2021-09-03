@@ -36,29 +36,38 @@ extern pte_t *pkmap_page_table;
 extern void kmap_init(void);
 
 /*
- * Right now we initialize only a single pte table. It can be extended
- * easily, subsequent pte tables have to be allocated in one physical
- * chunk of RAM.
+ * 现在我们只初始化一个 pte 表。
+ * 它可以轻松扩展，后续的 pte 表必须分配在一个物理 RAM 块中。
  */
 #ifdef CONFIG_X86_PAE
 #define LAST_PKMAP 512
 #else
-#define LAST_PKMAP 1024
+#define LAST_PKMAP 1024     // PKMap的页框数量
 #endif
 /*
  * Ordering is:
- *
- * FIXADDR_TOP
- * 			fixed_addresses
- * FIXADDR_START
- * 			temp fixed addresses
- * FIXADDR_BOOT_START
- * 			Persistent kmap area
- * PKMAP_BASE
- * VMALLOC_END
- * 			Vmalloc area
- * VMALLOC_START
- * high_memory
+ * FIXADDR_END          // 0xffffffff
+ * 4K空间，用于返回错误码
+ * FIXADDR_TOP          // 0xfffff000
+ *          这些地址指向物理内存中的随机位置。相对于内核空间起始处的线性映射，在该映射内部的虚拟地址和
+ *          物理地址之间的关联不是预设的，而可以自由定义，但定义后不能改变。固定映射区域会一直延伸到虚拟地址空间顶端。
+ *          固定映射地址的优点在于，在编译时对此类地址的处理类似于常数，内核一启动即为其分配了物理地址。
+ *          此类地址的解引用比普通指针要快速。内核会确保在上下文切换期间，对应于固定映射的页表项不会从TLB刷出，
+ *          因此在访问固定映射的内存时，总是通过TLB高速缓存取得对应的物理地址。
+ * 			fixed_addresses     // 固定映射区域
+ * 			该区域可以通过enum fixed_addresses细分
+ * FIXADDR_START        // 0xfffff000 - __end_of_permanent_fixed_addresses << PAGE_SHIFT
+ * 			temp fixed addresses        // 临时固定映射区域
+ * FIXADDR_BOOT_START       // 0xfffff000 - __end_of_fixed_addresses << PAGE_SHIFT
+ *          永久映射用于将高端内存域中的非持久页映射到内核中
+ * 			Persistent kmap area        // 永久映射区域
+ * PKMAP_BASE			// (FIXADDR_BOOT_START - PAGE_SIZE*(1024 + 1)) & PMD_MASK
+ * 8K缓冲区
+ * VMALLOC_END      // 动态映射区域的结束地址，通过PKMAP_BASE-8K(启用highmem)，或者FIXADDR_START-8K
+ * 			Vmalloc area            // 该区域用于物理上不连续的内核映射
+ * VMALLOC_START        // 动态映射区域的起始地址，通过high_memory加出来的，8M对齐
+ * 8M缓冲区
+ * high_memory      // highmem起始地址869M
  */
 #define PKMAP_BASE ( (FIXADDR_BOOT_START - PAGE_SIZE*(LAST_PKMAP + 1)) & PMD_MASK )
 #define LAST_PKMAP_MASK (LAST_PKMAP-1)

@@ -163,9 +163,8 @@ static __inline__ int atomic_inc_and_test(atomic_t *v)
  * @v: pointer of type atomic_t
  * @i: integer value to add
  * 
- * Atomically adds @i to @v and returns true
- * if the result is negative, or false when
- * result is greater than or equal to zero.
+ * 原子地将@i 添加到@v 并在结果为负时返回true，
+ * 或者当结果大于或等于0 时返回false。
  */ 
 static __inline__ int atomic_add_negative(int i, atomic_t *v)
 {

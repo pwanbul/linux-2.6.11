@@ -297,6 +297,8 @@ struct alt_instr {
  * For non barrier like inlines please define new variants
  * without volatile and memory clobber.
  */
+// 替换指令，要求被替换的指令比新的指令长，这样如果有空的位置可以放入nop(0x90)操作
+// 因为x86的32位CPU有可能不提供mfence、lfence、sfence三条汇编指令的支持，故在不支持mfence的指令中使用："lock; addl $0,0(%%esp)", "mfence"。
 #define alternative(oldinstr, newinstr, feature) 	\
 	asm volatile ("661:\n\t" oldinstr "\n662:\n" 		     \
 		      ".section .altinstructions,\"a\"\n"     	     \
@@ -359,7 +361,7 @@ struct alt_instr {
  * by the kernel should be already ordered. But keep a full barrier for now. 
  */
 
-#define mb() alternative("lock; addl $0,0(%%esp)", "mfence", X86_FEATURE_XMM2)
+#define mb() alternative("lock; addl $0,0(%%esp)", "mfence", X86_FEATURE_XMM2)	/* Streaming SIMD Extensions-2 */
 #define rmb() alternative("lock; addl $0,0(%%esp)", "lfence", X86_FEATURE_XMM2)
 
 /**
@@ -415,11 +417,27 @@ struct alt_instr {
  **/
 
 #define read_barrier_depends()	do { } while(0)
+/**
+内存屏障的分类
+硬件层提供了一系列的内存屏障 memory barrier / memory fence(Intel的提法)来提供一致性的能力。拿X86平台来说，有几种主要的内存屏障
+1. lfence，是一种Load Barrier 读屏障。在读指令前插入读屏障，可以让高速缓存中的数据失效，重新从主内存加载数据
+2. sfence, 是一种Store Barrier 写屏障。在写指令之后插入写屏障，能让写入缓存的最新数据写回到主内存
+3. mfence, 是一种全能型的屏障，具备ifence和sfence的能力
+4. Lock前缀，Lock不是一种内存屏障，但是它能完成类似内存屏障的功能。Lock会对CPU总线和高速缓存加锁，可以理解为CPU指令级的一种锁。
+它后面可以跟ADD, ADC, AND, BTC, BTR, BTS, CMPXCHG, CMPXCH8B, DEC, INC, NEG, NOT, OR, SBB, SUB, XOR, XADD, and XCHG等指令。
+Lock前缀实现了类似的能力.
+1. 它先对总线/缓存加锁，然后执行后面的指令，最后释放锁后会把高速缓存中的脏数据全部刷新回主内存。
+2. 在Lock锁住总线的时候，其他CPU的读写请求都会被阻塞，直到锁释放。Lock后的写操作会让其他CPU相关的cache line失效，从而从新从内存加载最新的数据。这个是通过缓存一致性协议做的。
+*/
 
-#ifdef CONFIG_X86_OOSTORE
+/**
+Intel和AMD都没有在IA32 CPU中实现乱续写(Out-Of-Order Store)，所以wmb()定义为空操作，不约束CPU行为；但
+有些IA32 CPU厂商实现了OOO Store，所以就有了使用sfence的那个wmb()实现。
+ */
+#ifdef CONFIG_X86_OOSTORE		// Out-Of-Order Store
 /* Actually there are no OOO store capable CPUs for now that do SSE, 
    but make it already an possibility. */
-#define wmb() alternative("lock; addl $0,0(%%esp)", "sfence", X86_FEATURE_XMM)
+#define wmb() alternative("lock; addl $0,0(%%esp)", "sfence", X86_FEATURE_XMM)		/* Streaming SIMD Extensions */
 #else
 #define wmb()	__asm__ __volatile__ ("": : :"memory")
 #endif
@@ -431,6 +449,7 @@ struct alt_instr {
 #define smp_read_barrier_depends()	read_barrier_depends()
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
 #else
+// UP上内存屏障退化成优化屏障，仅仅约束编译器的重排列即可
 #define smp_mb()	barrier()
 #define smp_rmb()	barrier()
 #define smp_wmb()	barrier()
@@ -441,13 +460,21 @@ struct alt_instr {
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
 /* interrupt control.. */
+// 获取IF的状态
 #define local_save_flags(x)	do { typecheck(unsigned long,x); __asm__ __volatile__("pushfl ; popl %0":"=g" (x): /* no input */); } while (0)
+// 把变量x中保存的值恢复到IF中
 #define local_irq_restore(x) 	do { typecheck(unsigned long,x); __asm__ __volatile__("pushl %0 ; popfl": /* no output */ :"g" (x):"memory", "cc"); } while (0)
+// 关闭本地中断
 #define local_irq_disable() 	__asm__ __volatile__("cli": : :"memory")
+// 开启本地中断
 #define local_irq_enable()	__asm__ __volatile__("sti": : :"memory")
 /* used in the idle loop; sti takes one instruction cycle to complete */
 #define safe_halt()		__asm__ __volatile__("sti; hlt": : :"memory")
 
+/* ELFAGS中IF在第9位(从0开始算)
+ * IF为0时 关闭中断
+ * IF为1时 打开中断
+ * */
 #define irqs_disabled()			\
 ({					\
 	unsigned long flags;		\
@@ -455,7 +482,9 @@ struct alt_instr {
 	!(flags & (1<<9));		\
 })
 
-/* For spinlocks etc */
+/* For spinlocks etc
+ * 把EFLAGS保存下来，关闭(清除)本地中断
+ * */
 #define local_irq_save(x)	__asm__ __volatile__("pushfl ; popl %0 ; cli":"=g" (x): /* no input */ :"memory")
 
 /*

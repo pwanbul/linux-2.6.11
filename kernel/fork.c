@@ -503,6 +503,7 @@ fail_nocontext:
 	return retval;
 }
 
+// 复制fs_struct
 static inline struct fs_struct *__copy_fs_struct(struct fs_struct *old)
 {
 	struct fs_struct *fs = kmem_cache_alloc(fs_cachep, GFP_KERNEL);
@@ -575,7 +576,7 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 		goto out;
 
 	if (clone_flags & CLONE_FILES) {
-		atomic_inc(&oldf->count);
+		atomic_inc(&oldf->count);		// 引用加1
 		goto out;
 	}
 
@@ -595,8 +596,8 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 
 	spin_lock_init(&newf->file_lock);
 	newf->next_fd	    = 0;
-	newf->max_fds	    = NR_OPEN_DEFAULT;
-	newf->max_fdset	    = __FD_SETSIZE;         // sys_select
+	newf->max_fds	    = NR_OPEN_DEFAULT;			// 32
+	newf->max_fdset	    = __FD_SETSIZE;         // 1024
 	newf->close_on_exec = &newf->close_on_exec_init;
 	newf->open_fds	    = &newf->open_fds_init;
 	newf->fd	    = &newf->fd_array[0];
@@ -607,8 +608,8 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 	expand = 0;
 
 	/*
-	 * Check whether we need to allocate a larger fd array or fd set.
-	 * Note: we're not a clone task, so the open count won't  change.
+	 * 检查我们是否需要分配更大的 fd 数组或 fd 集.
+	 * 注意：我们不是克隆任务，所以打开计数不会改变。
 	 */
 	if (open_files > newf->max_fdset) {
 		newf->max_fdset = 0;
@@ -1188,7 +1189,7 @@ long do_fork(
 		 */
 		if (clone_flags & CLONE_VFORK) {
 			p->vfork_done = &vfork;		// 完成机制（completions mechanism）
-			init_completion(&vfork);        // 初始化完成体，即初始化等待队列头
+			init_completion(&vfork);        // 初始化完成体，即初始化等待队列头，done初始化为0
 		}
 
 		if ((p->ptrace & PT_PTRACED) || (clone_flags & CLONE_STOPPED)) {

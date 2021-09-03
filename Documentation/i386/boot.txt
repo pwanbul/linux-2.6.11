@@ -4,41 +4,29 @@
 		    H. Peter Anvin <hpa@zytor.com>
 			Last update 2002-01-01
 
-On the i386 platform, the Linux kernel uses a rather complicated boot
-convention.  This has evolved partially due to historical aspects, as
-well as the desire in the early days to have the kernel itself be a
-bootable image, the complicated PC memory model and due to changed
-expectations in the PC industry caused by the effective demise of
-real-mode DOS as a mainstream operating system.
+在i386平台上，Linux内核使用了相当复杂的启动约定。这种变化的部分原因是历史悠久的历史，
+以及在早期，人们希望将内核本身作为可引导映像，复杂的PC内存模型以及由于实际的有效淘汰
+而导致PC行业的期望发生了变化。模式DOS作为主流操作系统。
 
-Currently, four versions of the Linux/i386 boot protocol exist.
+当前，存在四个版本的Linuxi386引导协议。
 
-Old kernels:	zImage/Image support only.  Some very early kernels
-		may not even support a command line.
+旧内核：仅zImage/Image支持。一些非常早期的内核甚至可能不支持命令行。
 
-Protocol 2.00:	(Kernel 1.3.73) Added bzImage and initrd support, as
-		well as a formalized way to communicate between the
-		boot loader and the kernel.  setup.S made relocatable,
-		although the traditional setup area still assumed
-		writable.
+Protocol 2.00:	（内核1.3.73）添加了bzImage和initrd支持，以及一种在
+引导加载程序和内核之间进行通信的形式化方法。尽管传统的设置区域仍可写，但可以重新设置。
 
-Protocol 2.01:	(Kernel 1.3.76) Added a heap overrun warning.
+Protocol 2.01:	（内核1.3.76）添加了堆溢出警告。
 
-Protocol 2.02:	(Kernel 2.4.0-test3-pre3) New command line protocol.
-		Lower the conventional memory ceiling.	No overwrite
-		of the traditional setup area, thus making booting
-		safe for systems which use the EBDA from SMM or 32-bit
-		BIOS entry points.  zImage deprecated but still
-		supported.
+Protocol 2.02:	（内核2.4.0-test3-pre3）新的命令行协议。降低常规内存上限。
+不会覆盖传统的设置区域，因此对于使用来自SMM或32位BIOS入口点的EBDA的系统而言，引导安全。
+zImage已弃用，但仍受支持。
 
-Protocol 2.03:	(Kernel 2.4.18-pre1) Explicitly makes the highest possible
-		initrd address available to the bootloader.
+Protocol 2.03:	（内核2.4.18-pre1）明确地使引导加载程序使用尽可能高的initrd地址。
 
 
-**** MEMORY LAYOUT
+**** 内存布局
 
-The traditional memory map for the kernel loader, used for Image or
-zImage kernels, typically looks like:
+用于Image或zImage内核的内核加载器的传统内存映射通常如下所示：
 
 	|			 |
 0A0000	+------------------------+
@@ -50,7 +38,7 @@ zImage kernels, typically looks like:
 090200	+------------------------+
 	|  Kernel boot sector	 |	The kernel legacy boot sector.
 090000	+------------------------+
-	|  Protected-mode kernel |	The bulk of the kernel image.
+	|  Protected-mode kernel |	内核映像的大部分。
 010000	+------------------------+
 	|  Boot loader		 |	<- Boot sector entry point 0000:7C00
 001000	+------------------------+
@@ -58,45 +46,28 @@ zImage kernels, typically looks like:
 000800	+------------------------+
 	|  Typically used by MBR |
 000600	+------------------------+ 
-	|  BIOS use only	 |
+	|  BIOS use only	         |      BIOS中断向量表(1K) 与 硬件信息(256B)
 000000	+------------------------+
 
 
-When using bzImage, the protected-mode kernel was relocated to
-0x100000 ("high memory"), and the kernel real-mode block (boot sector,
-setup, and stack/heap) was made relocatable to any address between
-0x10000 and end of low memory.	Unfortunately, in protocols 2.00 and
-2.01 the command line is still required to live in the 0x9XXXX memory
-range, and that memory range is still overwritten by the early kernel.
-The 2.02 protocol resolves that problem.
+当使用bzImage时，保护模式内核被重定位到0x100000（“高内存”），并且内核实模式块（boot sector,setup, and stack/heap）
+可重定位到0x10000到低内存末尾之间的任何地址。不幸的是，在协议2.00和2.01中，仍要求命令行位于0x9XXXX内存范围内，
+并且该内存范围仍被早期内核覆盖。 2.02协议解决了该问题。
 
-It is desirable to keep the "memory ceiling" -- the highest point in
-low memory touched by the boot loader -- as low as possible, since
-some newer BIOSes have begun to allocate some rather large amounts of
-memory, called the Extended BIOS Data Area, near the top of low
-memory.	 The boot loader should use the "INT 12h" BIOS call to verify
-how much low memory is available.
+最好保持“内存上限”（即引导加载程序触及的低内存最高点）尽可能低，因为某些较新的BIOS已开始分配一些相当大的内存，称为扩展BIOS数据。
+低内存顶部附近的区域。引导加载程序应使用“ INT 12h” BIOS调用来验证有多少可用的低内存。
 
-Unfortunately, if INT 12h reports that the amount of memory is too
-low, there is usually nothing the boot loader can do but to report an
-error to the user.  The boot loader should therefore be designed to
-take up as little space in low memory as it reasonably can.  For
-zImage or old bzImage kernels, which need data written into the
-0x90000 segment, the boot loader should make sure not to use memory
-above the 0x9A000 point; too many BIOSes will break above that point.
+不幸的是，如果INT 12h报告内存量太低，则引导加载程序通常无法执行任何操作，只能向用户报告错误。
+因此，引导加载程序应设计为在低内存中占用尽可能少的空间。对于需要将数据写入0x90000段的zImage或旧的bzImage内核，
+引导加载程序应确保不要使用大于0x9A000点的内存；太多的BIOS将超过该点。
 
 
 **** THE REAL-MODE KERNEL HEADER
 
-In the following text, and anywhere in the kernel boot sequence, "a
-sector" refers to 512 bytes.  It is independent of the actual sector
-size of the underlying medium.
+在下文中，以及在内核引导序列中的任何位置，“扇区”均指512个字节。它与基础介质的实际扇区大小无关。
 
-The first step in loading a Linux kernel should be to load the
-real-mode code (boot sector and setup code) and then examine the
-following header at offset 0x01f1.  The real-mode code can total up to
-32K, although the boot loader may choose to load only the first two
-sectors (1K) and then examine the bootup sector size.
+加载Linux内核的第一步应该是加载实模式代码（boot sector and setup code），然后检查偏移量0x01f1处的以下标头。
+尽管引导加载程序可以选择仅加载前两个扇区（1K），然后检查引导扇区的大小，但是实模式代码的总和最多为32K。
 
 The header looks like:
 
@@ -129,43 +100,27 @@ Offset	Proto	Name		Meaning
 0228/4	2.02+	cmd_line_ptr	32-bit pointer to the kernel command line
 022C/4	2.03+	initrd_addr_max	Highest legal initrd address
 
-For backwards compatibility, if the setup_sects field contains 0, the
-real value is 4.
+为了向后兼容，如果setup_sects字段包含0，则实际值为4。
 
-If the "HdrS" (0x53726448) magic number is not found at offset 0x202,
-the boot protocol version is "old".  Loading an old kernel, the
-following parameters should be assumed:
+如果在偏移量0x202处找不到“ HdrS”（0x53726448）幻数，则引导协议版本为“旧”。加载旧内核时，应假定以下参数：
 
 	Image type = zImage
 	initrd not supported
 	Real-mode kernel must be located at 0x90000.
 
-Otherwise, the "version" field contains the protocol version,
-e.g. protocol version 2.01 will contain 0x0201 in this field.  When
-setting fields in the header, you must make sure only to set fields
-supported by the protocol version in use.
+否则，“版本”字段包含协议版本，例如协议版本2.01在此字段中将包含0x0201。在标题中设置字段时，必须确保仅设置使用的协议版本支持的字段。
 
-The "kernel_version" field, if set to a nonzero value, contains a
-pointer to a null-terminated human-readable kernel version number
-string, less 0x200.  This can be used to display the kernel version to
-the user.  This value should be less than (0x200*setup_sects).  For
-example, if this value is set to 0x1c00, the kernel version number
-string can be found at offset 0x1e00 in the kernel file.  This is a
-valid value if and only if the "setup_sects" field contains the value
-14 or higher.
+如果将“ kernel_version”字段设置为非零值，则该字段包含指向以null终止的人类可读内核版本号字符串的指针，该字符串应小于0x200。
+这可以用来向用户显示内核版本。此值应小于（0x200*setup_sects）。例如，如果此值设置为0x1c00，则可以在内核文件中的偏移量0x1e00处找
+到内核版本号字符串。仅当“ setup_sects”字段包含值14或更高时，才是有效值。
 
-Most boot loaders will simply load the kernel at its target address
-directly.  Such boot loaders do not need to worry about filling in
-most of the fields in the header.  The following fields should be
-filled out, however:
+大多数引导加载程序会直接将内核直接加载到其目标地址。这样的引导加载程序无需担心填写标题中的大多数字段。但是，应填写以下字段：
 
   vid_mode:
 	Please see the section on SPECIAL COMMAND LINE OPTIONS.
 
   type_of_loader:
-	If your boot loader has an assigned id (see table below), enter
-	0xTV here, where T is an identifier for the boot loader and V is
-	a version number.  Otherwise, enter 0xFF here.
+	如果引导加载程序具有分配的ID（请参见下表），请在此处输入0xTV，其中T是引导加载程序的标识符，而V是版本号。否则，请在此处输入0xFF。
 
 	Assigned boot loader ids:
 	0  LILO
@@ -181,10 +136,8 @@ filled out, however:
 	value assigned.
 
   loadflags, heap_end_ptr:
-	If the protocol version is 2.01 or higher, enter the
-	offset limit of the setup heap into heap_end_ptr and set the
-	0x80 bit (CAN_USE_HEAP) of loadflags.  heap_end_ptr appears to
-	be relative to the start of setup (offset 0x0200).
+	如果协议版本为2.01或更高版本，则将设置堆的偏移量限制输入heap_end_ptr中，并设置loadflags的0x80位（CAN_USE_HEAP）。
+	heap_end_ptr似乎是相对于安装开始的（偏移量0x0200）。
 
   setup_move_size: 
 	When using protocol 2.00 or 2.01, if the real mode
@@ -225,17 +178,11 @@ filled out, however:
 
 **** THE KERNEL COMMAND LINE
 
-The kernel command line has become an important way for the boot
-loader to communicate with the kernel.  Some of its options are also
-relevant to the boot loader itself, see "special command line options"
-below.
+内核命令行已成为引导加载程序与内核通信的重要方式。它的某些选项也与引导加载程序本身有关，请参见下面的“特殊命令行选项”。
 
-The kernel command line is a null-terminated string up to 255
-characters long, plus the final null.
+内核命令行是一个以NULL终止的字符串，最长255个字符，外加最后一个null。
 
-If the boot protocol version is 2.02 or later, the address of the
-kernel command line is given by the header field cmd_line_ptr (see
-above.)
+如果引导协议版本为2.02或更高版本，则内核命令行的地址由标头字段cmd_line_ptr给出（请参见上文）。
 
 If the protocol version is *not* 2.02 or higher, the kernel
 command line is entered using the following protocol:

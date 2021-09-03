@@ -113,7 +113,7 @@ struct sock_common {
 };
 
 /**
-  *	struct sock - network layer representation of sockets
+  *	struct sock - 套接字的网络层表示
   *	@__sk_common - shared layout with tcp_tw_bucket
   *	@sk_zapped - ax25 & ipx means !linked
   *	@sk_shutdown - mask of %SEND_SHUTDOWN and/or %RCV_SHUTDOWN
@@ -197,7 +197,7 @@ struct sock {
 	unsigned char		sk_userlocks;
 	socket_lock_t		sk_lock;
 	int			sk_rcvbuf;
-	wait_queue_head_t	*sk_sleep;
+	wait_queue_head_t	*sk_sleep;          // 套接字等待队列
 	struct dst_entry	*sk_dst_cache;
 	rwlock_t		sk_dst_lock;
 	struct xfrm_policy	*sk_policy[2];

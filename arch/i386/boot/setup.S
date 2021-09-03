@@ -309,7 +309,7 @@ loader_ok:
 
 meme820:
     # 1. setup.S代码被搬移到0x90000处。此时CS=DS=0x9000，处于实模式
-	xorl	%ebx, %ebx			# 连续计数器清0
+	xorl	%ebx, %ebx			# 连续计数器清0，ebx应该会被BIOS的0x15中断处理程序修改
 	# 2. 将0x9000:0x2d0(物理地址0x902d0)，赋值给di，结果将会保存在这里
 	movw	$E820MAP, %di			# point into the whitelist
 						# so we can have the bios

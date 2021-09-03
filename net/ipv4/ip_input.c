@@ -264,7 +264,7 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 }
 
 /*
- * 	Deliver IP Packets to the higher protocol layers.
+ * 	将 IP 数据包传送到更高的协议层。
  */ 
 int ip_local_deliver(struct sk_buff *skb)
 {
@@ -282,14 +282,17 @@ int ip_local_deliver(struct sk_buff *skb)
 		       ip_local_deliver_finish);
 }
 
+/* 决定分组的去向
+ * 1. 交付到传输层
+ * 2. 交付路由器转发出去
+ * */
 static inline int ip_rcv_finish(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 	struct iphdr *iph = skb->nh.iph;
 
 	/*
-	 *	Initialise the virtual path cache for the packet. It describes
-	 *	how the packet travels inside Linux networking.
+	 *	初始化数据包的虚拟路径缓存。它描述了数据包如何在 Linux 网络中传输。
 	 */ 
 	if (skb->dst == NULL) {
 		if (ip_route_input(skb, iph->daddr, iph->saddr, iph->tos, dev))
@@ -306,7 +309,7 @@ static inline int ip_rcv_finish(struct sk_buff *skb)
 		st[(idx>>16)&0xFF].i_bytes+=skb->len;
 	}
 #endif
-
+	// 是否有选项
 	if (iph->ihl > 5) {
 		struct ip_options *opt;
 
@@ -355,14 +358,14 @@ drop:
 }
 
 /*
- * 	Main IP Receive routine.
+ * 	主IP接收例程。
+ * 	接收到ipv4分组时出入该接口
  */ 
 int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 {
-	struct iphdr *iph;
+	struct iphdr *iph;		// ipv4首部指针
 
-	/* When the interface is in promisc. mode, drop all the crap
-	 * that it receives, do not try to analyse it.
+	/* 当接口处于 promisc 状态时。模式，丢弃它收到的所有垃圾，不要试图分析它。
 	 */
 	if (skb->pkt_type == PACKET_OTHERHOST)
 		goto drop;
@@ -390,6 +393,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 	 *	4.	Doesn't have a bogus length
 	 */
 
+	// 首部小于5*4字节，或者是非ipv4版本，返回
 	if (iph->ihl < 5 || iph->version != 4)
 		goto inhdr_error; 
 
@@ -416,7 +420,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 				skb->ip_summed = CHECKSUM_NONE;
 		}
 	}
-
+	// 通过NF_HOOK调用ip_rcv_finish
 	return NF_HOOK(PF_INET, NF_IP_PRE_ROUTING, skb, dev, NULL,
 		       ip_rcv_finish);
 

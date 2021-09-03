@@ -5,6 +5,7 @@
 #include <linux/config.h>
 
 #ifndef HAVE_ARCH_BUG
+// bug log
 #define BUG() do { \
 	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
 	panic("BUG!"); \
@@ -12,6 +13,7 @@
 #endif
 
 #ifndef HAVE_ARCH_PAGE_BUG
+// page bug log
 #define PAGE_BUG(page) do { \
 	printk("page BUG for page at %p\n", page); \
 	BUG(); \
@@ -23,6 +25,7 @@
 #endif
 
 #ifndef HAVE_ARCH_WARN_ON
+// warning log
 #define WARN_ON(condition) do { \
 	if (unlikely((condition)!=0)) { \
 		printk("Badness in %s at %s:%d\n", __FUNCTION__, __FILE__, __LINE__); \

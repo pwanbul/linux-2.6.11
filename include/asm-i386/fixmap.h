@@ -33,26 +33,21 @@
 #endif
 
 /*
- * Here we define all the compile-time 'special' virtual
- * addresses. The point is to have a constant address at
- * compile time, but to set the physical address only
- * in the boot process. We allocate these special addresses
- * from the end of virtual memory (0xfffff000) backwards.
- * Also this lets us do fail-safe vmalloc(), we
- * can guarantee that these special addresses and
- * vmalloc()-ed addresses never overlap.
+ * 在这里，我们定义了所有编译时“特殊”虚拟地址。
+ *重点是在编译时有一个常量地址，但只在引导过程中设置物理地址。
+ * 我们从虚拟内存的末尾（0xfffff000）向后分配这些特殊地址。
+ * 这也让我们可以做故障安全的 vmalloc()，
+ * 我们可以保证这些特殊地址和 vmalloc() ed 地址永远不会重叠。
  *
- * these 'compile-time allocated' memory buffers are
- * fixed-size 4k pages. (or larger if used with an increment
- * highger than 1) use fixmap_set(idx,phys) to associate
- * physical memory with fixmap indices.
+ * 这些“编译时分配”内存缓冲区是固定大小的 4k 页。
+ * （或更大，如果使用的增量大于 1）使用 fixmap_set(idx,phys)
+ * 将物理内存与 fixmap 索引相关联。
  *
- * TLB entries of such buffers will not be flushed across
- * task switches.
+ * 此类缓冲区的 TLB 条目不会在任务切换之间刷新。
  */
 enum fixed_addresses {
-	FIX_HOLE,
-	FIX_VSYSCALL,
+	FIX_HOLE,                       // 0
+	FIX_VSYSCALL,                   // 1
 #ifdef CONFIG_X86_LOCAL_APIC
 	FIX_APIC_BASE,	/* local (CPU) APIC) -- required for SMP or not */
 #endif
@@ -72,9 +67,9 @@ enum fixed_addresses {
 #ifdef CONFIG_X86_CYCLONE_TIMER
 	FIX_CYCLONE_TIMER, /*cyclone timer register*/
 #endif 
-#ifdef CONFIG_HIGHMEM
-	FIX_KMAP_BEGIN,	/* reserved pte's for temporary kernel mappings */
-	FIX_KMAP_END = FIX_KMAP_BEGIN+(KM_TYPE_NR*NR_CPUS)-1,
+#ifdef CONFIG_HIGHMEM       // 配置的high memory
+	FIX_KMAP_BEGIN,	/* reserved pte's for temporary kernel mappings */      // 2
+	FIX_KMAP_END = FIX_KMAP_BEGIN+(KM_TYPE_NR*NR_CPUS)-1,       //  FIX_KMAP_BEGIN + (13*NR_CPUS)-1, 14
 #endif
 #ifdef CONFIG_ACPI_BOOT
 	FIX_ACPI_BEGIN,
@@ -83,13 +78,13 @@ enum fixed_addresses {
 #ifdef CONFIG_PCI_MMCONFIG
 	FIX_PCIE_MCFG,
 #endif
-	__end_of_permanent_fixed_addresses,
+	__end_of_permanent_fixed_addresses,     // 假设除了CONFIG_HIGHMEM之外，其他都没配置，那么等于 15
 	/* temporary boot-time mappings, used before ioremap() is functional */
 #define NR_FIX_BTMAPS	16
-	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
-	FIX_BTMAP_BEGIN = FIX_BTMAP_END + NR_FIX_BTMAPS - 1,
-	FIX_WP_TEST,
-	__end_of_fixed_addresses
+	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,     // 15
+	FIX_BTMAP_BEGIN = FIX_BTMAP_END + NR_FIX_BTMAPS - 1,        // 30
+	FIX_WP_TEST,        // 41
+	__end_of_fixed_addresses        // 42
 };
 
 extern void __set_fixmap (enum fixed_addresses idx,
@@ -106,7 +101,7 @@ extern void __set_fixmap (enum fixed_addresses idx,
 #define clear_fixmap(idx) \
 		__set_fixmap(idx, 0, __pgprot(0))
 
-#define FIXADDR_TOP	((unsigned long)__FIXADDR_TOP)
+#define FIXADDR_TOP	((unsigned long)__FIXADDR_TOP)      // 0xfffff000
 
 #define __FIXADDR_SIZE	(__end_of_permanent_fixed_addresses << PAGE_SHIFT)
 #define __FIXADDR_BOOT_SIZE	(__end_of_fixed_addresses << PAGE_SHIFT)
@@ -127,9 +122,11 @@ extern void __set_fixmap (enum fixed_addresses idx,
 extern void __this_fixmap_does_not_exist(void);
 
 /*
- * 'index to address' translation. If anyone tries to use the idx
- * directly without tranlation, we catch the bug with a NULL-deference
- * kernel oops. Illegal ranges of incoming indices are caught too.
+ * “索引到地址”翻译。如果有人试图直接使用 idx 而不进行翻译，
+ * 我们会使用 NULL-deference kernel oops 来捕获错误。
+ * 传入索引的非法范围也被捕获。
+ *
+ * idx在enum fixed_address中定义，转换为addr
  */
 static __always_inline unsigned long fix_to_virt(const unsigned int idx)
 {

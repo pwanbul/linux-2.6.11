@@ -209,33 +209,35 @@ asmlinkage unsigned long sys_brk(unsigned long brk)
 	unsigned long newbrk, oldbrk;
 	struct mm_struct *mm = current->mm;
 
-	down_write(&mm->mmap_sem);
+	down_write(&mm->mmap_sem);		// 信号量
 
-	if (brk < mm->end_code)
+	if (brk < mm->end_code)		// 请求的地址地址比end_code还要小，不允许
 		goto out;
-	newbrk = PAGE_ALIGN(brk);
-	oldbrk = PAGE_ALIGN(mm->brk);
-	if (oldbrk == newbrk)
+	newbrk = PAGE_ALIGN(brk);		// 请求的地址向上对齐，即下一个页的起始地址
+	oldbrk = PAGE_ALIGN(mm->brk);		// 当前地址向上对齐
+	if (oldbrk == newbrk)		// 相等说明，请求的地址和当前的地址在同一个页中
 		goto set_brk;
-
+	
+	// 请求的地址和当前的地址不在同一个页中，可能会有两种情况
 	/* Always allow shrinking brk. */
-	if (brk <= mm->brk) {
-		if (!do_munmap(mm, newbrk, oldbrk-newbrk))
+	if (brk <= mm->brk) {		// 请求的地址在当前地址的前一个页中
+		if (!do_munmap(mm, newbrk, oldbrk-newbrk))		// 释放当前地址所在的页
 			goto set_brk;
 		goto out;
 	}
-
+	
+	// 请求的地址在当前地址的后一个页中，此时需要新加一页
 	/* Check against rlimit.. */
-	rlim = current->signal->rlim[RLIMIT_DATA].rlim_cur;
+	rlim = current->signal->rlim[RLIMIT_DATA].rlim_cur;		// 检查resource limit，RLIMIT_DATA的限制从start_data到brk的大小
 	if (rlim < RLIM_INFINITY && brk - mm->start_data > rlim)
 		goto out;
 
-	/* Check against existing mmap mappings. */
+	/* Check against existing mmap mappings. */			// 检查是否与其他vma重叠
 	if (find_vma_intersection(mm, oldbrk, newbrk+PAGE_SIZE))
 		goto out;
 
 	/* Ok, looks good - let it rip. */
-	if (do_brk(oldbrk, newbrk-oldbrk) != oldbrk)
+	if (do_brk(oldbrk, newbrk-oldbrk) != oldbrk)		// 分配新的一页
 		goto out;
 set_brk:
 	mm->brk = brk;
@@ -858,9 +860,10 @@ void __vm_stat_account(struct mm_struct *mm, unsigned long flags,
 #endif /* CONFIG_PROC_FS */
 
 /*
- * The caller must hold down_write(current->mm->mmap_sem).
+ * 调用者必须按住 down_write(current->mm->mmap_sem)。
+ *
+ * mmap核心
  */
-
 unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 			unsigned long len, unsigned long prot,
 			unsigned long flags, unsigned long pgoff)
@@ -887,10 +890,9 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 			return -EPERM;
 	}
 	/*
-	 * Does the application expect PROT_READ to imply PROT_EXEC?
+	 * 应用程序是否希望 PROT_READ 暗示 PROT_EXEC？
 	 *
-	 * (the exception is when the underlying filesystem is noexec
-	 *  mounted, in which case we dont add PROT_EXEC.)
+	 * （例外情况是当底层文件系统没有挂载时，我们不添加 PROT_EXEC。）
 	 */
 	if ((prot & PROT_READ) && (current->personality & READ_IMPLIES_EXEC))
 		if (!(file && (file->f_vfsmnt->mnt_flags & MNT_NOEXEC)))
@@ -900,21 +902,23 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 		return addr;
 
 	/* Careful about overflows.. */
-	len = PAGE_ALIGN(len);
+	//
+	len = PAGE_ALIGN(len);		// 向上对齐
 	if (!len || len > TASK_SIZE)
 		return -EINVAL;
 
-	/* offset overflow? */
+	/* 偏移溢出？ */
 	if ((pgoff + (len >> PAGE_SHIFT)) < pgoff)
 		return -EINVAL;
 
 	/* Too many mappings? */
+	// 检查mmap上限
 	if (mm->map_count > sysctl_max_map_count)
 		return -ENOMEM;
 
-	/* Obtain the address to map to. we verify (or select) it and ensure
-	 * that it represents a valid section of the address space.
+	/* 获取要映射到的地址。我们验证（或选择）它并确保它代表地址空间的有效部分。
 	 */
+	// 返回一个合适的addr
 	addr = get_unmapped_area(file, addr, len, pgoff, flags);
 	if (addr & ~PAGE_MASK)
 		return addr;
@@ -923,6 +927,8 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	 * to. we assume access permissions have been handled by the open
 	 * of the memory object, so we don't do any here.
 	 */
+	// MAP_和PROT_汇总成VM_
+	// do_mlockall把mm->def_flags设置为VM_LOCKED，默认0
 	vm_flags = calc_vm_prot_bits(prot) | calc_vm_flag_bits(flags) |
 			mm->def_flags | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
 
@@ -942,7 +948,8 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	}
 
 	inode = file ? file->f_dentry->d_inode : NULL;
-
+	
+	// 文件映射
 	if (file) {
 		switch (flags & MAP_TYPE) {
 		case MAP_SHARED:
@@ -975,7 +982,9 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 		default:
 			return -EINVAL;
 		}
-	} else {
+	}
+	// 匿名映射
+	else {
 		switch (flags & MAP_TYPE) {
 		case MAP_SHARED:
 			vm_flags |= VM_SHARED | VM_MAYSHARE;
@@ -1143,16 +1152,17 @@ unacct_error:
 
 EXPORT_SYMBOL(do_mmap_pgoff);
 
-/* Get an address range which is currently unmapped.
- * For shmat() with addr=0.
+/* 获取当前未映射的地址范围。
+ * 对于 addr=0 的 shmat()。
  *
- * Ugly calling convention alert:
- * Return value with the low bits set means error value,
- * ie
+ * 丑陋的调用约定警报：
+ * 低位设置的返回值表示错误值，即
  *	if (ret & ~PAGE_MASK)
  *		error = ret;
  *
- * This function "knows" that -ENOMEM has the bits set.
+ * 此函数“知道”-ENOMEM 已设置位。
+ *
+ * 在unmapped area中找一个能容纳下addr+len的区域，返回addr
  */
 #ifndef HAVE_ARCH_UNMAPPED_AREA
 unsigned long
@@ -1162,27 +1172,30 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 	unsigned long start_addr;
-
+	
+	// 超限
 	if (len > TASK_SIZE)
 		return -ENOMEM;
-
+	
+	// 优先选择的地址
 	if (addr) {
-		addr = PAGE_ALIGN(addr);
-		vma = find_vma(mm, addr);
-		if (TASK_SIZE - len >= addr &&
-		    (!vma || addr + len <= vma->vm_start))
+		addr = PAGE_ALIGN(addr);	// 向上对齐
+		vma = find_vma(mm, addr);	// 返回的vma与addr的关系有两种
+		if (TASK_SIZE - len >= addr &&		// addr+len不能超过TASK_SIZE
+		    (!vma || addr + len <= vma->vm_start))		// addr~addr+len这片区域不能和现有的vma的相交/包含
 			return addr;
 	}
-	start_addr = addr = mm->free_area_cache;
+	start_addr = addr = mm->free_area_cache;		// free_area_cache的初始值为mmap的基地址
 
 full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (TASK_SIZE - len < addr) {
 			/*
-			 * Start a new search - just in case we missed
-			 * some holes.
-			 */
+			 * 开始新的搜索 - 以防万一我们错过了一些漏洞。
+			 * 首次find_vma时是从free_area_cache开始的，而free_area_cache不一定等于TASK_UNMAPPED_BASE
+ 			 * 每次都从free_area_cache开始搜索，如果TASK_SIZE - len < addr且start_addr != TASK_UNMAPPED_BASE重新开始搜索
+ 			 * */
 			if (start_addr != TASK_UNMAPPED_BASE) {
 				start_addr = addr = TASK_UNMAPPED_BASE;
 				goto full_search;
@@ -1191,29 +1204,31 @@ full_search:
 		}
 		if (!vma || addr + len <= vma->vm_start) {
 			/*
-			 * Remember the place where we stopped the search:
+			 * 记住我们停止搜索的地方：
 			 */
-			mm->free_area_cache = addr + len;
+			mm->free_area_cache = addr + len;		// 更新起始搜索地址
 			return addr;
 		}
 		addr = vma->vm_end;
 	}
 }
-#endif	
+#endif
 
+// 释放mmap区域中一个VMA
 void arch_unmap_area(struct vm_area_struct *area)
 {
 	/*
-	 * Is this a new hole at the lowest possible address?
+	 * 这是在尽可能低的地址上的新洞吗？
+	 * 要尽量使得开始搜索的起始地址free_area_cache尽可能的地址
 	 */
-	if (area->vm_start >= TASK_UNMAPPED_BASE &&
-			area->vm_start < area->vm_mm->free_area_cache)
+	if (area->vm_start >= TASK_UNMAPPED_BASE && area->vm_start < area->vm_mm->free_area_cache)
 		area->vm_mm->free_area_cache = area->vm_start;
 }
 
 /*
- * This mmap-allocator allocates new areas top-down from below the
- * stack's low limit (the base):
+ * 这个 mmap 分配器从堆栈的下限（基数）以下自上而下分配新区域：
+ *
+ * 自顶向下的
  */
 #ifndef HAVE_ARCH_UNMAPPED_AREA_TOPDOWN
 unsigned long
@@ -1226,15 +1241,15 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 	unsigned long base = mm->mmap_base, addr = addr0;
 	int first_time = 1;
 
-	/* requested length too big for entire address space */
+	/* 请求的长度对于整个地址空间来说太大 */
 	if (len > TASK_SIZE)
 		return -ENOMEM;
 
-	/* dont allow allocations above current base */
+	/* 不允许分配高于当前基数 */
 	if (mm->free_area_cache > base)
 		mm->free_area_cache = base;
 
-	/* requesting a specific address */
+	/* 请求特定地址，同自底向上 */
 	if (addr) {
 		addr = PAGE_ALIGN(addr);
 		vma = find_vma(mm, addr);
@@ -1244,41 +1259,37 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 	}
 
 try_again:
-	/* make sure it can fit in the remaining address space */
-	if (mm->free_area_cache < len)
+	/* 确保它可以适应剩余的地址空间 */
+	if (mm->free_area_cache < len)		// mm->free_area_cache - 0 < len
 		goto fail;
 
-	/* either no address requested or cant fit in requested address hole */
+	/* 未请求地址或无法放入请求的地址hole */
 	addr = (mm->free_area_cache - len) & PAGE_MASK;
 	do {
 		/*
-		 * Lookup failure means no vma is above this address,
-		 * i.e. return with success:
+		 * 查找失败意味着没有 vma 高于此地址，即成功返回:
 		 */
  	 	if (!(vma = find_vma_prev(mm, addr, &prev_vma)))
 			return addr;
 
 		/*
-		 * new region fits between prev_vma->vm_end and
-		 * vma->vm_start, use it:
+		 * 新区域适合在prev_vma->vm_end和vma->vm_start之间，使用它：
 		 */
-		if (addr+len <= vma->vm_start &&
-				(!prev_vma || (addr >= prev_vma->vm_end)))
-			/* remember the address as a hint for next time */
+		if (addr+len <= vma->vm_start && (!prev_vma || (addr >= prev_vma->vm_end)))
+			/* 记住地址作为下次提示 */
 			return (mm->free_area_cache = addr);
 		else
-			/* pull free_area_cache down to the first hole */
+			/* 将 free_area_cache 拉到第一个洞 */
 			if (mm->free_area_cache == vma->vm_end)
 				mm->free_area_cache = vma->vm_start;
 
-		/* try just below the current vma->vm_start */
+		/* 尝试在当前 vma->vm_start 下方 */
 		addr = vma->vm_start-len;
-	} while (len <= vma->vm_start);
+	} while (len <= vma->vm_start);		// len <= vma->vm_start - 0
 
 fail:
 	/*
-	 * if hint left us with no space for the requested
-	 * mapping then try again:
+	 * 如果提示让我们没有空间用于请求的映射，请重试：
 	 */
 	if (first_time) {
 		mm->free_area_cache = base;
@@ -1286,15 +1297,14 @@ fail:
 		goto try_again;
 	}
 	/*
-	 * A failed mmap() very likely causes application failure,
-	 * so fall back to the bottom-up function here. This scenario
-	 * can happen with large stack limits and large mmap()
-	 * allocations.
+	 * 失败的mmap()很可能会导致应用程序失败，
+	 * 所以这里回到自底向上的函数。
+	 * 这种情况可能发生在较大的堆栈限制和较大的 mmap() 分配中。
 	 */
 	mm->free_area_cache = TASK_UNMAPPED_BASE;
 	addr = arch_get_unmapped_area(filp, addr0, len, pgoff, flags);
 	/*
-	 * Restore the topdown base:
+	 * 恢复自上而下的基地址:
 	 */
 	mm->free_area_cache = base;
 
@@ -1302,15 +1312,18 @@ fail:
 }
 #endif
 
+// 自顶向下的
 void arch_unmap_area_topdown(struct vm_area_struct *area)
 {
 	/*
-	 * Is this a new hole at the highest possible address?
+	 * 这是在尽可能高的地址上的新洞吗？
+	 * 尽可能的从高地址开始找
 	 */
 	if (area->vm_end > area->vm_mm->free_area_cache)
 		area->vm_mm->free_area_cache = area->vm_end;
 }
 
+// do_mmap_pgoff中调用
 unsigned long
 get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 		unsigned long pgoff, unsigned long flags)
@@ -1324,15 +1337,12 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 			return -EINVAL;
 		if (file && is_file_hugepages(file))  {
 			/*
-			 * Check if the given range is hugepage aligned, and
-			 * can be made suitable for hugepages.
+			 * 检查给定的范围是否是大页对齐的，并且可以使其适合大页。
 			 */
 			ret = prepare_hugepage_range(addr, len);
 		} else {
 			/*
-			 * Ensure that a normal request is not falling in a
-			 * reserved hugepage range.  For some archs like IA-64,
-			 * there is a separate region for hugepages.
+			 * 确保正常请求不在保留的大页面范围内。对于像 IA-64 这样的一些arch，有一个单独的大页面区域。
 			 */
 			ret = is_hugepage_only_range(addr, len);
 		}
@@ -1342,45 +1352,51 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 	}
 
 	if (file && file->f_op && file->f_op->get_unmapped_area)
-		return file->f_op->get_unmapped_area(file, addr, len,
-						pgoff, flags);
+		return file->f_op->get_unmapped_area(file, addr, len, pgoff, flags);
 
 	return current->mm->get_unmapped_area(file, addr, len, pgoff, flags);
 }
 
 EXPORT_SYMBOL(get_unmapped_area);
 
-/* Look up the first VMA which satisfies  addr < vm_end,  NULL if none. */
+/* 查找第一个满足 addr < vm_end 的 VMA，如果没有则为 NULL。 */
 struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 {
 	struct vm_area_struct *vma = NULL;
 
 	if (mm) {
-		/* Check the cache first. */
-		/* (Cache hit rate is typically around 35%.) */
+		/* 首先检查缓存。 */
+		/* （缓存命中率通常在 35% 左右。）*/
 		vma = mm->mmap_cache;
+		// 如果能在mmap_cache中找到，则不会进入到if中，[)的区间
 		if (!(vma && vma->vm_end > addr && vma->vm_start <= addr)) {
 			struct rb_node * rb_node;
 
 			rb_node = mm->mm_rb.rb_node;
 			vma = NULL;
 
+
+			/*首先确定vma的结束地址是否大于给定地址，如果是的话，再确定
+			 * vma的起始地址是否小于给定地址，也就是优先保证给定的地址是
+			 * 处于vma的范围之内的，如果无法保证这点，则只能找到一个距离
+			 * 给定地址最近的vma并且该vma的结束地址要大于给定地址
+			 * */
 			while (rb_node) {
 				struct vm_area_struct * vma_tmp;
 
-				vma_tmp = rb_entry(rb_node,
-						struct vm_area_struct, vm_rb);
+				vma_tmp = rb_entry(rb_node, struct vm_area_struct, vm_rb);
 
+				// 如果只论查找的话，可以理解成在二叉查找树上搜索
 				if (vma_tmp->vm_end > addr) {
 					vma = vma_tmp;
 					if (vma_tmp->vm_start <= addr)
 						break;
-					rb_node = rb_node->rb_left;
+					rb_node = rb_node->rb_left;			// VMA高于addr，则从右节点开始找
 				} else
-					rb_node = rb_node->rb_right;
+					rb_node = rb_node->rb_right;		// VMA低于addr，则从右节点开始找
 			}
 			if (vma)
-				mm->mmap_cache = vma;
+				mm->mmap_cache = vma;		// 更新mmap_cache缓存
 		}
 	}
 	return vma;
@@ -1388,7 +1404,7 @@ struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 
 EXPORT_SYMBOL(find_vma);
 
-/* Same as find_vma, but also return a pointer to the previous VMA in *pprev. */
+/* 与 find_vma 相同，但还返回一个指向 pprev 中前一个 VMA 的指针. */
 struct vm_area_struct *
 find_vma_prev(struct mm_struct *mm, unsigned long addr,
 			struct vm_area_struct **pprev)
@@ -1879,9 +1895,9 @@ static inline void verify_mm_writelocked(struct mm_struct *mm)
 }
 
 /*
- *  this is really a simplified "do_mmap".  it only handles
- *  anonymous maps.  eventually we may be able to do some
- *  brk-specific accounting here.
+ *  这实际上是一个简化的“do_mmap”。
+ *  它只处理匿名映射。最终我们也许可以在
+ *  这里做一些特定于 brk 的会计。
  */
 unsigned long do_brk(unsigned long addr, unsigned long len)
 {

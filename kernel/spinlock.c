@@ -24,11 +24,12 @@ int __lockfunc generic_raw_read_trylock(rwlock_t *lock)
 }
 EXPORT_SYMBOL(generic_raw_read_trylock);
 
+// 实现spin_trylock
 int __lockfunc _spin_trylock(spinlock_t *lock)
 {
 	preempt_disable();
-	if (_raw_spin_trylock(lock))
-		return 1;
+	if (_raw_spin_trylock(lock))		// 为true表示获得了自旋锁
+		return 1;		// 在持有锁期间，抢占式关闭的
 	
 	preempt_enable();
 	return 0;
@@ -147,9 +148,10 @@ void __lockfunc _write_lock_bh(rwlock_t *lock)
 }
 EXPORT_SYMBOL(_write_lock_bh);
 
+// spin_lock实现
 void __lockfunc _spin_lock(spinlock_t *lock)
 {
-	preempt_disable();
+	preempt_disable();		// 关闭抢占
 	_raw_spin_lock(lock);
 }
 

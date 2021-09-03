@@ -47,12 +47,10 @@ static kmem_cache_t *dentry_cache;
 #define DNAME_INLINE_LEN (sizeof(struct dentry)-offsetof(struct dentry,d_iname))
 
 /*
- * This is the single most critical data structure when it comes
- * to the dcache: the hashtable for lookups. Somebody should try
- * to make this good - I've just made it work.
+ * 当涉及到 dcache 时，这是一个最关键的数据结构：
+ * 用于查找的哈希表。应该有人试着把它做好——我刚刚让它发挥作用。
  *
- * This hash-function tries to avoid losing too many bits of hash
- * information, yet avoid using a prime hash-size or similar.
+ * 这个散列函数试图避免丢失太多的散列信息位，但避免使用主散列大小或类似的。
  */
 #define D_HASHBITS     d_hash_shift
 #define D_HASHMASK     d_hash_mask
@@ -1647,6 +1645,7 @@ static void __init dcache_init_early(void)
 	if (hashdist)
 		return;
 
+	// 假设 dhash_entries为1024，那么d_hash_shift为10， d_hash_mask为1023
 	dentry_hashtable =
 		alloc_large_system_hash("Dentry cache",
 					sizeof(struct hlist_head),
@@ -1661,6 +1660,7 @@ static void __init dcache_init_early(void)
 		INIT_HLIST_HEAD(&dentry_hashtable[loop]);
 }
 
+// centry cache初始化
 static void __init dcache_init(unsigned long mempages)
 {
 	int loop;
@@ -1696,10 +1696,12 @@ static void __init dcache_init(unsigned long mempages)
 		INIT_HLIST_HEAD(&dentry_hashtable[loop]);
 }
 
-/* SLAB cache for __getname() consumers */
+/* __getname() 消费者的 SLAB 缓存
+ * 分配的内存地址，本质上就是文件描述符
+ * */
 kmem_cache_t *names_cachep;
 
-/* SLAB cache for file structures */
+/* 文件结构的 SLAB 缓存 */
 kmem_cache_t *filp_cachep;
 
 EXPORT_SYMBOL(d_genocide);
@@ -1709,11 +1711,11 @@ extern void chrdev_init(void);
 
 void __init vfs_caches_init_early(void)
 {
-	dcache_init_early();
-	inode_init_early();
+	dcache_init_early();		// 初始化dentry cache hashtable
+	inode_init_early();			// 初始化inode cache hashtable
 }
 
-void __init vfs_caches_init(unsigned long mempages)
+void __init vfs_caches_init(unsigned long mempages)		// start kernel
 {
 	unsigned long reserve;
 
@@ -1723,14 +1725,16 @@ void __init vfs_caches_init(unsigned long mempages)
 	reserve = min((mempages - nr_free_pages()) * 3/2, mempages - 1);
 	mempages -= reserve;
 
+	// getname使用
 	names_cachep = kmem_cache_create("names_cache", PATH_MAX, 0,
 			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 
+	// fget使用
 	filp_cachep = kmem_cache_create("filp", sizeof(struct file), 0,
 			SLAB_HWCACHE_ALIGN|SLAB_PANIC, filp_ctor, filp_dtor);
 
-	dcache_init(mempages);
-	inode_init(mempages);
+	dcache_init(mempages);		// dentry cache hashtable
+	inode_init(mempages);		// inode cache hashtable
 	files_init(mempages);
 	mnt_init(mempages);
 	bdev_cache_init();

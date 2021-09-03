@@ -23,6 +23,7 @@
 #error Define GOLDEN_RATIO_PRIME for your wordsize.
 #endif
 
+// 散列函数，bits用来控制hash表的长度,单位为位
 static inline unsigned long hash_long(unsigned long val, unsigned int bits)
 {
 	unsigned long hash = val;
@@ -44,11 +45,11 @@ static inline unsigned long hash_long(unsigned long val, unsigned int bits)
 	hash += n;
 #else
 	/* On some cpus multiply is faster, on others gcc will do shifts */
-	hash *= GOLDEN_RATIO_PRIME;
+	hash *= GOLDEN_RATIO_PRIME;     // 0x9e370001UL是一个接近(sqrt(5)-1)/2的素数，计算结果会溢出，相当于取模
 #endif
 
 	/* High bits are more random, so use them. */
-	return hash >> (BITS_PER_LONG - bits);
+	return hash >> (BITS_PER_LONG - bits);      // BITS_PER_LONG为32
 }
 	
 static inline unsigned long hash_ptr(void *ptr, unsigned int bits)

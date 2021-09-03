@@ -41,7 +41,7 @@ bootmem_data_t node0_bdata;
  * numa interface - we expect the numa architecture specfic code to have
  *                  populated the following initialisation.
  *
- * 1) node_online_map  - the map of all nodes configured (online) in the system
+ * 1) node_online_map  - 系统中配置（在线）的所有节点的映射
  * 2) physnode_map     - the mapping between a pfn and owning node
  * 3) node_start_pfn   - the starting page frame number for a node
  * 3) node_end_pfn     - the ending page fram number for a node
@@ -236,6 +236,7 @@ static void __init reserve_ebda_region_node(void)
 		reserve_bootmem_node(NODE_DATA(0), addr, PAGE_SIZE);
 }
 
+// 非连续内存
 unsigned long __init setup_memory(void)
 {
 	int nid;
@@ -370,6 +371,7 @@ unsigned long __init setup_memory(void)
 	return system_max_low_pfn;
 }
 
+// 非连续内存
 void __init zone_sizes_init(void)
 {
 	int nid;

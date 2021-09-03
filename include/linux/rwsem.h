@@ -22,9 +22,9 @@
 struct rw_semaphore;
 
 #ifdef CONFIG_RWSEM_GENERIC_SPINLOCK
-#include <linux/rwsem-spinlock.h> /* use a generic implementation */
+#include <linux/rwsem-spinlock.h> /* 使用通用实现 */
 #else
-#include <asm/rwsem.h> /* use an arch-specific implementation */
+#include <asm/rwsem.h> /* 使用特定于arch的实现 */
 #endif
 
 #ifndef rwsemtrace
@@ -59,7 +59,7 @@ static inline int down_read_trylock(struct rw_semaphore *sem)
 }
 
 /*
- * lock for writing
+ * 写锁
  */
 static inline void down_write(struct rw_semaphore *sem)
 {
@@ -102,7 +102,7 @@ static inline void up_write(struct rw_semaphore *sem)
 }
 
 /*
- * downgrade write lock to read lock
+ * 将写锁降级为读锁
  */
 static inline void downgrade_write(struct rw_semaphore *sem)
 {

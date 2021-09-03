@@ -6,6 +6,7 @@
 
 /*
  * Non-implemented system calls get redirected here.
+ * 未实现的系统调用定向到sys_ni_syscall
  */
 asmlinkage long sys_ni_syscall(void)
 {

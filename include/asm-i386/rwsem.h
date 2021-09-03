@@ -5,16 +5,13 @@
  * Derived from asm-i386/semaphore.h
  *
  *
- * The MSW of the count is the negated number of active writers and waiting
- * lockers, and the LSW is the total number of active locks
+ * 计数的 MSW 是活动写入者和等待锁的否定数量，LSW 是活动锁的总数
  *
- * The lock count is initialized to 0 (no active and no waiting lockers).
+ * 锁计数初始化为 0（没有活动和等待的锁柜）。
  *
- * When a writer subtracts WRITE_BIAS, it'll get 0xffff0001 for the case of an
- * uncontended lock. This can be determined because XADD returns the old value.
- * Readers increment by 1 and see a positive value when uncontended, negative
- * if there are writers (and maybe) readers waiting (in which case it goes to
- * sleep).
+ * 当编写器减去 WRITE_BIAS 时，对于无竞争锁的情况，它将获得 0xffff0001。
+ * 这可以确定，因为 XADD 返回旧值。
+ * 读者增加 1 并在无竞争时看到正值，如果有作者（可能还有）读者在等待（在这种情况下它会进入睡眠状态），则为负值。
  *
  * The value of WAITING_BIAS supports up to 32766 waiting processes. This can
  * be extended to 65534 by manually checking the whole MSW rather than relying

@@ -238,7 +238,7 @@ void reparent_to_init(void)
 	/* cpus_allowed? */
 	/* rt_priority? */
 	/* signals? */
-	security_task_reparent_to_init(current);
+	security_task_reparent_to_init(current);		// 权能相关
 	memcpy(current->signal->rlim, init_task.signal->rlim,
 	       sizeof(current->signal->rlim));
 	atomic_inc(&(INIT_USER->__count));
@@ -828,7 +828,7 @@ fastcall NORET_TYPE void do_exit(long code)
 		module_put(tsk->binfmt->module);
 
 	tsk->exit_code = code;
-	exit_notify(tsk);
+	exit_notify(tsk);		// 向父进程发信号v
 #ifdef CONFIG_NUMA
 	mpol_free(tsk->mempolicy);
 	tsk->mempolicy = NULL;
@@ -838,7 +838,7 @@ fastcall NORET_TYPE void do_exit(long code)
 	schedule();
 	BUG();
 	/* Avoid "noreturn function does return".  */
-	for (;;) ;
+	for (;;) ;		// 不可能到这里了，因为进程永远不会从schedule返回了
 }
 
 NORET_TYPE void complete_and_exit(struct completion *comp, long code)

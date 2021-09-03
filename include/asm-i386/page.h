@@ -43,7 +43,7 @@
  * These are used to make use of C type-checking..
  */
 extern int nx_enabled;
-#ifdef CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE		// 物理地址扩展
 extern unsigned long long __supported_pte_mask;
 typedef struct { unsigned long pte_low, pte_high; } pte_t;
 typedef struct { unsigned long long pmd; } pmd_t;
@@ -129,17 +129,17 @@ extern int sysctl_legacy_va_layout;
 
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
-#define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)
-#define MAXMEM			(-__PAGE_OFFSET-__VMALLOC_RESERVE)
+#define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)      // vmalloc区域为128MB
+#define MAXMEM			(-__PAGE_OFFSET-__VMALLOC_RESERVE)			// MAXMEM为896MB
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
-#ifndef CONFIG_DISCONTIGMEM
-#define pfn_to_page(pfn)	(mem_map + (pfn))
+#ifndef CONFIG_DISCONTIGMEM     // 没有配置非连续内存
+#define pfn_to_page(pfn)	(mem_map + (pfn))       // 由页框号查找对应的页框描述符指针
 #define page_to_pfn(page)	((unsigned long)((page) - mem_map))
 #define pfn_valid(pfn)		((pfn) < max_mapnr)
 #endif /* !CONFIG_DISCONTIGMEM */
-#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)      // 查找内核地址对应的页框号
 
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 

@@ -320,11 +320,10 @@ void tcp_put_port(struct sock *sk)
 	local_bh_enable();
 }
 
-/* This lock without WQ_FLAG_EXCLUSIVE is good on UP and it can be very bad on SMP.
- * Look, when several writers sleep and reader wakes them up, all but one
- * immediately hit write lock and grab all the cpus. Exclusive sleep solves
- * this, _but_ remember, it adds useless work on UP machines (wake up each
- * exclusive lock release). It should be ifdefed really.
+/* 这个没有 WQ_FLAG_EXCLUSIVE 的锁在 UP 上很好，在 SMP 上可能很糟糕。
+ * 看，当几个作者睡觉并且读者唤醒他们时，除了一个之外，所有人都会立即
+ * 点击写锁并抢占所有 CPU。独占睡眠解决了这个问题，_但_记住，
+ * 它在 UP 机器上增加了无用的工作（唤醒每个独占锁释放）。真的应该是ifdefed。
  */
 
 void tcp_listen_wlock(void)

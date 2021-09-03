@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- *
+ *  环形缓冲区
  */
 #ifndef _LINUX_KFIFO_H
 #define _LINUX_KFIFO_H
@@ -27,7 +27,7 @@
 #include <linux/spinlock.h>
 
 struct kfifo {
-	unsigned char *buffer;	/* the buffer holding the data */
+	unsigned char *buffer;	/* the buffer holding the data 必须是2的幂*/
 	unsigned int size;	/* the size of the allocated buffer */
 	unsigned int in;	/* data is added at offset (in % size) */
 	unsigned int out;	/* data is extracted from off. (out % size) */

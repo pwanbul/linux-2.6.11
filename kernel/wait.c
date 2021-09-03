@@ -11,28 +11,31 @@
 #include <linux/wait.h>
 #include <linux/hash.h>
 
+// 加入等待队列
 void fastcall add_wait_queue(wait_queue_head_t *q, wait_queue_t *wait)
 {
 	unsigned long flags;
 
-	wait->flags &= ~WQ_FLAG_EXCLUSIVE;
+	wait->flags &= ~WQ_FLAG_EXCLUSIVE;      // 非排他
 	spin_lock_irqsave(&q->lock, flags);
 	__add_wait_queue(q, wait);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 EXPORT_SYMBOL(add_wait_queue);
 
+// 加入等待队列，尾插，排他
 void fastcall add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t *wait)
 {
 	unsigned long flags;
 
-	wait->flags |= WQ_FLAG_EXCLUSIVE;
+	wait->flags |= WQ_FLAG_EXCLUSIVE;       // 排他
 	spin_lock_irqsave(&q->lock, flags);
 	__add_wait_queue_tail(q, wait);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 EXPORT_SYMBOL(add_wait_queue_exclusive);
 
+// 从等待队列中删除
 void fastcall remove_wait_queue(wait_queue_head_t *q, wait_queue_t *wait)
 {
 	unsigned long flags;
@@ -45,29 +48,24 @@ EXPORT_SYMBOL(remove_wait_queue);
 
 
 /*
- * Note: we use "set_current_state()" _after_ the wait-queue add,
- * because we need a memory barrier there on SMP, so that any
- * wake-function that tests for the wait-queue being active
- * will be guaranteed to see waitqueue addition _or_ subsequent
- * tests in this thread will see the wakeup having taken place.
+ * 注意：我们在等待队列添加中使用“ set_current_state（）” _ after_，
+ * 因为我们在SMP上需要一个内存屏障，因此可以保证任何测试等待队列处于
+ * 活动状态的唤醒功能都可以看到随后的等待队列添加或在该线程中进行测试将看到唤醒已发生。
  *
- * The spin_unlock() itself is semi-permeable and only protects
- * one way (it only protects stuff inside the critical region and
- * stops them from bleeding out - it would still allow subsequent
- * loads to move into the the critical region).
+ * spin_unlock（）本身是半渗透性的，并且仅以一种方式进行保护
+ * （它仅保护关键区域内的东西并阻止它们渗出-仍将允许后续负载移入关键区域）。
  */
 void fastcall
 prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 {
 	unsigned long flags;
 
-	wait->flags &= ~WQ_FLAG_EXCLUSIVE;
+	wait->flags &= ~WQ_FLAG_EXCLUSIVE;      // 非排他
 	spin_lock_irqsave(&q->lock, flags);
-	if (list_empty(&wait->task_list))
+	if (list_empty(&wait->task_list))   // 防止wait重复加入队列中
 		__add_wait_queue(q, wait);
 	/*
-	 * don't alter the task state if this is just going to
-	 * queue an async wait queue callback
+	 * 如果只是要排队异步等待队列回调，请不要更改任务状态
 	 */
 	if (is_sync_wait(wait))
 		set_current_state(state);
@@ -80,13 +78,12 @@ prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
 {
 	unsigned long flags;
 
-	wait->flags |= WQ_FLAG_EXCLUSIVE;
+	wait->flags |= WQ_FLAG_EXCLUSIVE;       // 排他
 	spin_lock_irqsave(&q->lock, flags);
 	if (list_empty(&wait->task_list))
 		__add_wait_queue_tail(q, wait);
 	/*
-	 * don't alter the task state if this is just going to
- 	 * queue an async wait queue callback
+	 * 如果只是要排队异步等待队列回调，请不要更改任务状态
 	 */
 	if (is_sync_wait(wait))
 		set_current_state(state);

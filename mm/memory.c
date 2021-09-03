@@ -60,9 +60,9 @@
 #include <linux/elf.h>
 
 #ifndef CONFIG_DISCONTIGMEM
-/* use the per-pgdat data instead for discontigmem - mbligh */
+/* 使用 per-pgdat 数据代替 discontigmem - mbligh */
 unsigned long max_mapnr;
-struct page *mem_map;
+struct page *mem_map;			// 页框数组全局指针
 
 EXPORT_SYMBOL(max_mapnr);
 EXPORT_SYMBOL(mem_map);

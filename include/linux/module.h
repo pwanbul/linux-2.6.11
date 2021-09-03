@@ -199,6 +199,7 @@ void *__symbol_get_gpl(const char *symbol);
 	__attribute__((section("__ksymtab" sec), unused))	\
 	= { (unsigned long)&sym, __kstrtab_##sym }
 
+/*https://www.jianshu.com/p/289f10ccef2d*/
 #define EXPORT_SYMBOL(sym)					\
 	__EXPORT_SYMBOL(sym, "")
 

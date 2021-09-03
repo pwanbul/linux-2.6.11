@@ -321,11 +321,9 @@ static __inline__ unsigned int tcp_listen_poll(struct sock *sk,
 }
 
 /*
- *	Wait for a TCP event.
+ *	等待 TCP 事件。
  *
- *	Note that we don't need to lock the socket, as the upper poll layers
- *	take care of normal races (between the test and the event) and we don't
- *	go look at any of the socket buffers directly.
+ *	请注意，我们不需要锁定套接字，因为上层轮询层负责正常的竞争（在测试和事件之间），而且我们不会直接查看任何套接字缓冲区。
  */
 unsigned int tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 {

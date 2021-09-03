@@ -46,25 +46,34 @@ unsigned long __init bootmem_bootmap_pages (unsigned long pages)
 }
 
 /*
- * Called once to set up the allocator itself.
+ * 调用一次以设置分配器本身.
+ *
+ * init_bootmem_core的目的在于执行bootmem分配器的第一个初始化步骤。
+ * 先前检测到的低端内存页帧的范围输入到相应的bootmem_data_t实例中，
+ * 这里是contig_bootmem_data。最初在位图contig_bootmem_data->node_bootmem_map中，
+ * 所有的页都标记为已用。由于init_bootmem_core是一个体系结构无关的函数，
+ * 它尚无法知道哪些页可用，哪些页不能使用。因为体系结构方面的原因，有些页需要特殊的处理，
+ * 例如IA-32系统上的0页。有些页则已经使用，例如内核映像占用的页。
+ * 实际可用的页必须由体系结构相关的代码显式标记出来。
  */
 static unsigned long __init init_bootmem_core (pg_data_t *pgdat,
 	unsigned long mapstart, unsigned long start, unsigned long end)
 {
-	bootmem_data_t *bdata = pgdat->bdata;
-	unsigned long mapsize = ((end - start)+7)/8;
+	bootmem_data_t *bdata = pgdat->bdata;       // pgdat->bdata为&contig_bootmem_data
+	unsigned long mapsize = ((end - start)+7)/8;    // mapsize为要创建的位图的大小,单位字节，每位对应一个页框
 
+    // pgdat_list为pg_data_t的头结点
 	pgdat->pgdat_next = pgdat_list;
 	pgdat_list = pgdat;
 
-	mapsize = (mapsize + (sizeof(long) - 1UL)) & ~(sizeof(long) - 1UL);
-	bdata->node_bootmem_map = phys_to_virt(mapstart << PAGE_SHIFT);
+	mapsize = (mapsize + (sizeof(long) - 1UL)) & ~(sizeof(long) - 1UL);   // 向上4字节对齐，结果28672
+	bdata->node_bootmem_map = phys_to_virt(mapstart << PAGE_SHIFT); // node_bootmem_map为位图的起始位置的线性地址
 	bdata->node_boot_start = (start << PAGE_SHIFT);
 	bdata->node_low_pfn = end;
 
 	/*
-	 * Initially all pages are reserved - setup_arch() has to
-	 * register free RAM areas explicitly.
+	 * 最初所有页面都是保留的 - setup_arch() 必须明确注册空闲 RAM 区域。
+	 * 把位图中的每一位都置1，表示为占用状态。在接下去的函数中，会把内核可以使用的页框号对应的位置0
 	 */
 	memset(bdata->node_bootmem_map, 0xff, mapsize);
 
@@ -101,17 +110,17 @@ static void __init reserve_bootmem_core(bootmem_data_t *bdata, unsigned long add
 		}
 }
 
+// 释放内存，addr为起始物理地址，size为大小
 static void __init free_bootmem_core(bootmem_data_t *bdata, unsigned long addr, unsigned long size)
 {
 	unsigned long i;
 	unsigned long start;
 	/*
-	 * round down end of usable mem, partially free pages are
-	 * considered reserved.
+	 * 四舍五入可用内存的末尾，部分空闲页面被认为是保留的。
 	 */
 	unsigned long sidx;
-	unsigned long eidx = (addr + size - bdata->node_boot_start)/PAGE_SIZE;
-	unsigned long end = (addr + size)/PAGE_SIZE;
+	unsigned long eidx = (addr + size - bdata->node_boot_start)/PAGE_SIZE;  // 可用的页面数
+	unsigned long end = (addr + size)/PAGE_SIZE;        // 总的页面数
 
 	BUG_ON(!size);
 	BUG_ON(end > bdata->node_low_pfn);
@@ -120,7 +129,7 @@ static void __init free_bootmem_core(bootmem_data_t *bdata, unsigned long addr, 
 		bdata->last_success = addr;
 
 	/*
-	 * Round up the beginning of the address.
+	 * 将地址的开头四舍五入。
 	 */
 	start = (addr + PAGE_SIZE-1) / PAGE_SIZE;
 	sidx = start - (bdata->node_boot_start/PAGE_SIZE);
@@ -132,17 +141,15 @@ static void __init free_bootmem_core(bootmem_data_t *bdata, unsigned long addr, 
 }
 
 /*
- * We 'merge' subsequent allocations to save space. We might 'lose'
- * some fraction of a page if allocations cannot be satisfied due to
- * size constraints on boxes where there is physical RAM space
- * fragmentation - in these cases (mostly large memory boxes) this
- * is not a problem.
+ * 我们“合并”后续分配以节省空间。如果由于存在物理RAM空间碎片
+ * 的盒子的大小限制而无法满足分配，我们可能会“丢失”页面的
+ * 一部分——在这些情况下（主要是大内存盒子），这不是问题。
  *
- * On low memory boxes we get it right in 100% of the cases.
+ * 在低内存盒上，我们在 100% 的情况下都能做到。
  *
- * alignment has to be a power of 2 value.
+ * alignment必须是2的幂值。
  *
- * NOTE:  This function is _not_ reentrant.
+ * 注意：此函数_不可_重入。
  */
 static void * __init
 __alloc_bootmem_core(struct bootmem_data *bdata, unsigned long size,
@@ -160,8 +167,7 @@ __alloc_bootmem_core(struct bootmem_data *bdata, unsigned long size,
 
 	eidx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT);
 	offset = 0;
-	if (align &&
-	    (bdata->node_boot_start & (align - 1UL)) != 0)
+	if (align && (bdata->node_boot_start & (align - 1UL)) != 0)
 		offset = (align - (bdata->node_boot_start & (align - 1UL)));
 	offset >>= PAGE_SHIFT;
 
@@ -252,7 +258,12 @@ found:
 	memset(ret, 0, size);
 	return ret;
 }
-
+/* free_all_bootmem释放的不是已经申请的内存，
+ * 而是bootmem没分配出去的内存，
+ * 调用free_all_bootmem以后
+ * bootmem就把自身也释放掉了，不可用了，
+ * 之后会用更高级的内存管理系统。
+ * */
 static unsigned long __init free_all_bootmem_core(pg_data_t *pgdat)
 {
 	struct page *page;
@@ -325,6 +336,7 @@ static unsigned long __init free_all_bootmem_core(pg_data_t *pgdat)
 	return total;
 }
 
+// 非连续内存
 unsigned long __init init_bootmem_node (pg_data_t *pgdat, unsigned long freepfn, unsigned long startpfn, unsigned long endpfn)
 {
 	return(init_bootmem_core(pgdat, freepfn, startpfn, endpfn));
@@ -345,11 +357,12 @@ unsigned long __init free_all_bootmem_node (pg_data_t *pgdat)
 	return(free_all_bootmem_core(pgdat));
 }
 
+// 连续内存
 unsigned long __init init_bootmem (unsigned long start, unsigned long pages)
 {
-	max_low_pfn = pages;
-	min_low_pfn = start;
-	return(init_bootmem_core(NODE_DATA(0), start, 0, pages));
+	max_low_pfn = pages;    // 结束页框，896MB
+	min_low_pfn = start;    // 起始页框，pg1后面
+	return(init_bootmem_core(NODE_DATA(0), start, 0, pages));       // NODE_DATA(0):contig_page_data
 }
 
 #ifndef CONFIG_HAVE_ARCH_BOOTMEM_NODE
@@ -359,6 +372,7 @@ void __init reserve_bootmem (unsigned long addr, unsigned long size)
 }
 #endif /* !CONFIG_HAVE_ARCH_BOOTMEM_NODE */
 
+// 释放内存页面
 void __init free_bootmem (unsigned long addr, unsigned long size)
 {
 	free_bootmem_core(NODE_DATA(0)->bdata, addr, size);
@@ -369,9 +383,10 @@ unsigned long __init free_all_bootmem (void)
 	return(free_all_bootmem_core(NODE_DATA(0)));
 }
 
+// 分配内存，size为大小，align为对齐要求，goal为分配内存的区域
 void * __init __alloc_bootmem (unsigned long size, unsigned long align, unsigned long goal)
 {
-	pg_data_t *pgdat = pgdat_list;
+	pg_data_t *pgdat = pgdat_list;		// 配置为连续内存时，链表中只有一个元素
 	void *ptr;
 
 	for_each_pgdat(pgdat)
@@ -387,6 +402,12 @@ void * __init __alloc_bootmem (unsigned long size, unsigned long align, unsigned
 	return NULL;
 }
 
+/* __alloc_bootmem_node -
+ * @pgdat 内存节点
+ * @size 页框跨度数+1
+ * @align 对齐
+ * @goal
+ * */
 void * __init __alloc_bootmem_node (pg_data_t *pgdat, unsigned long size, unsigned long align, unsigned long goal)
 {
 	void *ptr;

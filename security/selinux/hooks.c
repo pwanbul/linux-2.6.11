@@ -112,7 +112,7 @@ static struct security_operations *secondary_ops = NULL;
 static LIST_HEAD(superblock_security_head);
 static DEFINE_SPINLOCK(sb_security_lock);
 
-/* Allocate and free functions for each kind of security blob. */
+/* 为每种安全 blob 分配和释放函数。 */
 
 static int task_alloc_security(struct task_struct *task)
 {
@@ -4332,7 +4332,7 @@ __init int selinux_init(void)
 
 	printk(KERN_INFO "SELinux:  Initializing.\n");
 
-	/* Set the security state for the initial task. */
+	/* 为init_task设置安全状态。 */
 	if (task_alloc_security(current))
 		panic("SELinux:  Failed to initialize initial task.\n");
 	tsec = current->security;
@@ -4383,9 +4383,8 @@ next_sb:
 	spin_unlock(&sb_security_lock);
 }
 
-/* SELinux requires early initialization in order to label
-   all processes and objects when they are created. */
-security_initcall(selinux_init);
+/* SELinux 需要提前初始化，以便在创建时标记所有进程和对象。 */
+security_initcall(selinux_init);		// 在initcall中第一个调用
 
 #if defined(CONFIG_SECURITY_NETWORK) && defined(CONFIG_NETFILTER)
 

@@ -612,15 +612,14 @@ EXPORT_SYMBOL(copy_to_user);
  * @from: Source address, in user space.
  * @n:    Number of bytes to copy.
  *
- * Context: User context only.  This function may sleep.
+ * 上下文：仅用户上下文。此功能可能会休眠。
  *
- * Copy data from user space to kernel space.
+ * 将数据从用户空间复制到内核空间。
  *
- * Returns number of bytes that could not be copied.
- * On success, this will be zero.
+ * 返回无法复制的字节数。成功时，这将为零。
  *
- * If some data could not be copied, this function will pad the copied
- * data to the requested size using zero bytes.
+ * 如果无法复制某些数据，此函数将使用零字节将复制的数据填充到请求的大小。
+ *
  */
 unsigned long
 copy_from_user(void *to, const void __user *from, unsigned long n)

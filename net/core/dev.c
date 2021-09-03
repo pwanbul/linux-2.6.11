@@ -212,8 +212,7 @@ static inline struct hlist_head *dev_index_hash(int ifindex)
 static struct notifier_block *netdev_chain;
 
 /*
- *	Device drivers call our routines to queue packets here. We empty the
- *	queue in the local softnet handler.
+ *	设备驱动程序调用我们的例程在此处对数据包进行排队。我们清空本地 softnet 处理程序中的队列。
  */
 DEFINE_PER_CPU(struct softnet_data, softnet_data) = { 0, };
 
@@ -1407,10 +1406,8 @@ static void sample_queue(unsigned long dummy)
  *	netif_rx	-	post buffer to the network code
  *	@skb: buffer to post
  *
- *	This function receives a packet from a device driver and queues it for
- *	the upper (protocol) levels to process.  It always succeeds. The buffer
- *	may be dropped during processing for congestion control or by the
- *	protocol layers.
+ *	此函数从设备驱动程序接收数据包并将其排队以供上层（协议）级别处理。
+ *	它总是成功。缓冲区可能会在拥塞控制处理期间或由协议层丢弃。
  *
  *	return values:
  *	NET_RX_SUCCESS	(no congestion)
@@ -1419,6 +1416,7 @@ static void sample_queue(unsigned long dummy)
  *	NET_RX_CN_HIGH  (high congestion)
  *	NET_RX_DROP     (packet was dropped)
  *
+ * 网络驱动程序和内核协议的分界线
  */
 
 int netif_rx(struct sk_buff *skb)
@@ -1433,27 +1431,27 @@ int netif_rx(struct sk_buff *skb)
 		return NET_RX_DROP;
 	}
 #endif
-	
+
+	// 设置skb的到达时间
 	if (!skb->stamp.tv_sec)
 		net_timestamp(&skb->stamp);
 
 	/*
-	 * The code is rearranged so that the path is the most
-	 * short when CPU is congested, but is still operating.
+	 * 代码重新排列，使得当CPU拥塞时路径最短，但仍在运行。
 	 */
 	local_irq_save(flags);
 	this_cpu = smp_processor_id();
 	queue = &__get_cpu_var(softnet_data);
 
 	__get_cpu_var(netdev_rx_stat).total++;
-	if (queue->input_pkt_queue.qlen <= netdev_max_backlog) {
-		if (queue->input_pkt_queue.qlen) {
+	if (queue->input_pkt_queue.qlen <= netdev_max_backlog) {		// 没有超过上限
+		if (queue->input_pkt_queue.qlen) {			// 队列不为空
 			if (queue->throttle)
 				goto drop;
 
 enqueue:
 			dev_hold(skb->dev);
-			__skb_queue_tail(&queue->input_pkt_queue, skb);
+			__skb_queue_tail(&queue->input_pkt_queue, skb);		// skb加入队尾
 #ifndef OFFLINE_SAMPLE
 			get_sample_stats(this_cpu);
 #endif
@@ -1762,9 +1760,12 @@ job_done:
 	return 0;
 }
 
+/* 软中断处理函数，该函数可以在不同CPU上同时执行，
+ * 因此操作的数据应当是per cpu的
+ * */
 static void net_rx_action(struct softirq_action *h)
 {
-	struct softnet_data *queue = &__get_cpu_var(softnet_data);
+	struct softnet_data *queue = &__get_cpu_var(softnet_data);		// 获取本地CPU的数据
 	unsigned long start_time = jiffies;
 	int budget = netdev_max_backlog;
 
@@ -1801,7 +1802,7 @@ out:
 
 softnet_break:
 	__get_cpu_var(netdev_rx_stat).time_squeeze++;
-	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
+	__raise_softirq_irqoff(NET_RX_SOFTIRQ);		// 再次把自己激活
 	goto out;
 }
 
@@ -3230,10 +3231,9 @@ static int dev_cpu_callback(struct notifier_block *nfb,
 
 
 /*
- *	Initialize the DEV module. At boot time this walks the device list and
- *	unhooks any devices that fail to initialise (normally hardware not
- *	present) and leaves us with a valid list of present and active devices.
- *
+ *	I初始化 DEV 模块。在启动时，这会遍历设备列表并取消
+ *	任何无法初始化的设备（通常硬件不存在），并为我们留下
+ *	一个有效的存在和活动设备列表。
  */
 
 /*
@@ -3265,7 +3265,7 @@ static int __init net_dev_init(void)
 		INIT_HLIST_HEAD(&dev_index_head[i]);
 
 	/*
-	 *	Initialise the packet receive queues.
+	 *	初始化数据包接收队列。
 	 */
 
 	for (i = 0; i < NR_CPUS; i++) {

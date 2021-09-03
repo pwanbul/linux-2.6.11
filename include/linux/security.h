@@ -34,8 +34,7 @@
 struct ctl_table;
 
 /*
- * These functions are in security/capability.c and are used
- * as the default capabilities functions
+ * 这些函数在 security/capability.c 中，用作默认的capability函数
  */
 extern int cap_capable (struct task_struct *tsk, int cap);
 extern int cap_settime (struct timespec *ts, struct timezone *tz);
@@ -1022,7 +1021,7 @@ struct swap_info_struct;
  *	@name contains the name of the security module being unstacked.
  *	@ops contains a pointer to the struct security_operations of the module to unstack.
  * 
- * This is the main security structure.
+ * 这是主要的安全结构。
  */
 struct security_operations {
 	int (*ptrace) (struct task_struct * parent, struct task_struct * child);
@@ -1197,7 +1196,9 @@ struct security_operations {
 	int (*netlink_send) (struct sock * sk, struct sk_buff * skb);
 	int (*netlink_recv) (struct sk_buff * skb);
 
-	/* allow module stacking */
+	/* 允许模块堆叠
+	 * 注册和注销的接口也被自身管理起来
+	 * */
 	int (*register_security) (const char *name,
 	                          struct security_operations *ops);
 	int (*unregister_security) (const char *name,
@@ -1240,7 +1241,7 @@ struct security_operations {
 #endif	/* CONFIG_SECURITY_NETWORK */
 };
 
-/* global variables */
+/* 全局变量 */
 extern struct security_operations *security_ops;
 
 /* inline stuff */

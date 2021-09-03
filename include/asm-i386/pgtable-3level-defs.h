@@ -4,8 +4,8 @@
 /*
  * PGDIR_SHIFT determines what a top-level page table entry can map
  */
-#define PGDIR_SHIFT	30
-#define PTRS_PER_PGD	4
+#define PGDIR_SHIFT	30          // 虚拟地址按2-9-9-12划分
+#define PTRS_PER_PGD	4       // 每页全局目录中指针的数量
 
 /*
  * PMD_SHIFT determines the size of the area a middle-level

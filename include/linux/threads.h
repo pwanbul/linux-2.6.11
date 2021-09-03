@@ -9,10 +9,12 @@
  */
  
 /*
- * Maximum supported processors that can run under SMP.  This value is
- * set via configure setting.  The maximum is equal to the size of the
- * bitmasks used on that platform, i.e. 32 or 64.  Setting this smaller
- * saves quite a bit of memory.
+ * 可在 SMP 下运行的最大支持处理器数。
+ * 该值是通过配置设置设置的。
+ * 最大值等于该平台上使用的位掩码的大小，即32或64。
+ * 将这个设置得更小可以节省相当多的内存。
+ *
+ * CPU的数量
  */
 #ifdef CONFIG_SMP
 #define NR_CPUS		CONFIG_NR_CPUS
@@ -30,6 +32,6 @@
 /*
  * A maximum of 4 million PIDs should be enough for a while:
  */
-#define PID_MAX_LIMIT (sizeof(long) > 4 ? 4*1024*1024 : PID_MAX_DEFAULT)
+#define PID_MAX_LIMIT (sizeof(long) > 4 ? 4*1024*1024 : PID_MAX_DEFAULT)        // 32为32768个，64为位4M个
 
 #endif

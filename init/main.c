@@ -117,7 +117,7 @@ extern void time_init(void);
 void (*late_time_init)(void);
 extern void softirq_init(void);
 
-/* Untouched command line (eg. for /proc) saved by arch-specific code. */
+/* 由特定于架构的代码保存的未触及的命令行（例如，用于 proc）。 */
 char saved_command_line[COMMAND_LINE_SIZE];
 
 static char *execute_command;
@@ -289,7 +289,7 @@ __setup("init=", init_setup);
 
 extern void setup_arch(char **);
 
-#ifndef CONFIG_SMP
+#ifndef CONFIG_SMP      // !SMP
 
 #ifdef CONFIG_X86_LOCAL_APIC
 static void __init smp_init(void)
@@ -300,40 +300,41 @@ static void __init smp_init(void)
 #define smp_init()	do { } while (0)
 #endif
 
+// 下面2个函数在!SMP中为空
 static inline void setup_per_cpu_areas(void) { }
 static inline void smp_prepare_cpus(unsigned int maxcpus) { }
 
-#else
+#else   // CONFIG_SMP
 
 #ifdef __GENERIC_PER_CPU
-unsigned long __per_cpu_offset[NR_CPUS];
+unsigned long __per_cpu_offset[NR_CPUS];        // 保存元素数据到其"数组元素"之间偏移量
 
 EXPORT_SYMBOL(__per_cpu_offset);
 
-static void __init setup_per_cpu_areas(void)
+static void __init setup_per_cpu_areas(void)        // per CPU变量初始化
 {
 	unsigned long size, i;
 	char *ptr;
 	/* Created by linker magic */
-	extern char __per_cpu_start[], __per_cpu_end[];
+	extern char __per_cpu_start[], __per_cpu_end[];     // 链接脚本中定义的2个特殊符号，中间存放的per CPU变量
 
 	/* Copy section for each CPU (we discard the original) */
-	size = ALIGN(__per_cpu_end - __per_cpu_start, SMP_CACHE_BYTES);
-#ifdef CONFIG_MODULES
+	size = ALIGN(__per_cpu_end - __per_cpu_start, SMP_CACHE_BYTES);     // 一级缓存的大小128字节，向上对齐
+#ifdef CONFIG_MODULES       // 是否支持模块
 	if (size < PERCPU_ENOUGH_ROOM)
 		size = PERCPU_ENOUGH_ROOM;
 #endif
-
-	ptr = alloc_bootmem(size * NR_CPUS);
+    // 定义一次，加载多次
+	ptr = alloc_bootmem(size * NR_CPUS);        // 按cpu的数量，分配空间
 
 	for (i = 0; i < NR_CPUS; i++, ptr += size) {
-		__per_cpu_offset[i] = ptr - __per_cpu_start;
-		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);
+		__per_cpu_offset[i] = ptr - __per_cpu_start;        // 记录下每个"数组元素"起始地址和section之间偏移量
+		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);      // 把每CPU变量复制各个cpu的"数组元素"内
 	}
 }
 #endif /* !__GENERIC_PER_CPU */
 
-/* Called by boot processor to activate the rest. */
+/* 由引导处理器调用以激活其余部分。 */
 static void __init smp_init(void)
 {
 	unsigned int i;
@@ -422,10 +423,13 @@ asmlinkage void __init start_kernel(void)
  * enable them
  */
 	lock_kernel();
+	/* 建立持久内核映射（PKMap，Persistent Kernel Map）机制所需的散列表，
+	 * 该机制利用散列表从给定的虚拟地址确定持久内核映射的物理地址。
+	 * */
 	page_address_init();
 	printk(linux_banner);
-	setup_arch(&command_line);
-	setup_per_cpu_areas();
+	setup_arch(&command_line);      // 其中一项任务是负责初始化自举分配器
+	setup_per_cpu_areas();      // 初始化per cpu变量
 
 	/*
 	 * Mark the boot cpu "online" so that it can call console drivers in
@@ -444,7 +448,7 @@ asmlinkage void __init start_kernel(void)
 	 * fragile until we cpu_idle() for the first time.
 	 */
 	preempt_disable();
-	build_all_zonelists();
+	build_all_zonelists();      // 建立结点和内存域的数据结构
 	page_alloc_init();
 	printk("Kernel command line: %s\n", saved_command_line);
 	parse_early_param();
@@ -452,12 +456,12 @@ asmlinkage void __init start_kernel(void)
 		   __stop___param - __start___param,
 		   &unknown_bootoption);
 	sort_main_extable();
-	trap_init();
+	trap_init();		// IDT初始化
 	rcu_init();
 	init_IRQ();
-	pidhash_init();
+	pidhash_init();		// pid hash表初始化
 	init_timers();
-	softirq_init();
+	softirq_init();		// tasklet初始化
 	time_init();
 
 	/*
@@ -478,14 +482,14 @@ asmlinkage void __init start_kernel(void)
 		initrd_start = 0;
 	}
 #endif
-	vfs_caches_init_early();
-	mem_init();
-	kmem_cache_init();
+	vfs_caches_init_early();		// 初始vfs cache
+	mem_init();     // mem_init是另一个特定于体系结构的函数，用于停用bootmem分配器并迁移到实际的内存管理函数；
+	kmem_cache_init();      // 通用slab初始化
 	numa_policy_init();
 	if (late_time_init)
 		late_time_init();
 	calibrate_delay();
-	pidmap_init();
+	pidmap_init();      // 初始化pid bitmap
 	pgtable_cache_init();
 	prio_tree_init();
 	anon_vma_init();
@@ -493,12 +497,12 @@ asmlinkage void __init start_kernel(void)
 	if (efi_enabled)
 		efi_enter_virtual_mode();
 #endif
-	fork_init(num_physpages);
-	proc_caches_init();
+	fork_init(num_physpages);   // 为task_struct的slab缓存初始化，并设置进程数量限制
+	proc_caches_init();     // 6种slab缓存初始化
 	buffer_init();
 	unnamed_dev_init();
-	security_init();
-	vfs_caches_init(num_physpages);
+	security_init();		// LSM初始化
+	vfs_caches_init(num_physpages);			// vfs缓存初始化
 	radix_tree_init();
 	signals_init();
 	/* rootfs populating might need page-writeback */

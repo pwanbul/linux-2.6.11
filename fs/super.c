@@ -15,7 +15,7 @@
  *  Added kerneld support: Jacques Gelinas and Bjorn Ekwall
  *  Added change_root: Werner Almesberger & Hans Lermen, Feb '96
  *  Added options to /proc/mounts:
- *    Torbj�rn Lindh (torbjorn.lindh@gopta.se), April 14, 1996.
+ *    Torbj�rn Lindh (torbjorn.lindh@gopta.se), April 14, 1996.
  *  Added devfs support: Richard Gooch <rgooch@atnf.csiro.au>, 13-JAN-1998
  *  Heavily rewritten for 'one fs - one tree' dcache architecture. AV, Mar 2000
  */
@@ -44,8 +44,8 @@ void get_filesystem(struct file_system_type *fs);
 void put_filesystem(struct file_system_type *fs);
 struct file_system_type *get_fs_type(const char *name);
 
-LIST_HEAD(super_blocks);
-DEFINE_SPINLOCK(sb_lock);
+LIST_HEAD(super_blocks);		// 超级块头节点
+DEFINE_SPINLOCK(sb_lock);		// 操作链表时的自旋锁
 
 /**
  *	alloc_super	-	create new superblock
@@ -264,7 +264,7 @@ void generic_shutdown_super(struct super_block *sb)
 EXPORT_SYMBOL(generic_shutdown_super);
 
 /**
- *	sget	-	find or create a superblock
+ *	sget	-	查找或创建一个超级块
  *	@type:	filesystem type superblock should belong to
  *	@test:	comparison callback
  *	@set:	setup callback
@@ -292,7 +292,7 @@ retry:
 			destroy_super(s);
 		return old;
 	}
-	if (!s) {
+	if (!s) {		// 找不到时创建
 		spin_unlock(&sb_lock);
 		s = alloc_super();
 		if (!s)
@@ -308,7 +308,7 @@ retry:
 	}
 	s->s_type = type;
 	strlcpy(s->s_id, type->name, sizeof(s->s_id));
-	list_add_tail(&s->s_list, &super_blocks);
+	list_add_tail(&s->s_list, &super_blocks);		// 尾插入全局链表~~~~
 	list_add(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);
 	get_filesystem(type);

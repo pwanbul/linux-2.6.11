@@ -1304,7 +1304,7 @@ static int __init set_ihash_entries(char *str)
 __setup("ihash_entries=", set_ihash_entries);
 
 /*
- * Initialize the waitqueues and inode hash table.
+ * 初始化等待队列和 inode 哈希表。
  */
 void __init inode_init_early(void)
 {
@@ -1339,7 +1339,7 @@ void __init inode_init(unsigned long mempages)
 				0, SLAB_PANIC, init_once, NULL);
 	set_shrinker(DEFAULT_SEEKS, shrink_icache_memory);
 
-	/* Hash may have been set up in inode_init_early */
+	/* 哈希可能已在 inode_init_early 中设置 */
 	if (!hashdist)
 		return;
 

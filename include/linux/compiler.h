@@ -3,15 +3,15 @@
 
 #ifndef __ASSEMBLY__
 
-#ifdef __CHECKER__
-# define __user		__attribute__((noderef, address_space(1)))
+#ifdef __CHECKER__      // sparse工具支持
+# define __user		__attribute__((noderef, address_space(1)))      // 用来修饰变量，变量在用户地址空间(address_space(1))，这个变量的地址需要是有效的(noderef)
 # define __kernel	/* default address space */
-# define __safe		__attribute__((safe))
-# define __force	__attribute__((force))
+# define __safe		__attribute__((safe))       // 变量可以为空
+# define __force	__attribute__((force))      // 变量可以进行强制转换
 # define __iomem	__attribute__((noderef, address_space(2)))
-# define __acquires(x)	__attribute__((context(0,1)))
+# define __acquires(x)	__attribute__((context(0,1)))       // 参数x在执行前引用计数必须是0, 执行后，引用计数必须为1，必须和__releases配对
 # define __releases(x)	__attribute__((context(1,0)))
-# define __acquire(x)	__context__(1)
+# define __acquire(x)	__context__(1)      // 参数x的引用计数+1
 # define __release(x)	__context__(-1)
 # define __cond_lock(x)	((x) ? ({ __context__(1); 1; }) : 0)
 extern void __chk_user_ptr(void __user *);

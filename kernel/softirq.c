@@ -37,19 +37,19 @@
  */
 
 #ifndef __ARCH_IRQ_STAT
-irq_cpustat_t irq_stat[NR_CPUS] ____cacheline_aligned;
+irq_cpustat_t irq_stat[NR_CPUS] ____cacheline_aligned;		// 每个CPU都一个和如中断相关的状态
 EXPORT_SYMBOL(irq_stat);
 #endif
 
+// 软中断注册在这个数组中，虽然有32个元素，但是目前只有6个软中断
 static struct softirq_action softirq_vec[32] __cacheline_aligned_in_smp;
 
 static DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
 
 /*
- * we cannot loop indefinitely here to avoid userspace starvation,
- * but we also don't want to introduce a worst case 1/HZ latency
- * to the pending events, so lets the scheduler to balance
- * the softirq load for us.
+ * 我们不能在这里无限循环以避免用户空间饥饿，
+ * 但我们也不希望将最坏情况下的 1HZ 延迟引入
+ * 待处理事件，因此让调度程序为我们平衡 softirq 负载。
  */
 static inline void wakeup_softirqd(void)
 {
@@ -61,13 +61,11 @@ static inline void wakeup_softirqd(void)
 }
 
 /*
- * We restart softirq processing MAX_SOFTIRQ_RESTART times,
- * and we fall back to softirqd after that.
+ * 我们重新启动 softirq 处理 MAX_SOFTIRQ_RESTART 次，
+ * 然后我们回退到 softirqd。
  *
- * This number has been established via experimentation.
- * The two things to balance is latency against fairness -
- * we want to handle softirqs as soon as possible, but they
- * should not be able to lock up the box.
+ * 这个数字是通过实验确定的。需要平衡的两件事是延迟与公平，
+ * 我们希望尽快处理软中断，但它们不应该能够锁定盒子。
  */
 #define MAX_SOFTIRQ_RESTART 10
 
@@ -78,57 +76,65 @@ asmlinkage void __do_softirq(void)
 	int max_restart = MAX_SOFTIRQ_RESTART;
 	int cpu;
 
-	pending = local_softirq_pending();
+	pending = local_softirq_pending();		// 获取本地cpu的软中断位图
 
-	local_bh_disable();
+	local_bh_disable();			// 软中断计数器加1
 	cpu = smp_processor_id();
 restart:
-	/* Reset the pending bitmask before enabling irqs */
-	local_softirq_pending() = 0;
+	/* 在启用 irqs 之前重置挂起的位掩码 */
+	local_softirq_pending() = 0;		// 清空本地cpu软中断位图
 
-	local_irq_enable();
+	local_irq_enable();		// 开启本地中断
 
-	h = softirq_vec;
+	h = softirq_vec;	// 软中断数组
 
 	do {
+		// 从0号软中断开始检查，如果激活了，就执行
 		if (pending & 1) {
 			h->action(h);
 			rcu_bh_qsctr_inc(cpu);
 		}
 		h++;
 		pending >>= 1;
-	} while (pending);
+	} while (pending);		// 最多32个软中断，实际只有6个
 
-	local_irq_disable();
+	local_irq_disable();			// 关闭本地中断
 
 	pending = local_softirq_pending();
+	/* 最多10次，
+	 * 如NET_RX_SOFTIRQ会在net_rx_action中再次注册自己,
+	 * 不加限制的话，用户进程就会饿死
+	 * */
 	if (pending && --max_restart)
 		goto restart;
 
 	if (pending)
-		wakeup_softirqd();
+		wakeup_softirqd();		// 通过内核线程来处理剩下的软中断
 
-	__local_bh_enable();
+	__local_bh_enable();		// 软中断计数器减1
 }
 
 #ifndef __ARCH_HAS_DO_SOFTIRQ
 
+/* 检查软中断
+ * 通常在中断处理返回之前调用
+ * */
 asmlinkage void do_softirq(void)
 {
 	__u32 pending;
 	unsigned long flags;
 
-	if (in_interrupt())
+	if (in_interrupt())		// 是否处在硬/软中断中
 		return;
 
-	local_irq_save(flags);
+	local_irq_save(flags);		// 保存IF状态，并关闭本地中断
 
-	pending = local_softirq_pending();
+	pending = local_softirq_pending();		// 获取本地CPU中软中断位图
 
 	if (pending)
 		__do_softirq();
 
-	local_irq_restore(flags);
+	local_irq_restore(flags);		// 恢复本地中断
 }
 
 EXPORT_SYMBOL(do_softirq);
@@ -171,27 +177,26 @@ void irq_exit(void)
 }
 
 /*
- * This function must run with irqs disabled!
+ * 此功能必须在禁用irqs的情况下运行！
+ *
  */
 inline fastcall void raise_softirq_irqoff(unsigned int nr)
 {
-	__raise_softirq_irqoff(nr);
+	__raise_softirq_irqoff(nr);		// 把nr设置和本地CPU相关的数据结构中
 
 	/*
-	 * If we're in an interrupt or softirq, we're done
-	 * (this also catches softirq-disabled code). We will
-	 * actually run the softirq once we return from
-	 * the irq or softirq.
+	 * 如果我们处于中断或软中断状态，我们就完成了（这也会捕获禁用软中断的代码）。
+	 * 一旦我们从irq或softirq返回，我们将实际运行softirq。
 	 *
-	 * Otherwise we wake up ksoftirqd to make sure we
-	 * schedule the softirq soon.
+	 * 否则我们唤醒ksoftirqd以确保我们尽快安排softirq。
 	 */
-	if (!in_interrupt())
+	if (!in_interrupt())		// 是否在硬中断或软中断上下文中
 		wakeup_softirqd();
 }
 
 EXPORT_SYMBOL(raise_softirq_irqoff);
 
+// 激活软中断
 void fastcall raise_softirq(unsigned int nr)
 {
 	unsigned long flags;
@@ -201,6 +206,10 @@ void fastcall raise_softirq(unsigned int nr)
 	local_irq_restore(flags);
 }
 
+/* 设置一个软中断
+ * nr表示软中断号，同时是优先级，数值越大优先级越低
+ * action表示处理函数
+ * */
 void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
 {
 	softirq_vec[nr].data = data;
@@ -341,6 +350,7 @@ void tasklet_kill(struct tasklet_struct *t)
 
 EXPORT_SYMBOL(tasklet_kill);
 
+// tasklet初始化
 void __init softirq_init(void)
 {
 	open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);

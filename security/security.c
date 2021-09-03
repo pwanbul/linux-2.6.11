@@ -18,17 +18,17 @@
 #include <linux/sched.h>
 #include <linux/security.h>
 
-#define SECURITY_FRAMEWORK_VERSION	"1.0.0"
+#define SECURITY_FRAMEWORK_VERSION	"1.0.0"		// LSM版本
 
-/* things that live in dummy.c */
+/* 生活在 dummy.c 中的东西 */
 extern struct security_operations dummy_security_ops;
 extern void security_fixup_ops(struct security_operations *ops);
 
-struct security_operations *security_ops;	/* Initialized to NULL */
+struct security_operations *security_ops;	/* 初始化为 NULL */
 
 static inline int verify(struct security_operations *ops)
 {
-	/* verify the security_operations structure exists */
+	/* 验证 security_operations 结构是否存在 */
 	if (!ops)
 		return -EINVAL;
 	security_fixup_ops(ops);
@@ -46,23 +46,24 @@ static void __init do_security_initcalls(void)
 }
 
 /**
- * security_init - initializes the security framework
+ * security_init - 初始化安全框架
  *
- * This should be called early in the kernel initialization sequence.
+ * 这应该在内核初始化序列的早期调用。
+ *
+ * 在LSM未初始化之前的安全检查必定通过，
+ * 因此将security_ops设置为dummy的操作
  */
-int __init security_init(void)
+int __init security_init(void)	// LSM初始化
 {
-	printk(KERN_INFO "Security Framework v" SECURITY_FRAMEWORK_VERSION
-	       " initialized\n");
+	printk(KERN_INFO "Security Framework v" SECURITY_FRAMEWORK_VERSION " initialized\n");
 
 	if (verify(&dummy_security_ops)) {
-		printk(KERN_ERR "%s could not verify "
-		       "dummy_security_ops structure.\n", __FUNCTION__);
+		printk(KERN_ERR "%s could not verify dummy_security_ops structure.\n", __FUNCTION__);
 		return -EIO;
 	}
 
-	security_ops = &dummy_security_ops;
-	do_security_initcalls();
+	security_ops = &dummy_security_ops;		// security_ops设置为dummy操作
+	do_security_initcalls();		// selinux_init
 
 	return 0;
 }

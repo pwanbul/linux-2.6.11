@@ -23,13 +23,15 @@ struct rwsem_waiter;
 
 /*
  * the rw-semaphore definition
- * - if activity is 0 then there are no active readers or writers
- * - if activity is +ve then that is the number of active readers
- * - if activity is -1 then there is one active writer
- * - if wait_list is not empty, then there are processes waiting for the semaphore
+ * - 如果activity为 0，则没有活动的读者或作者
+ * - 如果activity是 +ve 那么这就是活跃读者的数量
+ * - 如果activity为 -1，则有一个活动写者
+ * - 如果wait_list 不为空，则有进程在等待信号量
+ *
+ * 通用实现
  */
 struct rw_semaphore {
-	__s32			activity;
+	__s32			activity;		// 非atomic_t，因为有自旋锁保护
 	spinlock_t		wait_lock;
 	struct list_head	wait_list;
 #if RWSEM_DEBUG

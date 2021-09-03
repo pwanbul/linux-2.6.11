@@ -10,8 +10,15 @@ struct vm_area_struct;
 
 /*
  * GFP bitmasks..
+ * get free page
+ *
  */
 /* Zone modifiers in GFP_ZONEMASK (see linux/mmzone.h - low two bits) */
+/* 区域修饰符，ZONE_NORMAL为默认区域
+ * 如果指定__GFP_DMA，则只能在dma中分配
+ * 如果指定__GFP_HIGHMEM，按highmem，normal，mda的顺序找
+ * 如果指定没有指定，按normal，mda的顺序找
+ * */
 #define __GFP_DMA	0x01
 #define __GFP_HIGHMEM	0x02
 
@@ -26,6 +33,7 @@ struct vm_area_struct;
  *
  * __GFP_NORETRY: The VM implementation must not retry indefinitely.
  */
+// 行为修饰符
 #define __GFP_WAIT	0x10	/* Can wait and reschedule? */
 #define __GFP_HIGH	0x20	/* Should access emergency pools? */
 #define __GFP_IO	0x40	/* Can start physical IO? */
@@ -46,7 +54,7 @@ struct vm_area_struct;
 #define GFP_LEVEL_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS| \
 			__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT| \
 			__GFP_NOFAIL|__GFP_NORETRY|__GFP_NO_GROW|__GFP_COMP)
-
+// 常用配置
 #define GFP_ATOMIC	(__GFP_HIGH)
 #define GFP_NOIO	(__GFP_WAIT)
 #define GFP_NOFS	(__GFP_WAIT | __GFP_IO)
@@ -85,18 +93,20 @@ FASTCALL(__alloc_pages(unsigned int, unsigned int, struct zonelist *));
 static inline struct page *alloc_pages_node(int nid, unsigned int gfp_mask,
 						unsigned int order)
 {
-	if (unlikely(order >= MAX_ORDER))
+	if (unlikely(order >= MAX_ORDER))		// 分配阶最多10，即1024个连续页框
 		return NULL;
-
-	return __alloc_pages(gfp_mask, order,
-		NODE_DATA(nid)->node_zonelists + (gfp_mask & GFP_ZONEMASK));
+	/* gfp_mask中zone modifiers可以指定zone
+	 * __GFP_DMA	0x01
+	 * __GFP_HIGHMEM	0x02
+	 * GFP_ZONEMASK为0x03
+	 * */
+	return __alloc_pages(gfp_mask, order, NODE_DATA(nid)->node_zonelists + (gfp_mask & GFP_ZONEMASK));
 }
 
-#ifdef CONFIG_NUMA
+#ifdef CONFIG_NUMA      // 配置NUMA
 extern struct page *alloc_pages_current(unsigned gfp_mask, unsigned order);
 
-static inline struct page *
-alloc_pages(unsigned int gfp_mask, unsigned int order)
+static inline struct page *alloc_pages(unsigned int gfp_mask, unsigned int order)
 {
 	if (unlikely(order >= MAX_ORDER))
 		return NULL;
@@ -105,17 +115,18 @@ alloc_pages(unsigned int gfp_mask, unsigned int order)
 }
 extern struct page *alloc_page_vma(unsigned gfp_mask,
 			struct vm_area_struct *vma, unsigned long addr);
-#else
+#else   // !NUMA
+// 分配连续地1<<order个页框，返回第一个页框描述符的地址
 #define alloc_pages(gfp_mask, order) \
 		alloc_pages_node(numa_node_id(), gfp_mask, order)
 #define alloc_page_vma(gfp_mask, vma, addr) alloc_pages(gfp_mask, 0)
 #endif
-#define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)
+#define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)		// 分配一个页框
 
 extern unsigned long FASTCALL(__get_free_pages(unsigned int gfp_mask, unsigned int order));
 extern unsigned long FASTCALL(get_zeroed_page(unsigned int gfp_mask));
 
-#define __get_free_page(gfp_mask) \
+#define __get_free_page(gfp_mask) \     // 分配一个页框,返回一个页框的虚拟地址
 		__get_free_pages((gfp_mask),0)
 
 #define __get_dma_pages(gfp_mask, order) \

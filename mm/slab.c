@@ -209,7 +209,7 @@ struct slab {
 	unsigned long		colouroff;
 	void			*s_mem;		/* including colour offset */
 	unsigned int		inuse;		/* num of objs active in slab */
-	kmem_bufctl_t		free;
+	kmem_bufctl_t		free;       // typedef unsigned short kmem_bufctl_t;
 };
 
 /*
@@ -247,6 +247,7 @@ struct slab_rcu {
  * footprint.
  *
  */
+// 每CPU结构
 struct array_cache {
 	unsigned int avail;
 	unsigned int limit;
@@ -270,12 +271,15 @@ struct arraycache_init {
  * into this structure, too. Figure out what causes
  * fewer cross-node spinlock operations.
  */
+// 3种链表
 struct kmem_list3 {
 	struct list_head	slabs_partial;	/* partial list first, better asm code */
 	struct list_head	slabs_full;
 	struct list_head	slabs_free;
+	/* 高速缓存中空闲对象个数(包括slabs_partial链表中和slabs_free链表中所有的空闲对象) */
 	unsigned long	free_objects;
 	int		free_touched;
+	/* 两次缓存收缩时的间隔，降低次数，提高性能 */
 	unsigned long	next_reap;
 	struct array_cache	*shared;
 };
@@ -298,29 +302,37 @@ struct kmem_list3 {
  *
  * manages a cache.
  */
-	
+// slab缓存区
 struct kmem_cache_s {
 /* 1) per-cpu data, touched during every alloc/free */
+	/* 指向包含空闲对象的本地高速缓存，每个CPU有一个该结构，当有对象释放时，优先放入本地CPU高速缓存中 */
 	struct array_cache	*array[NR_CPUS];
+	/* 要转移进本地高速缓存或从本地高速缓存中转移出去的对象的数量 */
 	unsigned int		batchcount;
+	/* 本地高速缓存中空闲对象的最大数目 */
 	unsigned int		limit;
 /* 2) touched by every alloc & free from the backend */
 	struct kmem_list3	lists;
 	/* NUMA: kmem_3list_t	*nodelists[MAX_NUMNODES] */
 	unsigned int		objsize;
+	/* 高速缓存永久属性的标识，如果SLAB描述符放在外部(不放在SLAB中)，则CFLAGS_OFF_SLAB置1 */
 	unsigned int	 	flags;	/* constant flags */
+	/* 每个SLAB中对象的个数(在同一个高速缓存中slab中对象个数相同) */
 	unsigned int		num;	/* # of objs per slab */
 	unsigned int		free_limit; /* upper limit of objects in the lists */
 	spinlock_t		spinlock;
 
 /* 3) cache_grow/shrink */
 	/* order of pgs per slab (2^n) */
+	/* 一个单独SLAB中包含的连续页框数目的对数 */
 	unsigned int		gfporder;
 
 	/* force GFP flags, e.g. GFP_DMA */
 	unsigned int		gfpflags;
-
+	
+	/* SLAB使用的颜色个数 */
 	size_t			colour;		/* cache colouring range */
+	/* SLAB中基本对齐偏移，当新SLAB着色时，偏移量的值需要乘上这个基本对齐偏移量，理解就是1个偏移量等于多少个B大小的值 */
 	unsigned int		colour_off;	/* colour offset */
 	unsigned int		colour_next;	/* cache colouring */
 	kmem_cache_t		*slabp_cache;
@@ -334,7 +346,9 @@ struct kmem_cache_s {
 	void (*dtor)(void *, kmem_cache_t *, unsigned long);
 
 /* 4) cache creation/removal */
+	/* 存放高速缓存名字 */
 	const char		*name;
+	/* 高速缓存描述符双向链表指针 */
 	struct list_head	next;
 
 /* 5) statistics */
@@ -546,6 +560,7 @@ static kmem_cache_t cache_cache = {
 };
 
 /* Guard access to the cache-chain. */
+// slab管理使用
 static struct semaphore	cache_chain_sem;
 static struct list_head cache_chain;
 
@@ -741,7 +756,7 @@ static struct notifier_block cpucache_notifier = { &cpuup_callback, NULL, 0 };
 /* Initialisation.
  * Called after the gfp() functions have been enabled, and before smp_init().
  */
-void __init kmem_cache_init(void)
+void __init kmem_cache_init(void)       // stark_kernel
 {
 	size_t left_over;
 	struct cache_sizes *sizes;
@@ -773,7 +788,7 @@ void __init kmem_cache_init(void)
 
 	/* 1) create the cache_cache */
 	init_MUTEX(&cache_chain_sem);
-	INIT_LIST_HEAD(&cache_chain);
+	INIT_LIST_HEAD(&cache_chain);       //
 	list_add(&cache_cache.next, &cache_chain);
 	cache_cache.colour_off = cache_line_size();
 	cache_cache.array[smp_processor_id()] = &initarray_cache.cache;
@@ -1183,6 +1198,11 @@ static void slab_destroy (kmem_cache_t *cachep, struct slab *slabp)
  * cacheline.  This can be beneficial if you're counting cycles as closely
  * as davem.
  */
+ /* 以mm_struct分配为例
+  * kmem_cache_create(
+  *     "mm_struct", sizeof(struct mm_struct), 0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL
+  * )
+  * */
 kmem_cache_t *
 kmem_cache_create (const char *name, size_t size, size_t align,
 	unsigned long flags, void (*ctor)(void*, kmem_cache_t *, unsigned long),
@@ -2475,12 +2495,13 @@ EXPORT_SYMBOL(__kmalloc);
 
 #ifdef CONFIG_SMP
 /**
- * __alloc_percpu - allocate one copy of the object for every present
- * cpu in the system, zeroing them.
- * Objects should be dereferenced using the per_cpu_ptr macro only.
+ * __alloc_percpu -
+ * 为系统中的每个现有 cpu 分配对象的一个副本，将它们归零。
  *
- * @size: how many bytes of memory are required.
- * @align: the alignment, which can't be greater than SMP_CACHE_BYTES.
+ * 应仅使用 per_cpu_ptr 宏取消引用对象。
+ *
+ * @size: 需要多少字节的内存。
+ * @align: 对齐，不能大于 SMP_CACHE_BYTES。
  */
 void *__alloc_percpu(size_t size, size_t align)
 {
@@ -2543,6 +2564,7 @@ EXPORT_SYMBOL(kmem_cache_free);
  * @size: element size.
  * @flags: the type of memory to allocate.
  */
+ // 同calloc
 void *kcalloc(size_t n, size_t size, int flags)
 {
 	void *ret = NULL;
@@ -2552,7 +2574,7 @@ void *kcalloc(size_t n, size_t size, int flags)
 
 	ret = kmalloc(n * size, flags);
 	if (ret)
-		memset(ret, 0, n * size);
+		memset(ret, 0, n * size);       // 每字节初始化为0
 	return ret;
 }
 
@@ -2565,6 +2587,7 @@ EXPORT_SYMBOL(kcalloc);
  * Don't free memory not originally allocated by kmalloc()
  * or you will run into trouble.
  */
+ // 同free
 void kfree (const void *objp)
 {
 	kmem_cache_t *c;

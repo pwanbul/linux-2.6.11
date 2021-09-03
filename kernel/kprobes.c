@@ -38,9 +38,9 @@
 #include <asm/kdebug.h>
 
 #define KPROBE_HASH_BITS 6
-#define KPROBE_TABLE_SIZE (1 << KPROBE_HASH_BITS)
+#define KPROBE_TABLE_SIZE (1 << KPROBE_HASH_BITS)       // 64
 
-static struct hlist_head kprobe_table[KPROBE_TABLE_SIZE];
+static struct hlist_head kprobe_table[KPROBE_TABLE_SIZE];       // hash桶
 
 unsigned int kprobe_cpu = NR_CPUS;
 static DEFINE_SPINLOCK(kprobe_lock);

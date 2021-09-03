@@ -19,7 +19,7 @@ struct sockaddr_ll
 	unsigned char	sll_addr[8];
 };
 
-/* Packet types */
+/* ip数据包类型 */
 
 #define PACKET_HOST		0		/* To us		*/
 #define PACKET_BROADCAST	1		/* To all		*/

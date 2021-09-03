@@ -16,7 +16,7 @@ $(obj)/vmlinux: $(obj)/head.o $(obj)/misc.o $(obj)/piggy.o FORCE
 $(obj)/vmlinux.bin: vmlinux FORCE
 	$(call if_changed,objcopy)
 
-$(obj)/vmlinux.bin.gz: $(obj)/vmlinux.bin FORCE
+$(obj)/vmlinux.bin.gz: $(obj)/vmlinux.bin FORCEm
 	$(call if_changed,gzip)
 
 LDFLAGS_piggy.o := -r --format binary --oformat elf32-i386 -T

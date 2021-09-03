@@ -363,22 +363,16 @@ menu "Loadable module support"
 config MODULES
 	bool "Enable loadable module support"
 	help
-	  Kernel modules are small pieces of compiled code which can
-	  be inserted in the running kernel, rather than being
-	  permanently built into the kernel.  You use the "modprobe"
-	  tool to add (and sometimes remove) them.  If you say Y here,
-	  many parts of the kernel can be built as modules (by
-	  answering M instead of Y where indicated): this is most
-	  useful for infrequently used options which are not required
-	  for booting.  For more information, see the man pages for
-	  modprobe, lsmod, modinfo, insmod and rmmod.
+	  内核模块是一小段已编译的代码，可以插入正在运行的内核中，而不是永久构建到内核中。
+	  您可以使用“modprobe”工具添加（有时会删除）它们。如果您在此处选择 Y，
+	  则内核的许多部分都可以构建为模块（通过回答M而不是Y指示的地方）：这对于
+	  引导不需要的不常用选项最有用。有关详细信息，请参阅 modprobe、lsmod、
+	  modinfo、insmod 和 rmmod 的手册页。
 
-	  If you say Y here, you will need to run "make
-	  modules_install" to put the modules under /lib/modules/
-	  where modprobe can find them (you may need to be root to do
-	  this).
+	  如果您在这里选择Y，您将需要运行“make modules_install”将模块放在
+	  libmodules下modprobe可以找到它们的位置（您可能需要是 root 才能执行此操作）。
 
-	  If unsure, say Y.
+	  如果不确定，请说 Y。
 
 config MODULE_UNLOAD
 	bool "Module unloading"

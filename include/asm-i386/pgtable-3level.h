@@ -84,7 +84,7 @@ static inline void pud_clear (pud_t * pud) { }
 ((unsigned long) __va(pud_val(pud) & PAGE_MASK))
 
 
-/* Find an entry in the second-level page table.. */
+/* 在二级页表中找到一个条目.. */
 #define pmd_offset(pud, address) ((pmd_t *) pud_page(*(pud)) + \
 			pmd_index(address))
 

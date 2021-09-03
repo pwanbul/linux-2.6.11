@@ -112,8 +112,9 @@ struct nf_bridge_info {
 
 #endif
 
+// sk_buff用一个链表管理，此次为链表的头，qlen表示链表长度
 struct sk_buff_head {
-	/* These two members must be first. */
+	/* 这两个成员必须是第一位的。 */
 	struct sk_buff	*next;
 	struct sk_buff	*prev;
 
@@ -134,8 +135,7 @@ struct skb_frag_struct {
 	__u16 size;
 };
 
-/* This data is invariant across clones and lives at
- * the end of the header data, ie. at skb->end.
+/* 这个数据在克隆之间是不变的，并且存在于头数据的末尾，即在 skb-> end。
  */
 struct skb_shared_info {
 	atomic_t	dataref;
@@ -188,20 +188,29 @@ struct skb_shared_info {
  *      @private: Data which is private to the HIPPI implementation
  *	@tc_index: Traffic control index
  */
-
+/* 在内核分析（收到的）网络分组时，底层协议的数据将传递到更高的层。发送数据时顺序相反，
+ * 各种协议产生的数据（首部和净荷）依次向更低的层传递，直至最终发送。这些操作的速度对网络子
+ * 系统的性能有决定性的影响，因此内核使用了一种特殊的结构，称为套接字缓冲区（socket buffer）。
+ *
+ * 套接字缓冲区用于在网络实现的各个层次之间交换数据，而无须来回复制分组数据，对性能的提高
+ * 很可观。套接字结构是网络子系统的基石之一，因为在产生和分析分组时，在各个协议层次上都需
+ * 要处理该结构。
+ *
+ * 套接字缓存区定义
+ * */
 struct sk_buff {
-	/* These two members must be first. */
+	/* 这两个成员必须是第一位的。 */
 	struct sk_buff		*next;
 	struct sk_buff		*prev;
 
-	struct sk_buff_head	*list;
+	struct sk_buff_head	*list;		// 指向链表头
 	struct sock		*sk;
-	struct timeval		stamp;
+	struct timeval		stamp;		//
 	struct net_device	*dev;
 	struct net_device	*input_dev;
 	struct net_device	*real_dev;
 
-	union {
+	union {		// 传输层头部
 		struct tcphdr	*th;
 		struct udphdr	*uh;
 		struct icmphdr	*icmph;
@@ -211,25 +220,24 @@ struct sk_buff {
 		unsigned char	*raw;
 	} h;
 
-	union {
+	union {		// 网络层头部
 		struct iphdr	*iph;
 		struct ipv6hdr	*ipv6h;
 		struct arphdr	*arph;
 		unsigned char	*raw;
 	} nh;
 
-	union {
+	union {		// 数据链路层
 	  	unsigned char 	*raw;
 	} mac;
 
-	struct  dst_entry	*dst;
+	struct  dst_entry	*dst;		// 在ip分组后，dst决定分组的去向
 	struct	sec_path	*sp;
 
 	/*
-	 * This is the control buffer. It is free to use for every
-	 * layer. Please put your private variables there. If you
-	 * want to keep them across layers you have to do a skb_clone()
-	 * first. This is owned by whoever has the skb queued ATM.
+	 * 这是控制缓冲区。它可以自由用于每一层。
+	 * 请把你的私有变量放在那里。如果你想让它们跨层，你必须先做一个 skb_clone() 。
+	 * 这是由拥有 skb 排队 ATM 的任何人拥有的。
 	 */
 	char			cb[40];
 
@@ -273,7 +281,7 @@ struct sk_buff {
 #endif
 
 
-	/* These elements must be at the end, see alloc_skb() for details.  */
+	/* 这些元素必须在最后，详见 alloc_skb().  */
 	unsigned int		truesize;
 	atomic_t		users;
 	unsigned char		*head,

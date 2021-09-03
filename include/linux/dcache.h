@@ -25,11 +25,9 @@ struct vfsmount;
 #define IS_ROOT(x) ((x) == (x)->d_parent)
 
 /*
- * "quick string" -- eases parameter passing, but more importantly
- * saves "metadata" about the string (ie length and the hash).
+ * “快速字符串”——简化参数传递，但更重要的是保存关于字符串的“元数据”（即长度和哈希）。
  *
- * hash comes first so it snuggles against d_parent in the
- * dentry.
+ * hash 首先出现，因此它依偎在 dentry 中的 d_parent 上。
  */
 struct qstr {
 	unsigned int hash;
@@ -50,7 +48,7 @@ extern struct dentry_stat_t dentry_stat;
 /* Hash courtesy of the R5 hash in reiserfs modulo sign bits */
 #define init_name_hash()		0
 
-/* partial hash update function. Assume roughly 4 bits per character */
+/* 部分哈希更新函数。假设每个字符大约 4 位 */
 static inline unsigned long
 partial_name_hash(unsigned long c, unsigned long prevhash)
 {
@@ -58,8 +56,7 @@ partial_name_hash(unsigned long c, unsigned long prevhash)
 }
 
 /*
- * Finally: cut down the number of bits to a int value (and try to avoid
- * losing bits)
+ * 最后：将位数减少到 int 值（并尽量避免丢失位数）
  */
 static inline unsigned long end_name_hash(unsigned long hash)
 {
@@ -80,40 +77,60 @@ struct dcookie_struct;
 
 #define DNAME_INLINE_LEN_MIN 36
 
+/* 和超级块和索引节点不同，目录项并不是实际存在于磁盘上的。
+ *
+ * 在使用的时候在内存中创建目录项对象，其实通过索引节点已经可以定位到指定的文件，
+ * 但是索引节点对象的属性非常多，在查找，比较文件时，直接用索引节点效率不高，所以引入了目录项的概念。
+ *
+ * 路径中的每个部分都是一个目录项，比如路径： /mnt/cdrom/foo/bar 其中包含5个目录项，/ mnt cdrom foo bar
+ *
+ * 每个目录项对象都有3种状态：被使用，未使用和负状态
+ * 		被使用：对应一个有效的索引节点，并且该对象由一个或多个使用者
+ * 		未使用：对应一个有效的索引节点，但是VFS当前并没有使用这个目录项
+ * 		负状态：没有对应的有效索引节点（可能索引节点被删除或者路径不存在了）
+ *
+ * 	目录项的目的就是提高文件查找，比较的效率，所以访问过的目录项都会缓存在slab中。
+ * */
 struct dentry {
-	atomic_t d_count;
-	unsigned int d_flags;		/* protected by d_lock */
-	spinlock_t d_lock;		/* per dentry lock */
+	atomic_t d_count;		/* 使用计数 */
+	unsigned int d_flags;		/* protected by d_lock 目录项标识 */
+	spinlock_t d_lock;		/* per dentry lock 单目录项锁 */
 	struct inode *d_inode;		/* Where the name belongs to - NULL is
-					 * negative */
+					 * negative 相关联的索引节点 */
 	/*
 	 * The next three fields are touched by __d_lookup.  Place them here
 	 * so they all fit in a 16-byte range, with 16-byte alignment.
 	 */
-	struct dentry *d_parent;	/* parent directory */
-	struct qstr d_name;
+	struct dentry *d_parent;	/* parent directory 父目录的目录项对象*/
+	struct qstr d_name;		// 目录项名称
 
-	struct list_head d_lru;		/* LRU list */
+	struct list_head d_lru;		/* LRU list 未使用的链表 */
 	struct list_head d_child;	/* child of parent list */
-	struct list_head d_subdirs;	/* our children */
-	struct list_head d_alias;	/* inode alias list */
+	struct list_head d_subdirs;	/* our children 子目录链表 */
+	struct list_head d_alias;	/* inode alias list 索引节点别名链表 */
 	unsigned long d_time;		/* used by d_revalidate */
-	struct dentry_operations *d_op;
-	struct super_block *d_sb;	/* The root of the dentry tree */
-	void *d_fsdata;			/* fs-specific data */
+	struct dentry_operations *d_op; // 目录项操作相关函数
+	struct super_block *d_sb;	/* The root of the dentry tree 文件的超级块 */
+	void *d_fsdata;			/* fs-specific data 文件系统特有数据 */
  	struct rcu_head d_rcu;
 	struct dcookie_struct *d_cookie; /* cookie, if any */
-	struct hlist_node d_hash;	/* lookup hash list */	
+	struct hlist_node d_hash;	/* lookup hash list 散列表 */
 	int d_mounted;
-	unsigned char d_iname[DNAME_INLINE_LEN_MIN];	/* small names */
+	unsigned char d_iname[DNAME_INLINE_LEN_MIN];	/* small names  短文件名 */
 };
 
 struct dentry_operations {
+	/* 该函数判断目录项对象是否有效。VFS准备从dcache中使用一个目录项时会调用这个函数 */
 	int (*d_revalidate)(struct dentry *, struct nameidata *);
+	/* 为目录项对象生成hash值 */
 	int (*d_hash) (struct dentry *, struct qstr *);
+	/* 比较 qstr 类型的2个文件名 */
 	int (*d_compare) (struct dentry *, struct qstr *, struct qstr *);
+	/* 当目录项对象的 d_count 为0时，VFS调用这个函数 */
 	int (*d_delete)(struct dentry *);
+	/* 当目录项对象将要被释放时，VFS调用该函数 */
 	void (*d_release)(struct dentry *);
+	/* 当目录项对象丢失其索引节点时（也就是磁盘索引节点被删除了），VFS会调用该函数 */
 	void (*d_iput)(struct dentry *, struct inode *);
 };
 

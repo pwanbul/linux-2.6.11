@@ -22,7 +22,7 @@
 #endif /* CONFIG_NUMA */
 
 extern struct pglist_data *node_data[];
-#define NODE_DATA(nid)		(node_data[nid])
+#define NODE_DATA(nid)		(node_data[nid])        // NUMA中通过指定nid来获取对应的pd_data_t
 
 /*
  * generic node memory support, the following assumptions apply:

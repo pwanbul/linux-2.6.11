@@ -3,7 +3,7 @@
 #define _SELINUX_FLASK_H_
 
 /*
- * Security object class definitions
+ * 安全对象类定义
  */
 #define SECCLASS_SECURITY                                1
 #define SECCLASS_PROCESS                                 2
@@ -60,7 +60,7 @@
 #define SECCLASS_NSCD                                    53
 
 /*
- * Security identifier indices for initial entities
+ * 初始实体的安全标识符索引
  */
 #define SECINITSID_KERNEL                               1
 #define SECINITSID_SECURITY                             2

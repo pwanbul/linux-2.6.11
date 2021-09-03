@@ -26,8 +26,7 @@
 #include <linux/spinlock.h>
 
 /*
- * ZERO_PAGE is a global shared page that is always zero: used
- * for zero-mapped memory areas etc..
+ * ZERO_PAGE 是一个始终为零的全局共享页面：用于零映射内存区域等。
  */
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 extern unsigned long empty_zero_page[1024];
@@ -44,9 +43,8 @@ void pgtable_cache_init(void);
 void paging_init(void);
 
 /*
- * The Linux x86 paging architecture is 'compile-time dual-mode', it
- * implements both the traditional 2-level x86 page tables and the
- * newer 3-level PAE-mode page tables.
+ * Linux x86 分页架构是“编译时双模式”，它实现了传统的2级x86页表和较新的3级PAE模式页表。
+ * 3级相较于2级，多了PMD
  */
 #ifdef CONFIG_X86_PAE
 # include <asm/pgtable-3level-defs.h>
@@ -76,6 +74,7 @@ void paging_init(void);
  * The vmalloc() routines leaves a hole of 4kB between each vmalloced
  * area for the same reason. ;)
  */
+// 动态映射区域的起止地址
 #define VMALLOC_OFFSET	(8*1024*1024)
 #define VMALLOC_START	(((unsigned long) high_memory + vmalloc_earlyreserve + \
 			2*VMALLOC_OFFSET-1) & ~(VMALLOC_OFFSET-1))
@@ -297,10 +296,8 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 ((pmd_val(pmd) & (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT))
 
 /*
- * the pgd page can be thought of an array like this: pgd_t[PTRS_PER_PGD]
- *
- * this macro returns the index of the entry in the pgd page which would
- * control the given virtual address
+ * pgd 页面可以被认为是一个这样的数组：pgd_t[PTRS_PER_PGD]
+ * 此宏返回 pgd 页中条目的索引，该条目将控制给定的虚拟地址
  */
 #define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
 #define pgd_index_k(addr) pgd_index(addr)
@@ -318,19 +315,16 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
 /*
- * the pmd page can be thought of an array like this: pmd_t[PTRS_PER_PMD]
+ * pmd 页面可以被认为是一个这样的数组：pmd_t[PTRS_PER_PMD]
  *
- * this macro returns the index of the entry in the pmd page which would
- * control the given virtual address
+ * 此宏返回 pmd 页面中条目的索引，该条目将控制给定的虚拟地址
  */
 #define pmd_index(address) \
 		(((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
 
 /*
- * the pte page can be thought of an array like this: pte_t[PTRS_PER_PTE]
- *
- * this macro returns the index of the entry in the pte page which would
- * control the given virtual address
+ * pte 页面可以被认为是一个这样的数组： pte_t[PTRS_PER_PTE]
+ * 这个宏返回 pte 页面中条目的索引，它将控制给定的虚拟地址
  */
 #define pte_index(address) \
 		(((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))

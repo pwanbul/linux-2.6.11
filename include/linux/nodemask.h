@@ -51,7 +51,7 @@
  *
  * for_each_node_mask(node, mask)	for-loop node over mask
  *
- * int num_online_nodes()		Number of online Nodes
+ * int num_online_nodes()		在线节点数
  * int num_possible_nodes()		Number of all possible Nodes
  *
  * int node_online(node)		Is some node online?
@@ -301,8 +301,7 @@ static inline int __nodemask_parse(const char __user *buf, int len,
 #endif /* MAX_NUMNODES */
 
 /*
- * The following particular system nodemasks and operations
- * on them manage all possible and online nodes.
+ * 以下特定的系统节点掩码和对它们的操作管理所有可能的和在线的节点
  */
 
 extern nodemask_t node_online_map;
@@ -329,7 +328,9 @@ extern nodemask_t node_possible_map;
 	node;					\
 })
 
+// 设置在线numa节点
 #define node_set_online(node)	   set_bit((node), node_online_map.bits)
+// 设置离线numa节点
 #define node_set_offline(node)	   clear_bit((node), node_online_map.bits)
 
 #define for_each_node(node)	   for_each_node_mask((node), node_possible_map)

@@ -10,11 +10,11 @@
 struct pt_regs;
 
 struct die_args {
-	struct pt_regs *regs;
-	const char *str;
-	long err;
-	int trapnr;
-	int signr;
+	struct pt_regs *regs;   // 寄存器上下文
+	const char *str;        // 描述
+	long err;       // cpu返回的错误码
+	int trapnr;     // 中断号
+	int signr;      // 信号编号
 };
 
 /* Note - you should never unregister because that can race with NMIs.
@@ -38,7 +38,7 @@ enum die_val {
 	DIE_GPF,
 	DIE_CALL,
 	DIE_NMI_IPI,
-	DIE_PAGE_FAULT,
+	DIE_PAGE_FAULT,     // 页面故障
 };
 
 static inline int notify_die(enum die_val val,char *str,struct pt_regs *regs,long err,int trap, int sig)

@@ -4,44 +4,44 @@
 #include <linux/config.h>
 #include <linux/compiler.h>
 
-/* These macros are used to mark some functions or 
- * initialized data (doesn't apply to uninitialized data)
- * as `initialization' functions. The kernel can take this
- * as hint that the function is used only during the initialization
- * phase and free up used memory resources after
+/* 这些宏用于将某些函数或已初始化的数据（不适用于未初始化的数据）
+ * 标记为“已初始化”函数。内核可以以此暗示该函数仅在初始化阶段使用，
+ * 并在之后释放已使用的内存资源。
  *
  * Usage:
- * For functions:
+ * 对于函数:
  * 
- * You should add __init immediately before the function name, like:
+ * 您应该在函数名称之前立即添加 __init，例如:
  *
  * static void __init initme(int x, int y)
  * {
  *    extern int z; z = x * y;
  * }
  *
- * If the function has a prototype somewhere, you can also add
- * __init between closing brace of the prototype and semicolon:
+ * 如果函数在某处有原型，您还可以在原型的右括号和分号之间添加 __init:
  *
  * extern int initialize_foobar_device(int, int, int) __init;
  *
- * For initialized data:
- * You should insert __initdata between the variable name and equal
- * sign followed by value, e.g.:
+ * 对于初始化数据:
+ * 您应该在变量名和等号之间插入 __initdata 后跟值，(数据应当是静态的(包括函数内的)、全局的)例如:
  *
  * static int init_variable __initdata = 0;
  * static char linux_logo[] __initdata = { 0x32, 0x36, ... };
  *
- * Don't forget to initialize data not at file scope, i.e. within a function,
- * as gcc otherwise puts the data into the bss section and not into the init
- * section.
+ * 不要忘记初始化不在文件范围内的数据，即在函数内，否则 gcc 会将数据放入 bss 部分而不是 init 部分.
  * 
- * Also note, that this data cannot be "const".
+ * 另请注意，此数据不能为“const”.
  */
 
 /* These are for everybody (although not all archs will actually
    discard it in modules) */
+/* 这个标志符和函数声明放在一起，表示gcc编译器在编译时，
+ * 需要把这个函数放在.init.text Section 中，
+ * 而这个Section 在内核完成初始化之后，就会被释放掉。
+ * */
 #define __init		__attribute__ ((__section__ (".init.text")))
+
+//这个标志符和变量声明放在一起，表示gcc编译器在编译时，需要把这个变量放在.init.data Section中，而这个Section 在内核完成初始化之后，会释放掉。
 #define __initdata	__attribute__ ((__section__ (".init.data")))
 #define __exitdata	__attribute__ ((__section__(".exit.data")))
 #define __exit_call	__attribute_used__ __attribute__ ((__section__ (".exitcall.exit")))
@@ -59,10 +59,10 @@
 
 #ifndef __ASSEMBLY__
 /*
- * Used for initialization calls..
+ * 用于初始化调用..
  */
-typedef int (*initcall_t)(void);
-typedef void (*exitcall_t)(void);
+typedef int (*initcall_t)(void);		// initcall函数指针
+typedef void (*exitcall_t)(void);		// exitcall函数指针
 
 extern initcall_t __con_initcall_start[], __con_initcall_end[];
 extern initcall_t __security_initcall_start[], __security_initcall_end[];
@@ -75,17 +75,17 @@ extern char saved_command_line[];
 
 #ifndef __ASSEMBLY__
 
-/* initcalls are now grouped by functionality into separate 
- * subsections. Ordering inside the subsections is determined
- * by link order. 
- * For backwards compatibility, initcall() puts the call in 
- * the device init subsection.
+/* initcalls 现在按功能分组到单独的小节中。小节内的排序由链接顺序决定。
+ * 为了向后兼容，initcall() 将调用放在设备初始化小节中。
+ *
+ * 注意：需要先定义一个指向函数的指针，在将指针设置到initcall section中
+ * initcall的函数必定是__init的，反之不成立
  */
 
 #define __define_initcall(level,fn) \
 	static initcall_t __initcall_##fn __attribute_used__ \
 	__attribute__((__section__(".initcall" level ".init"))) = fn
-
+// initcall有多种级别
 #define core_initcall(fn)		__define_initcall("1",fn)
 #define postcore_initcall(fn)		__define_initcall("2",fn)
 #define arch_initcall(fn)		__define_initcall("3",fn)
@@ -96,13 +96,17 @@ extern char saved_command_line[];
 
 #define __initcall(fn) device_initcall(fn)
 
+// exitcall就一种
 #define __exitcall(fn) \
 	static exitcall_t __exitcall_##fn __exit_call = fn
 
+// 其他类型的initcall
+// 控制台相关
 #define console_initcall(fn) \
 	static initcall_t __initcall_##fn \
 	__attribute_used__ __attribute__((__section__(".con_initcall.init")))=fn
 
+// LSM相关
 #define security_initcall(fn) \
 	static initcall_t __initcall_##fn \
 	__attribute_used__ __attribute__((__section__(".security_initcall.init"))) = fn
@@ -114,10 +118,9 @@ struct obs_kernel_param {
 };
 
 /*
- * Only for really core code.  See moduleparam.h for the normal way.
+ * 仅用于真正的核心代码。有关正常方式，请参阅 moduleparam.h。
  *
- * Force the alignment so the compiler doesn't space elements of the
- * obs_kernel_param "array" too far apart in .init.setup.
+ * 强制对齐，以便编译器不会在 .init.setup 中将 obs_kernel_param “数组”的元素间隔得太远。
  */
 #define __setup_param(str, unique_id, fn, early)			\
 	static char __setup_str_##unique_id[] __initdata = str;	\

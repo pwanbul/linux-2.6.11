@@ -82,6 +82,7 @@ struct cache_sizes {
 extern struct cache_sizes malloc_sizes[];
 extern void *__kmalloc(size_t, int);
 
+// 同malloc，返回void *指针，失败返回NULL(-ENOMEM)，成功返回有效地址，至少有size大小
 static inline void *kmalloc(size_t size, int flags)
 {
 	if (__builtin_constant_p(size)) {
@@ -112,15 +113,15 @@ extern unsigned int ksize(const void *);
 extern int FASTCALL(kmem_cache_reap(int));
 extern int FASTCALL(kmem_ptr_validate(kmem_cache_t *cachep, void *ptr));
 
-/* System wide caches */
-extern kmem_cache_t	*vm_area_cachep;
-extern kmem_cache_t	*mm_cachep;
-extern kmem_cache_t	*names_cachep;
-extern kmem_cache_t	*files_cachep;
-extern kmem_cache_t	*filp_cachep;
-extern kmem_cache_t	*fs_cachep;
-extern kmem_cache_t	*signal_cachep;
-extern kmem_cache_t	*sighand_cachep;
+/* 系统范围的缓存 */
+extern kmem_cache_t	*vm_area_cachep;			// vm_area_strcut
+extern kmem_cache_t	*mm_cachep;			// mm_struct
+extern kmem_cache_t	*names_cachep;		// 文件名
+extern kmem_cache_t	*files_cachep;		// files_struct
+extern kmem_cache_t	*filp_cachep;		// file
+extern kmem_cache_t	*fs_cachep;			// fs_struct
+extern kmem_cache_t	*signal_cachep;		// signal_struct
+extern kmem_cache_t	*sighand_cachep;	// sighand_struct
 extern kmem_cache_t	*bio_cachep;
 
 extern atomic_t slab_reclaim_pages;

@@ -7,16 +7,16 @@
 
 #ifdef CONFIG_LOCK_KERNEL
 
-#define kernel_locked()		(current->lock_depth >= 0)
+#define kernel_locked()		(current->lock_depth >= 0)		// lock_depth被初始化成-1，非-1则表示进程持有大内核锁
 
 extern int __lockfunc __reacquire_kernel_lock(void);
 extern void __lockfunc __release_kernel_lock(void);
 
 /*
- * Release/re-acquire global kernel lock for the scheduler
+ * 释放/重新获取调度器的全局内核锁
  */
 #define release_kernel_lock(tsk) do { 		\
-	if (unlikely((tsk)->lock_depth >= 0))	\
+	if (unlikely((tsk)->lock_depth >= 0))	\		// 当前进程持有大内核锁
 		__release_kernel_lock();	\
 } while (0)
 
@@ -32,6 +32,7 @@ extern void __lockfunc __release_kernel_lock(void);
 # define return_value_on_smp
 #endif
 
+// 重新请求大内核锁
 static inline int reacquire_kernel_lock(struct task_struct *task)
 {
 	if (unlikely(task->lock_depth >= 0))
@@ -42,7 +43,7 @@ static inline int reacquire_kernel_lock(struct task_struct *task)
 extern void __lockfunc lock_kernel(void)	__acquires(kernel_lock);
 extern void __lockfunc unlock_kernel(void)	__releases(kernel_lock);
 
-#else
+#else	// !CONFIG_LOCK_KERNEL
 
 #define lock_kernel()				do { } while(0)
 #define unlock_kernel()				do { } while(0)

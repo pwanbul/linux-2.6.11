@@ -25,15 +25,19 @@
  * using the generic single-entry routines.
  */
 
+// 内核链表是一个带头结点的双向循环链表
 struct list_head {
 	struct list_head *next, *prev;
 };
 
+// 静态初始化，一般init在后面的是静态初始化，指针域自己指向自己，而不是指向NULL
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
 
+// 定义一个节点
 #define LIST_HEAD(name) \
 	struct list_head name = LIST_HEAD_INIT(name)
 
+// 动态初始化
 #define INIT_LIST_HEAD(ptr) do { \
 	(ptr)->next = (ptr); (ptr)->prev = (ptr); \
 } while (0)
@@ -44,6 +48,7 @@ struct list_head {
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
+// 在prev和next之间加入一个节点new，prev和next必须连续
 static inline void __list_add(struct list_head *new,
 			      struct list_head *prev,
 			      struct list_head *next)
@@ -62,6 +67,7 @@ static inline void __list_add(struct list_head *new,
  * Insert a new entry after the specified head.
  * This is good for implementing stacks.
  */
+// 头插链表，相当于栈
 static inline void list_add(struct list_head *new, struct list_head *head)
 {
 	__list_add(new, head, head->next);
@@ -75,6 +81,7 @@ static inline void list_add(struct list_head *new, struct list_head *head)
  * Insert a new entry before the specified head.
  * This is useful for implementing queues.
  */
+// 尾插链表，相当于队列
 static inline void list_add_tail(struct list_head *new, struct list_head *head)
 {
 	__list_add(new, head->prev, head);
@@ -86,12 +93,13 @@ static inline void list_add_tail(struct list_head *new, struct list_head *head)
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
+// 在rcu方式加入节点
 static inline void __list_add_rcu(struct list_head * new,
 		struct list_head * prev, struct list_head * next)
 {
 	new->next = next;
 	new->prev = prev;
-	smp_wmb();
+	smp_wmb();		// 写内存屏障
 	next->prev = new;
 	prev->next = new;
 }
@@ -112,6 +120,7 @@ static inline void __list_add_rcu(struct list_head * new,
  * the _rcu list-traversal primitives, such as
  * list_for_each_entry_rcu().
  */
+// rcu头插链表，相当于栈
 static inline void list_add_rcu(struct list_head *new, struct list_head *head)
 {
 	__list_add_rcu(new, head, head->next);
@@ -133,6 +142,7 @@ static inline void list_add_rcu(struct list_head *new, struct list_head *head)
  * the _rcu list-traversal primitives, such as
  * list_for_each_entry_rcu().
  */
+// rcu尾插链表，相当于队列
 static inline void list_add_tail_rcu(struct list_head *new,
 					struct list_head *head)
 {
@@ -146,6 +156,7 @@ static inline void list_add_tail_rcu(struct list_head *new,
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
+// 删除在prev和next之间的所有节点，prve和next可以不连续，
 static inline void __list_del(struct list_head * prev, struct list_head * next)
 {
 	next->prev = prev;
@@ -158,11 +169,12 @@ static inline void __list_del(struct list_head * prev, struct list_head * next)
  * Note: list_empty on entry does not return true after this, the entry is
  * in an undefined state.
  */
+// 删除节点，传入欲删除的节点即可
 static inline void list_del(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
-	entry->next = LIST_POISON1;
-	entry->prev = LIST_POISON2;
+	entry->next = LIST_POISON1;		// 被删除的节点的指针域被设置成特殊的内存地址
+	entry->prev = LIST_POISON2;		// 使用list_empty判断不为空，但是访问会报错
 }
 
 /**
@@ -189,6 +201,7 @@ static inline void list_del(struct list_head *entry)
  * or call_rcu() must be used to defer freeing until an RCU
  * grace period has elapsed.
  */
+// rcu方式删除节点
 static inline void list_del_rcu(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
@@ -202,8 +215,9 @@ static inline void list_del_rcu(struct list_head *entry)
  *
  * The old entry will be replaced with the new entry atomically.
  */
+// rcu方式替换节点
 static inline void list_replace_rcu(struct list_head *old, struct list_head *new){
-	new->next = old->next;
+	new->next = old->next;		// 新处理新节点的指针域
 	new->prev = old->prev;
 	smp_wmb();
 	new->next->prev = new;
@@ -214,10 +228,11 @@ static inline void list_replace_rcu(struct list_head *old, struct list_head *new
  * list_del_init - deletes entry from list and reinitialize it.
  * @entry: the element to delete from the list.
  */
+// 把删除的节点，动态初始化
 static inline void list_del_init(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
-	INIT_LIST_HEAD(entry);
+	INIT_LIST_HEAD(entry);	// 初始化后，list_empty访问不报错
 }
 
 /**
@@ -481,6 +496,7 @@ static inline void list_splice_init(struct list_head *list,
 	for ((pos) = (pos)->next; prefetch((pos)->next), (pos) != (head); \
         	(pos) = rcu_dereference((pos)->next))
 
+// 下面是hash list的实现
 /*
  * Double linked lists with a single pointer list head.
  * Mostly useful for hash tables where the two pointer list head is

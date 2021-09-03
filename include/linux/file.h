@@ -11,26 +11,27 @@
 #include <linux/spinlock.h>
 
 /*
- * The default fd array needs to be at least BITS_PER_LONG,
- * as this is the granularity returned by copy_fdset().
+ * 默认的 fd 数组需要至少为 BITS_PER_LONG，因为这是 copy_fdset() 返回的粒度。
  */
 #define NR_OPEN_DEFAULT BITS_PER_LONG
 
 /*
  * Open file table structure
+ * 打开的文件描述符表
  */
 struct files_struct {
-        atomic_t count;
-        spinlock_t file_lock;     /* Protects all the below members.  Nests inside tsk->alloc_lock */
-        int max_fds;
-        int max_fdset;
-        int next_fd;
-        struct file ** fd;      /* current fd array */
-        fd_set *close_on_exec;
-        fd_set *open_fds;
-        fd_set close_on_exec_init;
-        fd_set open_fds_init;
-        struct file * fd_array[NR_OPEN_DEFAULT];
+	atomic_t count;         // 共享该表的进程数
+	spinlock_t file_lock;     /* Protects all the below members.  Nests inside tsk->alloc_lock */
+	int max_fds;            // 当前文件对象的最大数，32
+	int max_fdset;          // 当前文件描述符的最大数，1024
+	int next_fd;            // 已分配的文件描述符加1，0
+
+	struct file ** fd;      /* current fd array 指向文件对象指针数组的指针，在fork中初始化时指向fd_array */
+	fd_set *close_on_exec;  // 指向执行exec( )时需要关闭的文件描述符，在fork中初始化时指向close_on_exec_init
+	fd_set *open_fds;       // 指向打开文件描述符的指针，在fork中初始化时指向open_fds_init
+	fd_set close_on_exec_init;  // 执行exec( )时需要关闭的文件描述符的初值集合
+	fd_set open_fds_init;       // 文件描述符的初值集合
+	struct file * fd_array[NR_OPEN_DEFAULT];     // 文件对象指针的初始化数组，32
 };
 
 extern void FASTCALL(__fput(struct file *));

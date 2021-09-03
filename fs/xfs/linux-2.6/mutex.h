@@ -36,10 +36,10 @@
 #include <asm/semaphore.h>
 
 /*
- * Map the mutex'es from IRIX to Linux semaphores.
+ * 将互斥锁从 IRIX 映射到 Linux 信号量。
+ * Destroy 只是简单地初始化为 -99，这应该会阻止所有其他调用者。
  *
- * Destroy just simply initializes to -99 which should block all other
- * callers.
+ * mutex_t使用semaphore实现
  */
 #define MUTEX_DEFAULT		0x0
 typedef struct semaphore	mutex_t;

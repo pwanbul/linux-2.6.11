@@ -190,8 +190,7 @@ struct inode_operations simple_dir_inode_operations = {
 };
 
 /*
- * Common helper for pseudo-filesystems (sockfs, pipefs, bdev - stuff that
- * will never be mountable)
+ * 伪文件系统的通用助手（sockfs、pipefs、bdev - 永远无法安装的东西）
  */
 struct super_block *
 get_sb_pseudo(struct file_system_type *fs_type, char *name,

@@ -335,8 +335,7 @@ otherwise noted.
 struct file_operations                                                <section>
 ======================
 
-This describes how the VFS can manipulate an open file. As of kernel
-2.1.99, the following members are defined:
+这描述了 VFS 如何操作打开的文件。从内核 2.1.99 开始，定义了以下成员：
 
 struct file_operations {
 	loff_t (*llseek) (struct file *, loff_t, int);
@@ -366,9 +365,8 @@ otherwise noted.
 
   readdir: called when the VFS needs to read the directory contents
 
-  poll: called by the VFS when a process wants to check if there is
-	activity on this file and (optionally) go to sleep until there
-	is activity. Called by the select(2) and poll(2) system calls
+  poll: 当进程想要检查此文件上是否有活动并且（可选）进入睡眠状态直到有活动时，
+        由 VFS 调用。由 select(2) 和 poll(2) 系统调用调用
 
   ioctl: called by the ioctl(2) system call
 

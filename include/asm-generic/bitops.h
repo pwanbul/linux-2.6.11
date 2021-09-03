@@ -68,8 +68,7 @@ extern __inline__ int test_bit(int nr, const unsigned long * addr)
 #define ffs(x) generic_ffs(x)
 
 /*
- * hweightN: returns the hamming weight (i.e. the number
- * of bits set) of a N-bit word
+ * hweightN：返回 N 位字的汉明权重（即设置的位数）
  */
 
 #define hweight32(x) generic_hweight32(x)

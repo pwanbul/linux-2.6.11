@@ -18,25 +18,27 @@
 #endif
 
 /*
- * low level task data that entry.S needs immediate access to
- * - this struct should fit entirely inside of one cache line
- * - this struct shares the supervisor stack pages
- * - if the contents of this structure are changed, the assembly constants must also be changed
+ * entry.S 需要立即访问的低级任务数据
+ * - 这个结构应该完全适合一个缓存行
+ * - 此结构共享主管堆栈页面
+ * - 如果这个结构的内容改变了，汇编常量也必须改变
  */
 #ifndef __ASSEMBLY__
-
+// 线程描述符
 struct thread_info {
-	struct task_struct	*task;		/* main task structure */
+	struct task_struct	*task;		/* 指向task_struct指针 */
 	struct exec_domain	*exec_domain;	/* execution domain */
 	unsigned long		flags;		/* low level flags */
 	unsigned long		status;		/* thread-synchronous flags */
 	__u32			cpu;		/* current CPU */
-	__s32			preempt_count; /* 0 => preemptable, <0 => BUG */
+	// 见preempt_mask.h
+	__s32			preempt_count; /* 0 => preemptable, <0 => BUG 抢占/中断相关计数器 */
 
 
-	mm_segment_t		addr_limit;	/* thread address space:
+	mm_segment_t		addr_limit;	/* 当前可访问的地址空间范围，thread address space:
 					 	   0-0xBFFFFFFF for user-thead
 						   0-0xFFFFFFFF for kernel-thread
+						   access_ok()使用，set_fs()设置
 						*/
 	struct restart_block    restart_block;
 
@@ -56,7 +58,7 @@ struct thread_info {
 #ifdef CONFIG_4KSTACKS
 #define THREAD_SIZE            (4096)
 #else
-#define THREAD_SIZE		(8192)
+#define THREAD_SIZE		(8192)      // 进程内核栈8K
 #endif
 
 #define STACK_WARN             (THREAD_SIZE/8)
@@ -67,6 +69,7 @@ struct thread_info {
  */
 #ifndef __ASSEMBLY__
 
+// init_task的线程描述符
 #define INIT_THREAD_INFO(tsk)			\
 {						\
 	.task		= &tsk,			\
@@ -116,7 +119,9 @@ register unsigned long current_stack_pointer asm("esp") __attribute_used__;
 
 #else /* !__ASSEMBLY__ */
 
-/* how to get the thread information struct from ASM */
+/* 如何从 ASM 获取线程信息结构
+ * 获取线程描述符thread_info的指针
+ * */
 #define GET_THREAD_INFO(reg) \
 	movl $-THREAD_SIZE, reg; \
 	andl %esp, reg
@@ -133,13 +138,13 @@ register unsigned long current_stack_pointer asm("esp") __attribute_used__;
  * - pending work-to-be-done flags are in LSW
  * - other flags in MSW
  */
-#define TIF_SYSCALL_TRACE	0	/* syscall trace active */
+#define TIF_SYSCALL_TRACE	0	/* 进程被跟踪 syscall trace active */
 #define TIF_NOTIFY_RESUME	1	/* resumption notification requested */
-#define TIF_SIGPENDING		2	/* signal pending */
-#define TIF_NEED_RESCHED	3	/* rescheduling necessary */
-#define TIF_SINGLESTEP		4	/* restore singlestep on return to user mode */
+#define TIF_SIGPENDING		2	/* 进程有未决信号 signal pending */
+#define TIF_NEED_RESCHED	3	/* 进程可以被抢占 rescheduling necessary */
+#define TIF_SINGLESTEP		4	/* 返回用户空间时恢复单步执行 restore singlestep on return to user mode */
 #define TIF_IRET		5	/* return with iret */
-#define TIF_SYSCALL_AUDIT	7	/* syscall auditing active */
+#define TIF_SYSCALL_AUDIT	7	/* 进程被审计 syscall auditing active */
 #define TIF_POLLING_NRFLAG	16	/* true if poll_idle() is polling TIF_NEED_RESCHED */
 #define TIF_MEMDIE		17
 
@@ -155,7 +160,7 @@ register unsigned long current_stack_pointer asm("esp") __attribute_used__;
 /* work to do on interrupt/exception return */
 #define _TIF_WORK_MASK \
   (0x0000FFFF & ~(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP))
-#define _TIF_ALLWORK_MASK	0x0000FFFF	/* work to do on any return to u-space */
+#define _TIF_ALLWORK_MASK	0x0000FFFF	/* 返回 u-space 时要做的工作 */
 
 /*
  * Thread-synchronous status.

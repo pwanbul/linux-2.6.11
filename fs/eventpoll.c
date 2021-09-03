@@ -113,13 +113,13 @@
 /* Macro to free a "struct eppoll_entry" to the slab cache */
 #define PWQ_MEM_FREE(p) kmem_cache_free(pwq_cache, p)
 
-/* Fast test to see if the file is an evenpoll file */
+/* 快速测试以查看文件是否为偶数轮询文件 */
 #define IS_FILE_EPOLL(f) ((f)->f_op == &eventpoll_fops)
 
-/* Setup the structure that is used as key for the rb-tree */
+/* 设置用作 rb-tree 键的结构 */
 #define EP_SET_FFD(p, f, d) do { (p)->file = (f); (p)->fd = (d); } while (0)
 
-/* Compare rb-tree keys */
+/* 比较 rb-tree 键 */
 #define EP_CMP_FFD(p1, p2) ((p1)->file > (p2)->file ? +1: \
 			    ((p1)->file < (p2)->file ? -1: (p1)->fd - (p2)->fd))
 
@@ -148,7 +148,7 @@
 /* Get the "struct epitem" from an epoll queue wrapper */
 #define EP_ITEM_FROM_EPQUEUE(p) (container_of(p, struct ep_pqueue, pt)->epi)
 
-/* Tells if the epoll_ctl(2) operation needs an event copy from userspace */
+/* 告诉 epoll_ctl(2) 操作是否需要来自用户空间的事件副本 */
 #define EP_OP_HASH_EVENT(op) ((op) != EPOLL_CTL_DEL)
 
 
@@ -180,32 +180,30 @@ struct poll_safewake {
 };
 
 /*
- * This structure is stored inside the "private_data" member of the file
- * structure and rapresent the main data sructure for the eventpoll
- * interface.
+ * 此结构存储在文件结构的“private_data”成员中，
+ * 并表示 eventpoll 接口的主要数据结构.
  */
 struct eventpoll {
-	/* Protect the this structure access */
+	/* 保护这个结构访问 */
 	rwlock_t lock;
 
 	/*
-	 * This semaphore is used to ensure that files are not removed
-	 * while epoll is using them. This is read-held during the event
-	 * collection loop and it is write-held during the file cleanup
-	 * path, the epoll file exit code and the ctl operations.
+	 * 此信号量用于确保文件在 epoll 使用时不会被删除。
+	 * 这是在事件收集循环期间读取保持的，
+	 * 并且在文件清理路径、epoll 文件退出代码和 ctl 操作期间写入保持。
 	 */
 	struct rw_semaphore sem;
 
-	/* Wait queue used by sys_epoll_wait() */
+	/* sys_epoll_wait() 使用的等待队列 */
 	wait_queue_head_t wq;
 
-	/* Wait queue used by file->poll() */
+	/* file->poll() 使用的等待队列 */
 	wait_queue_head_t poll_wait;
 
-	/* List of ready file descriptors */
+	/* 准备好的文件描述符列表 */
 	struct list_head rdllist;
 
-	/* RB-Tree root used to store monitored fd structs */
+	/* RB-Tree 根用于存储受监控的 fd 结构 */
 	struct rb_root rbr;
 };
 
@@ -228,41 +226,39 @@ struct eppoll_entry {
 };
 
 /*
- * Each file descriptor added to the eventpoll interface will
- * have an entry of this type linked to the hash.
+ * 添加到 eventpoll 接口的每个文件描述符都会有一个链接到哈希的这种类型的条目。
  */
 struct epitem {
-	/* RB-Tree node used to link this structure to the eventpoll rb-tree */
+	/* RB-Tree 节点用于将这个结构链接到 eventpoll rb-tree */
 	struct rb_node rbn;
 
-	/* List header used to link this structure to the eventpoll ready list */
+	/* 用于将此结构链接到 eventpoll 就绪列表的列表头 */
 	struct list_head rdllink;
 
-	/* The file descriptor information this item refers to */
+	/* 此项引用的文件描述符信息 */
 	struct epoll_filefd ffd;
 
-	/* Number of active wait queue attached to poll operations */
+	/* 附加到轮询操作的活动等待队列数 */
 	int nwait;
 
-	/* List containing poll wait queues */
+	/* 包含轮询等待队列的列表 */
 	struct list_head pwqlist;
 
-	/* The "container" of this item */
+	/* 这个项目的“容器” */
 	struct eventpoll *ep;
 
-	/* The structure that describe the interested events and the source fd */
+	/* 描述感兴趣事件的结构和源 fd */
 	struct epoll_event event;
 
 	/*
-	 * Used to keep track of the usage count of the structure. This avoids
-	 * that the structure will desappear from underneath our processing.
+	 * 用于跟踪结构的使用计数。这避免了结构将从我们的处理下面消失。
 	 */
 	atomic_t usecnt;
 
-	/* List header used to link this item to the "struct file" items list */
+	/* 用于将此项链接到“struct file”项列表的列表标题 */
 	struct list_head fllink;
 
-	/* List header used to link the item to the transfer list */
+	/* 用于将项目链接到传输列表的列表标题 */
 	struct list_head txlink;
 
 	/*
@@ -334,7 +330,7 @@ static kmem_cache_t *pwq_cache;
 /* Virtual fs used to allocate inodes for eventpoll files */
 static struct vfsmount *eventpoll_mnt;
 
-/* File callbacks that implement the eventpoll file behaviour */
+/* 实现事件轮询文件行为的文件回调 */
 static struct file_operations eventpoll_fops = {
 	.release	= ep_eventpoll_close,
 	.poll		= ep_eventpoll_poll
@@ -421,7 +417,7 @@ static void ep_poll_safewake(struct poll_safewake *psw, wait_queue_head_t *wq)
 }
 
 
-/* Used to initialize the epoll bits inside the "struct file" */
+/* 用于初始化“结构文件”中的epoll位 */
 void eventpoll_init_file(struct file *file)
 {
 
@@ -467,11 +463,12 @@ void eventpoll_release_file(struct file *file)
 
 
 /*
- * It opens an eventpoll file descriptor by suggesting a storage of "size"
- * file descriptors. The size parameter is just an hint about how to size
- * data structures. It won't prevent the user to store more than "size"
- * file descriptors inside the epoll interface. It is the kernel part of
- * the userspace epoll_create(2).
+ * 它通过建议存储“大小”文件描述符来打开一个事件轮询文件描述符。
+ * size 参数只是关于如何调整数据结构大小的提示。
+ * 它不会阻止用户在 epoll 接口中存储超过“大小”的文件描述符。
+ * 它是用户空间 epoll_create(2) 的内核部分。
+ *
+ * epoll_create实现
  */
 asmlinkage long sys_epoll_create(int size)
 {
@@ -479,23 +476,22 @@ asmlinkage long sys_epoll_create(int size)
 	struct inode *inode;
 	struct file *file;
 
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_create(%d)\n",
-		     current, size));
+	// debug用
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_create(%d)\n", current, size));
 
-	/* Sanity check on the size parameter */
+	/* 大小参数的完整性检查 */
 	error = -EINVAL;
 	if (size <= 0)
 		goto eexit_1;
 
 	/*
-	 * Creates all the items needed to setup an eventpoll file. That is,
-	 * a file structure, and inode and a free file descriptor.
+	 * 创建设置事件轮询文件所需的所有项目。即文件结构、inode 和空闲文件描述符。
 	 */
 	error = ep_getfd(&fd, &inode, &file);
 	if (error)
 		goto eexit_1;
 
-	/* Setup the file internal data structure ( "struct eventpoll" ) */
+	/* 设置文件内部数据结构（“struct eventpoll”） */
 	error = ep_file_init(file);
 	if (error)
 		goto eexit_2;
@@ -516,13 +512,13 @@ eexit_1:
 
 
 /*
- * The following function implements the controller interface for
- * the eventpoll file that enables the insertion/removal/change of
- * file descriptors inside the interest set.  It represents
- * the kernel part of the user space epoll_ctl(2).
+ * 以下函数实现了 eventpoll 文件的控制器接口，
+ * 该接口启用了兴趣集中文件描述符的插入、移除、更改。
+ * 它代表用户空间的内核部分 epoll_ctl(2).
+ *
+ * epoll_ctl实现
  */
-asmlinkage long
-sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event __user *event)
+asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event __user *event)
 {
 	int error;
 	struct file *file, *tfile;
@@ -530,48 +526,47 @@ sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event __user *event)
 	struct epitem *epi;
 	struct epoll_event epds;
 
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %p)\n",
-		     current, epfd, op, fd, event));
+	// debug用
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %p)\n", current, epfd, op, fd, event));
 
 	error = -EFAULT;
-	if (EP_OP_HASH_EVENT(op) &&
-	    copy_from_user(&epds, event, sizeof(struct epoll_event)))
+	if (EP_OP_HASH_EVENT(op) && copy_from_user(&epds, event, sizeof(struct epoll_event)))
 		goto eexit_1;
 
-	/* Get the "struct file *" for the eventpoll file */
+	/* 获取事件轮询文件的“struct file*” */
 	error = -EBADF;
 	file = fget(epfd);
 	if (!file)
 		goto eexit_1;
 
-	/* Get the "struct file *" for the target file */
+	/* 获取目标文件的“struct file*” */
 	tfile = fget(fd);
 	if (!tfile)
 		goto eexit_2;
 
-	/* The target file descriptor must support poll */
+	/* 目标文件描述符必须支持轮询 */
 	error = -EPERM;
 	if (!tfile->f_op || !tfile->f_op->poll)
 		goto eexit_3;
 
 	/*
-	 * We have to check that the file structure underneath the file descriptor
-	 * the user passed to us _is_ an eventpoll file. And also we do not permit
-	 * adding an epoll file descriptor inside itself.
+	 * 我们必须检查用户传递给我们的文件描述符下面的文件结构是一个事件轮询文件。
+	 * 而且我们也不允许在其内部添加 epoll 文件描述符。
 	 */
 	error = -EINVAL;
 	if (file == tfile || !IS_FILE_EPOLL(file))
 		goto eexit_3;
 
 	/*
-	 * At this point it is safe to assume that the "private_data" contains
-	 * our own data structure.
+	 * 此时可以安全地假设“private_data”包含我们自己的数据结构。
 	 */
 	ep = file->private_data;
 
 	down_write(&ep->sem);
 
-	/* Try to lookup the file inside our hash table */
+	/* 尝试在我们的哈希表中查找文件
+	 * epi为NULL，则表示tfile还未加入红黑树
+	 * */
 	epi = ep_find(ep, tfile, fd);
 
 	error = -EINVAL;
@@ -613,26 +608,22 @@ eexit_3:
 eexit_2:
 	fput(file);
 eexit_1:
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %p) = %d\n",
-		     current, epfd, op, fd, event, error));
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %p) = %d\n", current, epfd, op, fd, event, error));
 
 	return error;
 }
 
 
 /*
- * Implement the event wait interface for the eventpoll file. It is the kernel
- * part of the user space epoll_wait(2).
+ * 为 eventpoll 文件实现事件等待接口。它是用户空间 epoll_wait(2) 的内核部分。
  */
-asmlinkage long sys_epoll_wait(int epfd, struct epoll_event __user *events,
-			       int maxevents, int timeout)
+asmlinkage long sys_epoll_wait(int epfd, struct epoll_event __user *events, int maxevents, int timeout)
 {
 	int error;
 	struct file *file;
 	struct eventpoll *ep;
 
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_wait(%d, %p, %d, %d)\n",
-		     current, epfd, events, maxevents, timeout));
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_wait(%d, %p, %d, %d)\n", current, epfd, events, maxevents, timeout));
 
 	/* The maximum number of event must be greater than zero */
 	if (maxevents <= 0)
@@ -676,7 +667,7 @@ eexit_1:
 
 
 /*
- * Creates the file descriptor to be used by the epoll interface.
+ * 创建 epoll 接口使用的文件描述符。
  */
 static int ep_getfd(int *efd, struct inode **einode, struct file **efile)
 {
@@ -687,7 +678,7 @@ static int ep_getfd(int *efd, struct inode **einode, struct file **efile)
 	struct file *file;
 	int error, fd;
 
-	/* Get an ready to use file */
+	/* 准备好使用文件 */
 	error = -ENFILE;
 	file = get_empty_filp();
 	if (!file)
@@ -758,16 +749,15 @@ static int ep_file_init(struct file *file)
 
 	memset(ep, 0, sizeof(*ep));
 	rwlock_init(&ep->lock);
-	init_rwsem(&ep->sem);
+	init_rwsem(&ep->sem);		// 初始化读写信号量
 	init_waitqueue_head(&ep->wq);
 	init_waitqueue_head(&ep->poll_wait);
 	INIT_LIST_HEAD(&ep->rdllist);
 	ep->rbr = RB_ROOT;
 
-	file->private_data = ep;
+	file->private_data = ep;		// 关键数据，每次create_epoll都会有创建一个
 
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: ep_file_init() ep=%p\n",
-		     current, ep));
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: ep_file_init() ep=%p\n", current, ep));
 	return 0;
 }
 
@@ -816,9 +806,13 @@ static void ep_free(struct eventpoll *ep)
 
 
 /*
- * Search the file inside the eventpoll hash. It add usage count to
- * the returned item, so the caller must call ep_release_epitem()
- * after finished using the "struct epitem".
+ * 在 eventpoll 哈希中搜索文件。
+ * 它将使用计数添加到返回的项目中，因此调用者必须
+ * 在使用完“struct epitem”后调用 ep_release_epitem()。
+ *
+ * ep是struct file的私有数据，已被初始化成struct eventpoll *
+ * file是tfile的指针
+ * fd是tfile的描述符
  */
 static struct epitem *ep_find(struct eventpoll *ep, struct file *file, int fd)
 {
@@ -832,7 +826,7 @@ static struct epitem *ep_find(struct eventpoll *ep, struct file *file, int fd)
 	read_lock_irqsave(&ep->lock, flags);
 	for (rbp = ep->rbr.rb_node; rbp; ) {
 		epi = rb_entry(rbp, struct epitem, rbn);
-		kcmp = EP_CMP_FFD(&ffd, &epi->ffd);
+		kcmp = EP_CMP_FFD(&ffd, &epi->ffd);		// kcmp取-1，0，+1
 		if (kcmp > 0)
 			rbp = rbp->rb_right;
 		else if (kcmp < 0)
@@ -845,16 +839,14 @@ static struct epitem *ep_find(struct eventpoll *ep, struct file *file, int fd)
 	}
 	read_unlock_irqrestore(&ep->lock, flags);
 
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: ep_find(%p) -> %p\n",
-		     current, file, epir));
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: ep_find(%p) -> %p\n", current, file, epir));
 
 	return epir;
 }
 
 
 /*
- * Increment the usage count of the "struct epitem" making it sure
- * that the user will have a valid pointer to reference.
+ * 增加“struct epitem”的使用计数，确保用户将拥有一个有效的引用指针。
  */
 static void ep_use_epitem(struct epitem *epi)
 {
@@ -920,8 +912,7 @@ static void ep_rbtree_insert(struct eventpoll *ep, struct epitem *epi)
 }
 
 
-static int ep_insert(struct eventpoll *ep, struct epoll_event *event,
-		     struct file *tfile, int fd)
+static int ep_insert(struct eventpoll *ep, struct epoll_event *event, struct file *tfile, int fd)
 {
 	int error, revents, pwake = 0;
 	unsigned long flags;

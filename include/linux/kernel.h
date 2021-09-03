@@ -28,7 +28,7 @@ extern const char linux_banner[];
 #define STACK_MAGIC	0xdeadbeef
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-#define ALIGN(x,a) (((x)+(a)-1)&~((a)-1))
+#define ALIGN(x,a) (((x)+(a)-1)&~((a)-1))       // 向上对齐，要求a为2的幂
 
 #define	KERN_EMERG	"<0>"	/* system is unusable			*/
 #define	KERN_ALERT	"<1>"	/* action must be taken immediately	*/
@@ -50,7 +50,7 @@ struct completion;
 
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
 void __might_sleep(char *file, int line);
-#define might_sleep() __might_sleep(__FILE__, __LINE__)
+#define might_sleep() __might_sleep(__FILE__, __LINE__)			// debug用，若这原子上下文中调用此接口就会打印堆栈信息
 #define might_sleep_if(cond) do { if (unlikely(cond)) might_sleep(); } while (0)
 #else
 #define might_sleep() do {} while(0)
@@ -240,6 +240,7 @@ extern void dump_stack(void);
  * @member:	the name of the member within the struct.
  *
  */
+// 各种xxx_entry会封装这个
 #define container_of(ptr, type, member) ({			\
         const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
         (type *)( (char *)__mptr - offsetof(type,member) );})

@@ -111,19 +111,21 @@
  * POSIX.1 2.4: an empty pathname is invalid (ENOENT).
  * PATH_MAX includes the nul terminator --RR.
  */
+
+// 把文件名绝对路径复制到page中
 static inline int do_getname(const char __user *filename, char *page)
 {
 	int retval;
 	unsigned long len = PATH_MAX;
 
-	if (!segment_eq(get_fs(), KERNEL_DS)) {
+	if (!segment_eq(get_fs(), KERNEL_DS)) {     // 等于KERNEL_DS，则跳过检查
 		if ((unsigned long) filename >= TASK_SIZE)
 			return -EFAULT;
 		if (TASK_SIZE - (unsigned long) filename < PATH_MAX)
 			len = TASK_SIZE - (unsigned long) filename;
 	}
 
-	retval = strncpy_from_user(page, filename, len);
+	retval = strncpy_from_user(page, filename, len);        // 从用户空间中复制数据
 	if (retval > 0) {
 		if (retval < len)
 			return 0;
@@ -133,21 +135,27 @@ static inline int do_getname(const char __user *filename, char *page)
 	return retval;
 }
 
+/*
+ * 获取文件名
+ * filename 为用户空间文件名绝对路径字符串
+ * 返回值为一片内存空间，里面存有文件名绝对路径字符串
+ * */
 char * getname(const char __user * filename)
 {
 	char *tmp, *result;
 
 	result = ERR_PTR(-ENOMEM);
-	tmp = __getname();
+	tmp = __getname();      // slab分配内存空间
 	if (tmp)  {
-		int retval = do_getname(filename, tmp);
+		int retval = do_getname(filename, tmp);		// 把文件名绝对路径复制到tmp，地址保存在retval中
 
 		result = tmp;
 		if (retval < 0) {
-			__putname(tmp);
+			__putname(tmp);     // 释放内存空间
 			result = ERR_PTR(retval);
 		}
 	}
+	// 审计
 	if (unlikely(current->audit_context) && !IS_ERR(result) && result)
 		audit_getname(result);
 	return result;
@@ -674,12 +682,11 @@ fail:
 }
 
 /*
- * Name resolution.
+ * 名称解析。
  *
- * This is the basic name resolution function, turning a pathname
- * into the final dentry.
+ * 这是基本的名称解析功能，将路径名转换为最终的 dentry。
  *
- * We expect 'base' to be positive and a directory.
+ * 我们希望 'base' 为正数并且是一个目录。
  */
 int fastcall link_path_walk(const char * name, struct nameidata *nd)
 {
@@ -688,32 +695,32 @@ int fastcall link_path_walk(const char * name, struct nameidata *nd)
 	int err;
 	unsigned int lookup_flags = nd->flags;
 	
-	while (*name=='/')
+	while (*name=='/')	// 跳过一个/
 		name++;
 	if (!*name)
 		goto return_reval;
 
 	inode = nd->dentry->d_inode;
 	if (nd->depth)
-		lookup_flags = LOOKUP_FOLLOW;
+		lookup_flags = LOOKUP_FOLLOW;		// 符号连接相关
 
-	/* At this point we know we have a real path component. */
+	/* 在这一点上，我们知道我们有一个真正的路径组件。 */
 	for(;;) {
 		unsigned long hash;
 		struct qstr this;
 		unsigned int c;
 
-		err = exec_permission_lite(inode, nd);
+		err = exec_permission_lite(inode, nd);		// 检查inode的权限与nd中是否匹配
 		if (err == -EAGAIN) { 
-			err = permission(inode, MAY_EXEC, nd);
+			err = permission(inode, MAY_EXEC, nd);	// 使用inode自定义的方法检查
 		}
  		if (err)
 			break;
 
-		this.name = name;
-		c = *(const unsigned char *)name;
+		this.name = name;		// 假设name为 "a_path/b_path/c_file"
+		c = *(const unsigned char *)name;	// 'a'
 
-		hash = init_name_hash();
+		hash = init_name_hash();		// 0
 		do {
 			name++;
 			hash = partial_name_hash(c, hash);
@@ -730,11 +737,10 @@ int fastcall link_path_walk(const char * name, struct nameidata *nd)
 			goto last_with_slashes;
 
 		/*
-		 * "." and ".." are special - ".." especially so because it has
-		 * to be able to know about the current root directory and
-		 * parent relationships.
+		 * "." 和 ".." 是特殊的 - ".." 尤其如此，因为它必须能够知道当前的根目录和父目录关系。
 		 */
-		if (this.name[0] == '.') switch (this.len) {
+		if (this.name[0] == '.')
+			switch (this.len) {
 			default:
 				break;
 			case 2:	
@@ -860,8 +866,7 @@ lookup_parent:
 			goto return_base;
 return_reval:
 		/*
-		 * We bypassed the ordinary revalidation routines.
-		 * We may need to check the cached dentry for staleness.
+		 * 我们绕过了普通的重新验证例程。我们可能需要检查缓存的 dentry 是否过时。
 		 */
 		if (nd->dentry && nd->dentry->d_sb &&
 		    (nd->dentry->d_sb->s_type->fs_flags & FS_REVAL_DOT)) {
@@ -952,16 +957,18 @@ set_it:
 	}
 }
 
+// 文件路径查找
 int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata *nd)
 {
 	int retval;
 
-	nd->last_type = LAST_ROOT; /* if there are only slashes... */
+	nd->last_type = LAST_ROOT; /* 如果只有/(根) */
 	nd->flags = flags;
 	nd->depth = 0;
 
-	read_lock(&current->fs->lock);
-	if (*name=='/') {
+	read_lock(&current->fs->lock);		// 加上与文件系统操作相关的锁
+	if (*name=='/') {		// 绝对路径查找
+		// i386上current->fs->altroot始终为NULL
 		if (current->fs->altroot && !(nd->flags & LOOKUP_NOALT)) {
 			nd->mnt = mntget(current->fs->altrootmnt);
 			nd->dentry = dget(current->fs->altroot);
@@ -970,15 +977,15 @@ int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata 
 				return 0;
 			read_lock(&current->fs->lock);
 		}
-		nd->mnt = mntget(current->fs->rootmnt);
-		nd->dentry = dget(current->fs->root);
-	} else {
-		nd->mnt = mntget(current->fs->pwdmnt);
-		nd->dentry = dget(current->fs->pwd);
+		nd->mnt = mntget(current->fs->rootmnt);		// current的根挂载点
+		nd->dentry = dget(current->fs->root);		// current的根目录
+	} else {		// 相对路径查找
+		nd->mnt = mntget(current->fs->pwdmnt);		// current的pwd挂载点
+		nd->dentry = dget(current->fs->pwd);		// current的pwd
 	}
 	read_unlock(&current->fs->lock);
 	current->total_link_count = 0;
-	retval = link_path_walk(name, nd);
+	retval = link_path_walk(name, nd);		// 核心
 	if (unlikely(current->audit_context
 		     && nd && nd->dentry && nd->dentry->d_inode))
 		audit_inode(name,
@@ -1340,10 +1347,9 @@ int may_open(struct nameidata *nd, int acc_mode, int flag)
 /*
  *	open_namei()
  *
- * namei for open - this is in fact almost the whole open-routine.
+ * namei for open - 这实际上几乎是整个开放程序。
  *
- * Note that the low bits of "flag" aren't the same as in the open
- * system call - they are 00 - no permissions needed
+ * 请注意，“标志”的低位与 open 系统调用中的不同 - 它们是 00 - 不需要权限
  *			  01 - read permission needed
  *			  10 - write permission needed
  *			  11 - read/write permissions needed
@@ -1365,14 +1371,14 @@ int open_namei(const char * pathname, int flag, int mode, struct nameidata *nd)
 	if (flag & O_APPEND)
 		acc_mode |= MAY_APPEND;
 
-	/* Fill in the open() intent data */
+	/* 填写 open() 意图数据 */
 	nd->intent.open.flags = flag;
 	nd->intent.open.create_mode = mode;
 
 	/*
-	 * The simplest case - just a plain lookup.
+	 * 最简单的情况 - 只是简单的查找。
 	 */
-	if (!(flag & O_CREAT)) {
+	if (!(flag & O_CREAT)) {		// 不需要创建文件
 		error = path_lookup(pathname, lookup_flags(flag)|LOOKUP_OPEN, nd);
 		if (error)
 			return error;

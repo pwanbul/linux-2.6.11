@@ -13,7 +13,7 @@ You can find the latest version of this document at
 
 Please send me your comments to
 
-    Ulisses Alonso Camar� <uaca@i.hate.spam.alumni.uv.es>
+    Ulisses Alonso Camar� <uaca@i.hate.spam.alumni.uv.es>
 
 -------------------------------------------------------------------------------
 + Why use PACKET_MMAP
@@ -170,7 +170,7 @@ see http://pusa.uv.es/~ulisses/packet_mmap/packet_mmap.pre-2.4.26_2.6.5.txt
  Block size limit
 ------------------
 
-As stated earlier, each block is a contiguous physical region of memory. These 
+如前所述，每个块都是一个连续的物理内存区域。 These
 memory regions are allocated with calls to the __get_free_pages() function. As 
 the name indicates, this function allocates pages of memory, and the second
 argument is "order" or a power of two number of pages, that is 

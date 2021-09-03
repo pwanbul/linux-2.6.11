@@ -73,6 +73,8 @@
  *    inside a macro, the way we do the other calls.
  */
 
+// CPU热插拔 https://www.sohu.com/a/156869487_223866
+
 #include <linux/kernel.h>
 #include <linux/threads.h>
 #include <linux/bitmap.h>

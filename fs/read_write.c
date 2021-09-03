@@ -219,15 +219,17 @@ ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *pp
 
 EXPORT_SYMBOL(do_sync_read);
 
+/* 把file中偏移量为pos的数据，复制count长度到buf中
+ * */
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
 	ssize_t ret;
 
-	if (!(file->f_mode & FMODE_READ))
+	if (!(file->f_mode & FMODE_READ))			// 文件是否可读
 		return -EBADF;
-	if (!file->f_op || (!file->f_op->read && !file->f_op->aio_read))
+	if (!file->f_op || (!file->f_op->read && !file->f_op->aio_read))		// 相应回调函数是否设置好了
 		return -EINVAL;
-	if (unlikely(!access_ok(VERIFY_WRITE, buf, count)))
+	if (unlikely(!access_ok(VERIFY_WRITE, buf, count)))			// buf~buf+count范围的粗糙检查
 		return -EFAULT;
 
 	ret = rw_verify_area(READ, file, pos, count);
@@ -299,25 +301,27 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 
 EXPORT_SYMBOL(vfs_write);
 
+// 获取文件读写位置
 static inline loff_t file_pos_read(struct file *file)
 {
 	return file->f_pos;
 }
-
+// 设置文件读写位置
 static inline void file_pos_write(struct file *file, loff_t pos)
 {
 	file->f_pos = pos;
 }
-
+/* read系统调用实现
+ **/
 asmlinkage ssize_t sys_read(unsigned int fd, char __user * buf, size_t count)
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
 	int fput_needed;
 
-	file = fget_light(fd, &fput_needed);
+	file = fget_light(fd, &fput_needed);		// 当进程已经打开了文件，才能用这个接口
 	if (file) {
-		loff_t pos = file_pos_read(file);
+		loff_t pos = file_pos_read(file);		// 获取文件读写位置
 		ret = vfs_read(file, buf, count, &pos);
 		file_pos_write(file, pos);
 		fput_light(file, fput_needed);

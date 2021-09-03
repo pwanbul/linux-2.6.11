@@ -93,10 +93,10 @@ asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
-struct notifier_block *i386die_chain;
+struct notifier_block *i386die_chain;		// i386die通知链全局指针
 static DEFINE_SPINLOCK(die_notifier_lock);
 
-int register_die_notifier(struct notifier_block *nb)
+int register_die_notifier(struct notifier_block *nb)    // 对notifier_chain_register的包装
 {
 	int err = 0;
 	unsigned long flags;
@@ -438,6 +438,7 @@ fastcall void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_errno = 0; \
 	info.si_code = sicode; \        // 信号编号，更详细的原因
 	info.si_addr = (void __user *)siaddr; \     // 出错的地址
+	//
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
 						== NOTIFY_STOP) \
 		return; \
@@ -951,8 +952,8 @@ void __init trap_init_f00f_bug(void)
 /* gate_addr: idt_table+异常编号
  * type: 4位
  * dpl: 2位，0或3
- * addr: 函数地址
- * seg: __KERNEL_CS
+ * addr: 函数32位虚拟地址
+ * seg: 段选择符，在GDT中使用，__KERNEL_CS
  * */
 #define _set_gate(gate_addr,type,dpl,addr,seg) \
 do { \

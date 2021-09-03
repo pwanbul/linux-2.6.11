@@ -31,7 +31,7 @@ typedef unsigned long long __u64;
  */
 #ifdef __KERNEL__
 
-#define BITS_PER_LONG 32
+#define BITS_PER_LONG 32        // long类型的长度
 
 #ifndef __ASSEMBLY__
 

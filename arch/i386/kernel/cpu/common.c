@@ -547,10 +547,8 @@ void __init early_cpu_init(void)
 #endif
 }
 /*
- * cpu_init() initializes state that is per-CPU. Some data is already
- * initialized (naturally) in the bootstrap process, such as the GDT
- * and IDT. We reload them nevertheless, this function acts as a
- * 'CPU state barrier', nothing should get across.
+ * cpu_init()初始化每个CPU的状态。一些数据已经在引导过程中（自然地）初始化，例如GDT和IDT。
+ * 尽管如此，我们还是重新加载了它们，这个函数就像一个“CPU 状态屏障”，什么都不会被跨越。
  */
 void __init cpu_init (void)
 {

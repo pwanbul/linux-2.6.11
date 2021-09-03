@@ -23,11 +23,9 @@ config KPROBES
 	bool "Kprobes"
 	depends on DEBUG_KERNEL
 	help
-	  Kprobes allows you to trap at almost any kernel address and
-	  execute a callback function.  register_kprobe() establishes
-	  a probepoint and specifies the callback.  Kprobes is useful
-	  for kernel debugging, non-intrusive instrumentation and testing.
-	  If in doubt, say "N".
+	  Kprobes 允许您在几乎任何内核地址处捕获并执行回调函数。
+	  register_kprobe() 建立一个探测点并指定回调。
+	  Kprobes 可用于内核调试、非侵入式检测和测试。如果有疑问，请说“N”。
 
 config DEBUG_STACK_USAGE
 	bool "Stack utilization instrumentation"

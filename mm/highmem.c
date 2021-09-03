@@ -45,17 +45,17 @@ static void page_pool_free(void *page, void *data)
 /*
  * Virtual_count is not a pure "count".
  *  0 means that it is not mapped, and has not been mapped
- *    since a TLB flush - it is usable.
+ *    since a TLB flush - it is usable.     没有映射，可以使用
  *  1 means that there are no users, but it has been mapped
- *    since the last TLB flush - so we can't use it.
- *  n means that there are (n-1) current users of it.
+ *    since the last TLB flush - so we can't use it.      没有映射，不能使用
+ *  n means that there are (n-1) current users of it.       已经映射，有n-1个用户
  */
 #ifdef CONFIG_HIGHMEM
-static int pkmap_count[LAST_PKMAP];
+static int pkmap_count[LAST_PKMAP];     // 页表项的计数器
 static unsigned int last_pkmap_nr;
 static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(kmap_lock);
 
-pte_t * pkmap_page_table;
+pte_t * pkmap_page_table;       // 永久内核映射页表
 
 static DECLARE_WAIT_QUEUE_HEAD(pkmap_map_wait);
 
@@ -508,31 +508,32 @@ static spinlock_t pool_lock;			/* protects page_address_pool */
 static struct page_address_slot {
 	struct list_head lh;			/* List of page_address_maps */
 	spinlock_t lock;			/* Protect this bucket's list */
-} ____cacheline_aligned_in_smp page_address_htable[1<<PA_HASH_ORDER];
+} ____cacheline_aligned_in_smp page_address_htable[1<<PA_HASH_ORDER];       // PA_HASH_ORDER为7
 
 static struct page_address_slot *page_slot(struct page *page)
 {
 	return &page_address_htable[hash_ptr(page, PA_HASH_ORDER)];
 }
 
+// 由页框描述符地址，查找页框的虚拟地址
 void *page_address(struct page *page)
 {
 	unsigned long flags;
 	void *ret;
 	struct page_address_slot *pas;
 
-	if (!PageHighMem(page))
-		return lowmem_page_address(page);
+	if (!PageHighMem(page))     // 是否为分配高端内存上的页框
+		return lowmem_page_address(page);       // 不是分配高端内存上的页框
 
-	pas = page_slot(page);
+	pas = page_slot(page);      // 找到page对应的桶
 	ret = NULL;
-	spin_lock_irqsave(&pas->lock, flags);
+	spin_lock_irqsave(&pas->lock, flags);       // 对桶上锁
 	if (!list_empty(&pas->lh)) {
 		struct page_address_map *pam;
 
 		list_for_each_entry(pam, &pas->lh, list) {
-			if (pam->page == page) {
-				ret = pam->virtual;
+			if (pam->page == page) {        // 在桶中找到page对应的节点
+				ret = pam->virtual;     // 返回虚拟地址
 				goto done;
 			}
 		}
@@ -544,6 +545,7 @@ done:
 
 EXPORT_SYMBOL(page_address);
 
+// 设置页框描述符和页框虚拟地址之间的映射关系
 void set_page_address(struct page *page, void *virtual)
 {
 	unsigned long flags;
@@ -552,30 +554,29 @@ void set_page_address(struct page *page, void *virtual)
 
 	BUG_ON(!PageHighMem(page));
 
-	pas = page_slot(page);
+	pas = page_slot(page);      // 找到page对应得桶
 	if (virtual) {		/* Add */
 		BUG_ON(list_empty(&page_address_pool));
 
-		spin_lock_irqsave(&pool_lock, flags);
-		pam = list_entry(page_address_pool.next,
-				struct page_address_map, list);
-		list_del(&pam->list);
-		spin_unlock_irqrestore(&pool_lock, flags);
+		spin_lock_irqsave(&pool_lock, flags);       // 对桶加锁
+		pam = list_entry(page_address_pool.next, struct page_address_map, list);
+		list_del(&pam->list);       // 把pam从page_address_pool中删除，即从pool中分配
+		spin_unlock_irqrestore(&pool_lock, flags);      // 对桶解锁
 
 		pam->page = page;
 		pam->virtual = virtual;
 
 		spin_lock_irqsave(&pas->lock, flags);
-		list_add_tail(&pam->list, &pas->lh);
+		list_add_tail(&pam->list, &pas->lh);        // 加入hash桶中
 		spin_unlock_irqrestore(&pas->lock, flags);
 	} else {		/* Remove */
 		spin_lock_irqsave(&pas->lock, flags);
 		list_for_each_entry(pam, &pas->lh, list) {
-			if (pam->page == page) {
-				list_del(&pam->list);
+			if (pam->page == page) {        // 遍历hash桶，找到page对应节点
+				list_del(&pam->list);       // 把节点从桶中删除
 				spin_unlock_irqrestore(&pas->lock, flags);
 				spin_lock_irqsave(&pool_lock, flags);
-				list_add_tail(&pam->list, &page_address_pool);
+				list_add_tail(&pam->list, &page_address_pool);      // 把节点加入pool中
 				spin_unlock_irqrestore(&pool_lock, flags);
 				goto done;
 			}
@@ -586,9 +587,12 @@ done:
 	return;
 }
 
-static struct page_address_map page_address_maps[LAST_PKMAP];
+static struct page_address_map page_address_maps[LAST_PKMAP];           // 静态变量，全局唯一
 
-void __init page_address_init(void)
+/* 该函数初始化高端内存（High Memory）线性地址空间中永久映射相关的全局变量。
+ * 所以在不支持高端内存即在没有配置CONFIG_HIGHMEM这个宏的时候，该函数是个空函数什么也不做。
+ * */
+void __init page_address_init(void)         // start_kernel
 {
 	int i;
 

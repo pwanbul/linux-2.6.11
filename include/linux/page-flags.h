@@ -12,8 +12,7 @@
 /*
  * Various page->flags bits:
  *
- * PG_reserved is set for special pages, which can never be swapped out. Some
- * of them might not even exist (eg empty_bad_page)...
+ * PG_reserved 是为特殊页面设置的，永远不能换出。其中一些甚至可能不存在（例如 empty_bad_page）...
  *
  * The PG_private bitflag is set if page->private contains a valid value.
  *

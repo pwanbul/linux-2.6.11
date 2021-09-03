@@ -19,34 +19,27 @@
 #include <asm/semaphore.h>
 
 /*
- * Semaphores are implemented using a two-way counter:
- * The "count" variable is decremented for each process
- * that tries to acquire the semaphore, while the "sleeping"
- * variable is a count of such acquires.
+ * 信号量是使用双向计数器实现的：
+ * 		“count”变量对于尝试获取信号量的每个进程递减，
+ * 		而“sleeping”变量是此类获取的计数。
  *
- * Notably, the inline "up()" and "down()" functions can
- * efficiently test if they need to do any extra work (up
- * needs to do something only if count was negative before
- * the increment operation.
+ * 值得注意的是，内联的“up()”和“down()”函数可以有效地
+ * 测试它们是否需要做任何额外的工作(只有在递增操作之前计数为负时，up 才需要做一些事情。)
  *
- * "sleeping" and the contention routine ordering is protected
- * by the spinlock in the semaphore's waitqueue head.
+ * “休眠”和争用例程排序受信号量等待队列头中的自旋锁保护。
  *
- * Note that these functions are only called when there is
- * contention on the lock, and as such all this is the
- * "non-critical" part of the whole semaphore business. The
- * critical part is the inline stuff in <asm/semaphore.h>
- * where we want to avoid any extra jumps and calls.
+ * 请注意，这些函数仅在锁存在争用时调用，
+ * 因此所有这些都是整个信号量业务的“non-critical”部分。
+ * critical部分是 <asm/semaphore.h> 中的内联内容，
+ * 我们希望避免任何额外的跳转和调用。
  */
 
 /*
  * Logic:
- *  - only on a boundary condition do we need to care. When we go
- *    from a negative count to a non-negative, we wake people up.
- *  - when we go from a non-negative count to a negative do we
- *    (a) synchronize with the "sleeper" count and (b) make sure
- *    that we're on the wakeup list before we synchronize so that
- *    we cannot lose wakeup events.
+ *  - 只有在边界条件下，我们才需要关心。当我们从负数变为非负数时，我们会唤醒人们。
+ *  - 当我们从非负计数变为负计数时，我们是否
+ *    (a) 与“睡眠者”计数同步，以及
+ *    (b) 确保我们在同步之前位于唤醒列表中，以便我们不会丢失唤醒事件。
  */
 
 fastcall void __up(struct semaphore *sem)
@@ -57,21 +50,19 @@ fastcall void __up(struct semaphore *sem)
 fastcall void __sched __down(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
-	DECLARE_WAITQUEUE(wait, tsk);
+	DECLARE_WAITQUEUE(wait, tsk);		// 静态初始化一个等待队列
 	unsigned long flags;
 
 	tsk->state = TASK_UNINTERRUPTIBLE;
-	spin_lock_irqsave(&sem->wait.lock, flags);
-	add_wait_queue_exclusive_locked(&sem->wait, &wait);
+	spin_lock_irqsave(&sem->wait.lock, flags);		// 加自旋锁并保存本地IF
+	add_wait_queue_exclusive_locked(&sem->wait, &wait);		// 加入等待队列队尾，排他唤醒
 
-	sem->sleepers++;
+	sem->sleepers++;			// 睡眠进程加1
 	for (;;) {
 		int sleepers = sem->sleepers;
 
 		/*
-		 * Add "everybody else" into it. They aren't
-		 * playing, because we own the spinlock in
-		 * the wait_queue_head.
+		 * 将“其他人”添加到其中。他们没有在玩，因为我们拥有 wait_queue_head 中的自旋锁。
 		 */
 		if (!atomic_add_negative(sleepers - 1, &sem->count)) {
 			sem->sleepers = 0;
@@ -85,8 +76,8 @@ fastcall void __sched __down(struct semaphore * sem)
 		spin_lock_irqsave(&sem->wait.lock, flags);
 		tsk->state = TASK_UNINTERRUPTIBLE;
 	}
-	remove_wait_queue_locked(&sem->wait, &wait);
-	wake_up_locked(&sem->wait);
+	remove_wait_queue_locked(&sem->wait, &wait);		// 等待队列中移除
+	wake_up_locked(&sem->wait);		// 唤醒下一个进程
 	spin_unlock_irqrestore(&sem->wait.lock, flags);
 	tsk->state = TASK_RUNNING;
 }
@@ -107,11 +98,11 @@ fastcall int __sched __down_interruptible(struct semaphore * sem)
 		int sleepers = sem->sleepers;
 
 		/*
-		 * With signals pending, this turns into
-		 * the trylock failure case - we won't be
-		 * sleeping, and we* can't get the lock as
-		 * it has contention. Just correct the count
-		 * and exit.
+		 * 当信号挂起时，这会变成 trylock 失败的情况
+		 * ——我们不会休眠，我们无法获得锁，因为它有争用。
+		 * 只需更正计数并退出即可。
+		 *
+		 * 进入睡眠之前必须再检查一个是否未决信号
 		 */
 		if (signal_pending(current)) {
 			retval = -EINTR;
@@ -147,12 +138,11 @@ fastcall int __sched __down_interruptible(struct semaphore * sem)
 }
 
 /*
- * Trylock failed - make sure we correct for
- * having decremented the count.
+ * Trylock 失败 - 确保我们更正减少了计数。
  *
- * We could have done the trylock with a
- * single "cmpxchg" without failure cases,
- * but then it wouldn't work on a 386.
+ * 我们本可以在没有失败案例的情况下使用
+ * 单个“cmpxchg”完成 trylock，
+ * 但是它在 386 上不起作用。
  */
 fastcall int __down_trylock(struct semaphore * sem)
 {
@@ -164,9 +154,8 @@ fastcall int __down_trylock(struct semaphore * sem)
 	sem->sleepers = 0;
 
 	/*
-	 * Add "everybody else" and us into it. They aren't
-	 * playing, because we own the spinlock in the
-	 * wait_queue_head.
+	 * 将“其他人”和我们加入其中。他们没有在玩，
+	 * 因为我们拥有 wait_queue_head 中的自旋锁。
 	 */
 	if (!atomic_add_negative(sleepers, &sem->count)) {
 		wake_up_locked(&sem->wait);
@@ -178,14 +167,12 @@ fastcall int __down_trylock(struct semaphore * sem)
 
 
 /*
- * The semaphore operations have a special calling sequence that
- * allow us to do a simpler in-line version of them. These routines
- * need to convert that sequence back into the C sequence when
- * there is contention on the semaphore.
+ * 信号量操作有一个特殊的调用序列，允许我们对它们进行更简单的内联版本。
+ * 当信号量存在争用时，这些例程需要将该序列转换回 C 序列。
  *
- * %eax contains the semaphore pointer on entry. Save the C-clobbered
- * registers (%eax, %edx and %ecx) except %eax whish is either a return
- * value or just clobbered..
+ * %eax 包含进入时的信号量指针。
+ * 保存 C-clobbered 寄存器（%eax、%edx 和 %ecx），
+ * 除了 %eax 是返回值或只是 clobbered..
  */
 asm(
 ".section .sched.text\n"

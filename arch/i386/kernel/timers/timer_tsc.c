@@ -149,7 +149,7 @@ unsigned long long sched_clock(void)
 		return jiffies_64 * (1000000000 / HZ);
 
 	/* Read the Time Stamp Counter */
-	rdtscll(this_offset);
+	rdtscll(this_offset);       // 返回从系统reset时，到现在的tick次数
 
 	/* return the value in ns */
 	return cycles_2_ns(this_offset);

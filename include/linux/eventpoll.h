@@ -51,7 +51,7 @@ struct file;
 
 #ifdef CONFIG_EPOLL
 
-/* Used to initialize the epoll bits inside the "struct file" */
+/* 用于初始化“结构文件”中的 epoll 位 */
 void eventpoll_init_file(struct file *file);
 
 /* Used to release the epoll bits inside the "struct file" */

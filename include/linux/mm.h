@@ -59,24 +59,25 @@ extern int sysctl_legacy_va_layout;
  * library, the executable area etc).
  */
 struct vm_area_struct {
-	struct mm_struct * vm_mm;	/* The address space we belong to. */
-	unsigned long vm_start;		/* Our start address within vm_mm. */
-	unsigned long vm_end;		/* The first byte after our end address
+	struct mm_struct * vm_mm;	/* 反向指针 The address space we belong to. */
+	unsigned long vm_start;		/* VMA起始地址 Our start address within vm_mm. */
+	unsigned long vm_end;		/* VMA结束地址的后一个字节 The first byte after our end address
 					   within vm_mm. */
 
 	/* linked list of VM areas per task, sorted by address */
-	struct vm_area_struct *vm_next;
+	struct vm_area_struct *vm_next;	// VMA链表指针域，按地址大小排序
 
-	pgprot_t vm_page_prot;		/* Access permissions of this VMA. */
+	pgprot_t vm_page_prot;		/* VMA的访问权限 Access permissions of this VMA. */
 	unsigned long vm_flags;		/* Flags, listed below. */
 
-	struct rb_node vm_rb;
+	struct rb_node vm_rb;		
 
 	/*
 	 * For areas with an address space and backing store,
 	 * linkage into the address_space->i_mmap prio tree, or
 	 * linkage to the list of like vmas hanging off its node, or
 	 * linkage of vma in the address_space->i_mmap_nonlinear list.
+	 * 优先树
 	 */
 	union {
 		struct {
@@ -98,7 +99,7 @@ struct vm_area_struct {
 	struct anon_vma *anon_vma;	/* Serialized by page_table_lock */
 
 	/* Function pointers to deal with this struct. */
-	struct vm_operations_struct * vm_ops;
+	struct vm_operations_struct * vm_ops;	// 处理此结构的函数指针
 
 	/* Information about our backing store: */
 	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
@@ -215,27 +216,27 @@ typedef unsigned long page_flags_t;
 #endif
 
 /*
- * Each physical page in the system has a struct page associated with
- * it to keep track of whatever it is we are using the page for at the
- * moment. Note that we have no way to track which tasks are using
- * a page.
+ * 系统中的每个物理页面都有一个与之关联的结构页面，
+ * 以跟踪我们目前正在使用该页面的任何内容。
+ * 请注意，我们无法跟踪哪些任务正在使用页面。
+ *
+ * 物理页框描述符
+ * 用来描述页框本身，而不描述其中的数据
  */
 struct page {
-	page_flags_t flags;		/* Atomic flags, some possibly
-					 * updated asynchronously */
-	atomic_t _count;		/* Usage count, see below. */
-	atomic_t _mapcount;		/* Count of ptes mapped in mms,
+	page_flags_t flags;		/* Atomic flags, some possibly updated asynchronously  标志*/
+	atomic_t _count;		/* 引用计数器，若为-1则表示页框空闲；当有一个进程或内核数据结构占用时为0，...*/
+	atomic_t _mapcount;		/* Count of ptes mapped in mms, 页表项数量，没有则为-1
 					 * to show when page is mapped
 					 * & limit reverse map searches.
 					 */
-	unsigned long private;		/* Mapping-private opaque data:
+	unsigned long private;		/* Mapping-private opaque data:     私有数据使用
 					 * usually used for buffer_heads
 					 * if PagePrivate set; used for
 					 * swp_entry_t if PageSwapCache
-					 * When page is free, this indicates
-					 * order in the buddy system.
+					 * 当页面空闲时，这表示伙伴系统中的order。
 					 */
-	struct address_space *mapping;	/* If low bit clear, points to
+	struct address_space *mapping;	/* If low bit clear, points to      页缓存使用
 					 * inode address_space, or NULL.
 					 * If page mapped as anonymous
 					 * memory, low bit is set, and
@@ -243,9 +244,7 @@ struct page {
 					 * see PAGE_MAPPING_ANON below.
 					 */
 	pgoff_t index;			/* Our offset within mapping. */
-	struct list_head lru;		/* Pageout list, eg. active_list
-					 * protected by zone->lru_lock !
-					 */
+	struct list_head lru;		/* 页框高速缓存 分页列表，例如。受 zone->lru_lock 保护的 active_list!*/
 	/*
 	 * On machines where all RAM is mapped into kernel address space,
 	 * we can simply calculate the virtual address. On machines with
@@ -257,8 +256,8 @@ struct page {
 	 * WANT_PAGE_VIRTUAL in asm/page.h
 	 */
 #if defined(WANT_PAGE_VIRTUAL)
-	void *virtual;			/* Kernel virtual address (NULL if
-					   not kmapped, ie. highmem) */
+	/* 内核也可能会有虚拟地址，在highmem中为NULL*/
+	void *virtual;			/* Kernel virtual address (NULL if not kmapped, ie. highmem) */
 #endif /* WANT_PAGE_VIRTUAL */
 };
 
@@ -269,30 +268,26 @@ struct page {
 #include <linux/page-flags.h>
 
 /*
- * Methods to modify the page usage count.
+ * 修改页面使用计数的方法。
  *
- * What counts for a page usage:
+ * 什么对页面使用很重要：
  * - cache mapping   (page->mapping)
  * - private data    (page->private)
- * - page mapped in a task's page tables, each mapping
- *   is counted separately
+ * - 页映射在任务的页表中，每个映射单独计算
  *
- * Also, many kernel routines increase the page count before a critical
- * routine so they can be sure the page doesn't go away from under them.
+ * 此外，许多内核例程在关键例程之前增加页面计数，因此它们可以确保页面不会从它们下面消失。
  *
- * Since 2.6.6 (approx), a free page has ->_count = -1.  This is so that we
- * can use atomic_add_negative(-1, page->_count) to detect when the page
- * becomes free and so that we can also use atomic_inc_and_test to atomically
- * detect when we just tried to grab a ref on a page which some other CPU has
- * already deemed to be freeable.
+ * 从 2.6.6（大约）开始，一个空闲页面有 ->_count = -1。
+ * 这样我们就可以使用 atomic_add_negative(-1, page->_count)
+ * 来检测页面何时变为空闲，并且我们还可以使用 atomic_inc_and_test 来自动
+ * 检测何时我们只是尝试在其他 CPU 上抓取页面上的引用已经被认为是可释放的。
  *
- * NO code should make assumptions about this internal detail!  Use the provided
- * macros which retain the old rules: page_count(page) == 0 is a free page.
+ * 任何代码都不应该对这个内部细节做出假设！使用提供的保留旧规则的宏：
+ * page_count(page) == 0 是一个已释放的页面。
  */
 
 /*
- * Drop a ref, return true if the logical refcount fell to zero (the page has
- * no users)
+ * 删除一个引用，如果逻辑引用计数为零（该页面没有用户），则返回 true
  */
 #define put_page_testzero(p)				\
 	({						\
@@ -313,6 +308,7 @@ extern void FASTCALL(__page_cache_release(struct page *));
 
 #ifdef CONFIG_HUGETLB_PAGE
 
+// 返回当前页框p被引用的次数，_count为0时表示被引用1次，因此需要加1
 static inline int page_count(struct page *p)
 {
 	if (PageCompound(p))
@@ -352,7 +348,7 @@ static inline void put_page(struct page *page)
  * zeroes, and text pages of executables and shared libraries have
  * only one copy in memory, at most, normally.
  *
- * For the non-reserved pages, page_count(page) denotes a reference count.
+ * 对于非保留页面，page_count(page) 表示引用计数。
  *   page_count() == 0 means the page is free.
  *   page_count() == 1 means the page is used for exactly one purpose
  *   (e.g. a private data page of one process).
@@ -402,7 +398,7 @@ static inline void put_page(struct page *page)
  * so we use (MAX_NODES_SHIFT + MAX_ZONES_SHIFT) here to get enough bits.
  */
 #define NODEZONE_SHIFT (sizeof(page_flags_t)*8 - MAX_NODES_SHIFT - MAX_ZONES_SHIFT)
-#define NODEZONE(node, zone)	((node << ZONES_SHIFT) | zone)
+#define NODEZONE(node, zone)	((node << ZONES_SHIFT) | zone)      // ZONES_SHIFT为2
 
 static inline unsigned long page_zonenum(struct page *page)
 {
@@ -416,19 +412,21 @@ static inline unsigned long page_to_nid(struct page *page)
 struct zone;
 extern struct zone *zone_table[];
 
+// 通过页框描述符查找其所在的内存区域
 static inline struct zone *page_zone(struct page *page)
 {
 	return zone_table[page->flags >> NODEZONE_SHIFT];
 }
 
+// zone_table的数组下标NODEZONE(nid, zone)，被编码到flag中高位中
 static inline void set_page_zone(struct page *page, unsigned long nodezone_num)
 {
-	page->flags &= ~(~0UL << NODEZONE_SHIFT);
+	page->flags &= ~(~0UL << NODEZONE_SHIFT);		// 高NODEZONE_SHIFT清0
 	page->flags |= nodezone_num << NODEZONE_SHIFT;
 }
 
 #ifndef CONFIG_DISCONTIGMEM
-/* The array of struct pages - for discontigmem use pgdat->lmem_map */
+/* 结构页数组 - 对于 discontigmem 使用 pgdat->lmem_map */
 extern struct page *mem_map;
 #endif
 
@@ -502,9 +500,9 @@ static inline pgoff_t page_index(struct page *page)
 }
 
 /*
- * The atomic page->_mapcount, like _count, starts from -1:
- * so that transitions both from it and to it can be tracked,
- * using atomic_inc_and_test and atomic_add_negative(-1).
+ * Tatomic page->_mapcount 和 _count 一样，
+ * 从 -1 开始：这样就可以使用 atomic_inc_and_test
+ * 和 atomic_add_negative(-1) 跟踪从它到它的转换。
  */
 static inline void reset_page_mapcount(struct page *page)
 {

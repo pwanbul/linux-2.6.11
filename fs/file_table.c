@@ -17,7 +17,7 @@
 #include <linux/mount.h>
 #include <linux/cdev.h>
 
-/* sysctl tunables... */
+/* sysctl 可调参数... */
 struct files_stat_struct files_stat = {
 	.max_files = NR_FILE
 };
@@ -57,21 +57,22 @@ static inline void file_free(struct file *f)
 	kmem_cache_free(filp_cachep, f);
 }
 
-/* Find an unused file structure and return a pointer to it.
- * Returns NULL, if there are no more free file structures or
- * we run out of memory.
+/* 找到一个未使用的文件结构并返回一个指向它的指针。
+ * 如果没有更多可用文件结构或内存不足，则返回 NULL。
+ *
+ * 通用接口，获取一个空的struct file结构
+ * 注意，使用epoll需要config EPOLL
  */
 struct file *get_empty_filp(void)
 {
-static int old_max;
+	static int old_max;
 	struct file * f;
 
 	/*
-	 * Privileged users can go above max_files
+	 * 特权用户可以超过 max_files
 	 */
-	if (files_stat.nr_files < files_stat.max_files ||
-				capable(CAP_SYS_ADMIN)) {
-		f = kmem_cache_alloc(filp_cachep, GFP_KERNEL);
+	if (files_stat.nr_files < files_stat.max_files || capable(CAP_SYS_ADMIN)) {
+		f = kmem_cache_alloc(filp_cachep, GFP_KERNEL);		// 专用接口
 		if (f) {
 			memset(f, 0, sizeof(*f));
 			if (security_file_alloc(f)) {
@@ -90,13 +91,12 @@ static int old_max;
 		}
 	}
 
-	/* Ran out of filps - report that */
+	/* 用完了filps - 报告 */
 	if (files_stat.max_files >= old_max) {
-		printk(KERN_INFO "VFS: file-max limit %d reached\n",
-					files_stat.max_files);
+		printk(KERN_INFO "VFS: file-max limit %d reached\n", files_stat.max_files);
 		old_max = files_stat.max_files;
 	} else {
-		/* Big problems... */
+		/* 大问题... */
 		printk(KERN_WARNING "VFS: filp allocation failed\n");
 	}
 fail:
@@ -146,6 +146,7 @@ void fastcall __fput(struct file *file)
 	mntput(mnt);
 }
 
+// 打开文件描述符fd指定的文件，返回struct file*
 struct file fastcall *fget(unsigned int fd)
 {
 	struct file *file;
@@ -162,11 +163,12 @@ struct file fastcall *fget(unsigned int fd)
 EXPORT_SYMBOL(fget);
 
 /*
- * Lightweight file lookup - no refcnt increment if fd table isn't shared. 
- * You can use this only if it is guranteed that the current task already 
- * holds a refcnt to that file. That check has to be done at fget() only
- * and a flag is returned to be passed to the corresponding fput_light().
- * There must not be a cloning between an fget_light/fput_light pair.
+ * 轻量级文件查找
+ * - 如果 fd 表未共享，则没有 refcnt 增量。
+ *
+ * 只有在确保当前任务已经拥有对该文件的引用时，您才能使用它。
+ * 该检查必须仅在 fget() 处完成，并返回一个标志以传递给相应的 fput_light()。
+ * fget_light/fput_light 对之间不能有克隆。
  */
 struct file fastcall *fget_light(unsigned int fd, int *fput_needed)
 {
@@ -244,8 +246,8 @@ too_bad:
 void __init files_init(unsigned long mempages)
 { 
 	int n; 
-	/* One file with associated inode and dcache is very roughly 1K. 
-	 * Per default don't use more than 10% of our memory for files. 
+	/* 一个具有关联 inode 和 dcache 的文件大约为 1K。
+	 * 默认情况下，不要将超过 10% 的内存用于文件。
 	 */ 
 
 	n = (mempages * (PAGE_SIZE / 1024)) / 10;

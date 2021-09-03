@@ -26,15 +26,17 @@
 #include <asm/system.h>
 #include <asm/current.h>
 
-typedef struct __wait_queue wait_queue_t;
-typedef int (*wait_queue_func_t)(wait_queue_t *wait, unsigned mode, int sync, void *key);
+typedef struct __wait_queue wait_queue_t;       // 等待队列成员
+typedef int (*wait_queue_func_t)(wait_queue_t *wait, unsigned mode, int sync, void *key);   // 唤醒时调用的回调函数指针
 int default_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
 
+// 等待队列的成员
 struct __wait_queue {
-	unsigned int flags;
-#define WQ_FLAG_EXCLUSIVE	0x01
-	struct task_struct * task;
-	wait_queue_func_t func;
+	unsigned int flags;     // 取WQ_FLAG_EXCLUSIVE或者0
+	// 排他唤醒进程，防止惊群响应,https://blog.csdn.net/lyztyycode/article/details/78648798
+    #define WQ_FLAG_EXCLUSIVE	0x01
+	struct task_struct * task;  //为NULL表示异步IO
+	wait_queue_func_t func;         // 回调函数
 	struct list_head task_list;
 };
 
@@ -48,6 +50,7 @@ struct wait_bit_queue {
 	wait_queue_t wait;
 };
 
+// 等待队列的头
 struct __wait_queue_head {
 	spinlock_t lock;
 	struct list_head task_list;
@@ -58,7 +61,7 @@ typedef struct __wait_queue_head wait_queue_head_t;
 /*
  * Macros for declaration and initialisaton of the datatypes
  */
-
+// 等待队列成员静态初始化
 #define __WAITQUEUE_INITIALIZER(name, tsk) {				\
 	.task		= tsk,						\
 	.func		= default_wake_function,			\
@@ -67,6 +70,7 @@ typedef struct __wait_queue_head wait_queue_head_t;
 #define DECLARE_WAITQUEUE(name, tsk)					\
 	wait_queue_t name = __WAITQUEUE_INITIALIZER(name, tsk)
 
+// 等待队列头静态初始化
 #define __WAIT_QUEUE_HEAD_INITIALIZER(name) {				\
 	.lock		= SPIN_LOCK_UNLOCKED,				\
 	.task_list	= { &(name).task_list, &(name).task_list } }
@@ -77,12 +81,14 @@ typedef struct __wait_queue_head wait_queue_head_t;
 #define __WAIT_BIT_KEY_INITIALIZER(word, bit)				\
 	{ .flags = word, .bit_nr = bit, }
 
+// 初始化动态生成的等待队列头
 static inline void init_waitqueue_head(wait_queue_head_t *q)
 {
 	q->lock = SPIN_LOCK_UNLOCKED;
 	INIT_LIST_HEAD(&q->task_list);
 }
 
+// 初始化动态生成的等待队列成员
 static inline void init_waitqueue_entry(wait_queue_t *q, struct task_struct *p)
 {
 	q->flags = 0;
@@ -104,11 +110,8 @@ static inline int waitqueue_active(wait_queue_head_t *q)
 }
 
 /*
- * Used to distinguish between sync and async io wait context:
- * sync i/o typically specifies a NULL wait queue entry or a wait
- * queue entry bound to a task (current task) to wake up.
- * aio specifies a wait queue entry with an async notification
- * callback routine, not associated with any task.
+    用于区分同步和异步io等待上下文：sync io通常指定NULL等待队列条目或绑定到要唤醒的任务（当前任务）
+    的等待队列条目。 aio使用异步通知回调例程指定一个等待队列条目，该例程不与任何任务关联.
  */
 #define is_sync_wait(wait)	(!(wait) || ((wait)->task))
 
@@ -116,6 +119,7 @@ extern void FASTCALL(add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 
+// 等待队列成员加入等待队列，头插
 static inline void __add_wait_queue(wait_queue_head_t *head, wait_queue_t *new)
 {
 	list_add(&new->task_list, &head->task_list);
@@ -124,12 +128,14 @@ static inline void __add_wait_queue(wait_queue_head_t *head, wait_queue_t *new)
 /*
  * Used for wake-one threads:
  */
+// 等待队列成员加入等待队列，尾插
 static inline void __add_wait_queue_tail(wait_queue_head_t *head,
 						wait_queue_t *new)
 {
 	list_add_tail(&new->task_list, &head->task_list);
 }
 
+// 等待队列成员从等待队列中删除
 static inline void __remove_wait_queue(wait_queue_head_t *head,
 							wait_queue_t *old)
 {
@@ -147,15 +153,42 @@ int FASTCALL(out_of_line_wait_on_bit(void *, int, int (*)(void *), unsigned));
 int FASTCALL(out_of_line_wait_on_bit_lock(void *, int, int (*)(void *), unsigned));
 wait_queue_head_t *FASTCALL(bit_waitqueue(void *, int));
 
+/* 各种唤醒函数
+ * 1. wake_up: 唤醒可中断的和不可中断的，所有非排他+1个排他的
+ * 2. wake_up_nr: 唤醒可中断的和不可中断的，所有非排他+nr个排他的
+ * 3. wake_up_all: 唤醒可中断的和不可中断的，所有非排他+所有排他的
+ * 4. wake_up_interruptible: 唤醒可中断的，所有非排他+所有排他的
+ * 5. wake_up_interruptible_nr: 唤醒可中断的，所有非排他+所有排他的
+ * 6. wake_up_interruptible_all: 唤醒可中断的，所有非排他+所有排他的
+ *
+ * 7. wake_up_locked与wake_up类似，不同的是调用者需要持有自旋锁
+ * */
 #define wake_up(x)			__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, NULL)
 #define wake_up_nr(x, nr)		__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr, NULL)
 #define wake_up_all(x)			__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 0, NULL)
 #define wake_up_interruptible(x)	__wake_up(x, TASK_INTERRUPTIBLE, 1, NULL)
 #define wake_up_interruptible_nr(x, nr)	__wake_up(x, TASK_INTERRUPTIBLE, nr, NULL)
 #define wake_up_interruptible_all(x)	__wake_up(x, TASK_INTERRUPTIBLE, 0, NULL)
+
 #define	wake_up_locked(x)		__wake_up_locked((x), TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE)
 #define wake_up_interruptible_sync(x)   __wake_up_sync((x),TASK_INTERRUPTIBLE, 1)
 
+/* 等待第一个参数queue作为等待队列头的等待队列被唤醒，
+ * 而且第二个参数condition必须满足，否则阻塞。
+ *
+ * wait_event()和wait_event_interruptible()的区别
+ * 在于后者可以被信号打断，而前者不能。加上timeout后的
+ * 宏意味着阻塞等待的超时时间，以jiffy为单位，在第三个参数
+ * 的timeout到达时，不论condition是否满足，均返回。
+ * */
+
+/* 各种等待函数
+ * 1. wait_event:等待condition为true，不可中断的等待
+ * 2. wait_event_timeout:等待condition为true，不可中断的，有超时时间的等待
+ * 3. wait_event_interruptible:等待condition为true，可中断的等待
+ * 4. wait_event_interruptible_timeout:等待condition为true，可中断的，有超时时间的等待
+ * 5. wait_event_interruptible_exclusive:等待condition为true，可中断的，排他的等待
+ * */
 #define __wait_event(wq, condition) 					\
 do {									\
 	DEFINE_WAIT(__wait);						\
@@ -169,6 +202,7 @@ do {									\
 	finish_wait(&wq, &__wait);					\
 } while (0)
 
+// 等待condition为true，不可中断的等待
 #define wait_event(wq, condition) 					\
 do {									\
 	if (condition)	 						\
@@ -191,6 +225,7 @@ do {									\
 	finish_wait(&wq, &__wait);					\
 } while (0)
 
+// 等待condition为true，不可中断的，有超时时间的等待
 #define wait_event_timeout(wq, condition, timeout)			\
 ({									\
 	long __ret = timeout;						\
@@ -217,6 +252,7 @@ do {									\
 	finish_wait(&wq, &__wait);					\
 } while (0)
 
+// 等待condition为true，可中断的等待
 #define wait_event_interruptible(wq, condition)				\
 ({									\
 	int __ret = 0;							\
@@ -245,6 +281,7 @@ do {									\
 	finish_wait(&wq, &__wait);					\
 } while (0)
 
+// 等待condition为true，可中断的，有超时时间的等待
 #define wait_event_interruptible_timeout(wq, condition, timeout)	\
 ({									\
 	long __ret = timeout;						\
@@ -272,6 +309,7 @@ do {									\
 	finish_wait(&wq, &__wait);					\
 } while (0)
 
+// 等待condition为true，可中断的，排他的等待
 #define wait_event_interruptible_exclusive(wq, condition)		\
 ({									\
 	int __ret = 0;							\
@@ -281,7 +319,7 @@ do {									\
 })
 
 /*
- * Must be called with the spinlock in the wait_queue_head_t held.
+ * 必须使用持有的 wait_queue_head_t 中的自旋锁调用。
  */
 static inline void add_wait_queue_exclusive_locked(wait_queue_head_t *q,
 						   wait_queue_t * wait)

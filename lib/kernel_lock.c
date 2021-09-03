@@ -64,32 +64,30 @@ EXPORT_SYMBOL(smp_processor_id);
 
 #endif /* PREEMPT && __smp_processor_id && DEBUG_PREEMPT */
 
-#ifdef CONFIG_PREEMPT_BKL
+#ifdef CONFIG_PREEMPT_BKL			// 支持抢占的大内核锁
 /*
  * The 'big kernel semaphore'
  *
- * This mutex is taken and released recursively by lock_kernel()
- * and unlock_kernel().  It is transparently dropped and reaquired
- * over schedule().  It is used to protect legacy code that hasn't
- * been migrated to a proper locking design yet.
+ * 这个互斥锁由lock_kernel() 和unlock_kernel() 递归地获取和释放。
+ * 它在 schedule() 中被透明地丢弃和重新获取。
+ * 它用于保护尚未迁移到适当锁定设计的遗留代码。
  *
- * Note: code locked by this semaphore will only be serialized against
- * other code using the same locking facility. The code guarantees that
- * the task remains on the same CPU.
+ * 注意：被这个信号量锁定的代码只会使用
+ * 相同的锁定工具针对其他代码进行序列化。
+ * 代码保证任务保持在同一个 CPU 上。
  *
- * Don't use in new code.
+ * 不要在新代码中使用。
  */
 DECLARE_MUTEX(kernel_sem);
 
 /*
- * Re-acquire the kernel semaphore.
+ * 重新获取内核锁，信号实现
  *
- * This function is called with preemption off.
+ * 这个函数在抢占关闭的情况下被调用。
  *
- * We are executing in schedule() so the code must be extremely careful
- * about recursion, both due to the down() and due to the enabling of
- * preemption. schedule() will re-check the preemption flag after
- * reacquiring the semaphore.
+ * 我们在 schedule() 中执行，因此代码必须非常小心递归，
+ * 无论是由于 down() 还是由于启用了抢占。
+ * schedule() 将在重新获取信号量后重新检查抢占标志。
  */
 int __lockfunc __reacquire_kernel_lock(void)
 {
@@ -109,13 +107,16 @@ int __lockfunc __reacquire_kernel_lock(void)
 	return 0;
 }
 
+/* 释放大内核锁，信号量实现
+ * 强制释放，不要求lock_depth==0，但要>=0
+ * */
 void __lockfunc __release_kernel_lock(void)
 {
 	up(&kernel_sem);
 }
 
 /*
- * Getting the big kernel semaphore.
+ * 获取大内核锁，信号量实现。
  */
 void __lockfunc lock_kernel(void)
 {
@@ -124,13 +125,14 @@ void __lockfunc lock_kernel(void)
 
 	if (likely(!depth))
 		/*
-		 * No recursion worries - we set up lock_depth _after_
+		 * 无需担心递归 - 我们设置了 lock_depth _after_
 		 */
 		down(&kernel_sem);
 
 	task->lock_depth = depth;
 }
-
+/* 释放大内核锁，信号量实现
+ * */
 void __lockfunc unlock_kernel(void)
 {
 	struct task_struct *task = current;
@@ -141,17 +143,16 @@ void __lockfunc unlock_kernel(void)
 		up(&kernel_sem);
 }
 
-#else
+#else		// !CONFIG_PREEMPT_BKL
 
 /*
  * The 'big kernel lock'
  *
- * This spinlock is taken and released recursively by lock_kernel()
- * and unlock_kernel().  It is transparently dropped and reaquired
- * over schedule().  It is used to protect legacy code that hasn't
- * been migrated to a proper locking design yet.
+ * 这个自旋锁由lock_kernel() 和unlock_kernel() 递归地获取和释放。
+ * 它在 schedule() 中被透明地丢弃和重新获取。
+ * 它用于保护尚未迁移到适当锁定设计的遗留代码。
  *
- * Don't use in new code.
+ * 不要在新代码中使用。
  */
 static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(kernel_flag);
 
@@ -179,7 +180,9 @@ int __lockfunc __reacquire_kernel_lock(void)
 	preempt_disable();
 	return 0;
 }
-
+/* 释放大内核锁，自旋锁实现
+ * 强制释放，不要求lock_depth==0，但要>=0
+ * */
 void __lockfunc __release_kernel_lock(void)
 {
 	_raw_spin_unlock(&kernel_flag);
@@ -187,9 +190,9 @@ void __lockfunc __release_kernel_lock(void)
 }
 
 /*
- * These are the BKL spinlocks - we try to be polite about preemption. 
- * If SMP is not on (ie UP preemption), this all goes away because the
- * _raw_spin_trylock() will always succeed.
+ * 这些是 BKL 自旋锁 - 我们尽量对抢占保持礼貌。
+ * 如果 SMP 未开启（即 UP 抢占），这一切都会消失，
+ * 因为 _raw_spin_trylock() 将始终成功。
  */
 #ifdef CONFIG_PREEMPT
 static inline void __lock_kernel(void)
@@ -237,10 +240,9 @@ static inline void __unlock_kernel(void)
 }
 
 /*
- * Getting the big kernel lock.
+ * 获得大内核锁，使用自旋锁实现
  *
- * This cannot happen asynchronously, so we only need to
- * worry about other CPU's.
+ * 这不能异步发生，所以我们只需要担心其他 CPU。
  */
 void __lockfunc lock_kernel(void)
 {
@@ -249,7 +251,9 @@ void __lockfunc lock_kernel(void)
 		__lock_kernel();
 	current->lock_depth = depth;
 }
-
+/*
+ * 释放大内核锁，自旋锁实现
+ * */
 void __lockfunc unlock_kernel(void)
 {
 	BUG_ON(current->lock_depth < 0);

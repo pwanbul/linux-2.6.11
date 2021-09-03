@@ -71,7 +71,7 @@
 		*(__param)						\
 		VMLINUX_SYMBOL(__stop___param) = .;			\
 	}
-
+// 收集LSM相关函数
 #define SECURITY_INIT							\
 	.security_initcall.init : {					\
 		VMLINUX_SYMBOL(__security_initcall_start) = .;		\

@@ -13,19 +13,13 @@
 #include <asm/uaccess.h>
 
 /*
- * bitmaps provide an array of bits, implemented using an an
- * array of unsigned longs.  The number of valid bits in a
- * given bitmap does _not_ need to be an exact multiple of
- * BITS_PER_LONG.
+ * 位图提供位数组，使用无符号长数组实现。给定位图中的有效位数
+ * 不需要是 BITS_PER_LONG 的精确倍数。
  *
- * The possible unused bits in the last, partially used word
- * of a bitmap are 'don't care'.  The implementation makes
- * no particular effort to keep them zero.  It ensures that
- * their value will not affect the results of any operation.
- * The bitmap operations that return Boolean (bitmap_empty,
- * for example) or scalar (bitmap_weight, for example) results
- * carefully filter out these unused bits from impacting their
- * results.
+ * 位图的最后一个部分使用的字中可能未使用的位是“不关心”。
+ * 实现没有特别努力使它们保持为零。 它确保它们的值不会影响任何操作的结果。
+ * 返回布尔值（例如 bitmap_empty）或标量（例如 bitmap_weight）
+ * 结果的位图操作会仔细过滤掉这些未使用的位，以免影响其结果。
  *
  * These operations actually hold to a slightly stronger rule:
  * if you don't input any bitmaps to these ops that have some

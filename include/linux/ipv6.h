@@ -101,25 +101,25 @@ struct ipv6_comp_hdr {
  *	BEWARE, it is incorrect. The first 4 bits of flow_lbl
  *	are glued to priority now, forming "class".
  */
-
+// ipv6首部
 struct ipv6hdr {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
 	__u8			priority:4,
 				version:4;
 #elif defined(__BIG_ENDIAN_BITFIELD)
-	__u8			version:4,
+	__u8			version:4,		// 版本号
 				priority:4;
 #else
 #error	"Please fix <asm/byteorder.h>"
 #endif
-	__u8			flow_lbl[3];
+	__u8			flow_lbl[3];		// 流标签
 
-	__u16			payload_len;
-	__u8			nexthdr;
-	__u8			hop_limit;
+	__u16			payload_len;		// 载荷长度，不含首部
+	__u8			nexthdr;			// 下一个头首部
+	__u8			hop_limit;			// time to live
 
-	struct	in6_addr	saddr;
-	struct	in6_addr	daddr;
+	struct	in6_addr	saddr;		// 128位源IP地址
+	struct	in6_addr	daddr;		// 128位目的IP地址
 };
 
 /*

@@ -18,6 +18,7 @@ unsigned int nr_free_highpages(void);
 
 static inline unsigned int nr_free_highpages(void) { return 0; }
 
+/* 永久内核映射，可以休眠*/
 static inline void *kmap(struct page *page)
 {
 	might_sleep();

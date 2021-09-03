@@ -77,6 +77,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file);
 #define ELF_PAGEOFFSET(_v) ((_v) & (ELF_MIN_ALIGN-1))
 #define ELF_PAGEALIGN(_v) (((_v) + ELF_MIN_ALIGN - 1) & ~(ELF_MIN_ALIGN - 1))
 
+// ELF格式的二进制文件对象，静态的
 static struct linux_binfmt elf_format = {
 		.module		= THIS_MODULE,
 		.load_binary	= load_elf_binary,
@@ -500,7 +501,13 @@ out:
 #define INTERPRETER_AOUT 1
 #define INTERPRETER_ELF 2
 
-
+/* 加载ELF格式的可执行文件
+ * 处理ELF中segment与进程地址空间的映射
+ * 重点关注：
+ * 		arch_pick_mmap_layout  处理mmap的起始地址
+ * 		setup_arg_pages		设置用户栈
+ * 		start_thread	设置entry point
+ * */
 static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 {
 	struct file *interpreter = NULL; /* to shut gcc up */
@@ -760,13 +767,13 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
 		current->personality |= READ_IMPLIES_EXEC;
 
-	arch_pick_mmap_layout(current->mm);
+	arch_pick_mmap_layout(current->mm);		// 使用的新的mmap布局还是旧的
 
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */
 	current->mm->rss = 0;
-	current->mm->free_area_cache = current->mm->mmap_base;
-	retval = setup_arg_pages(bprm, STACK_TOP, executable_stack);
+	current->mm->free_area_cache = current->mm->mmap_base;		// 初始化为mmap的基地址
+	retval = setup_arg_pages(bprm, STACK_TOP, executable_stack);		// 设置用户栈
 	if (retval < 0) {
 		send_sig(SIGKILL, current, 0);
 		goto out_free_dentry;
@@ -968,7 +975,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	 */
 	ELF_PLAT_INIT(regs, reloc_func_desc);
 #endif
-
+	// http://www.dosrc.com/mark/linux-3.18.6/2016/05/15/linux-kernel-loading-of-executable-program.html
 	start_thread(regs, elf_entry, bprm->p);
 	if (unlikely(current->ptrace & PT_PTRACED)) {
 		if (current->ptrace & PT_TRACE_EXEC)

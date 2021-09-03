@@ -833,7 +833,8 @@ static int dummy_setprocattr(struct task_struct *p, char *name, void *value, siz
 	return -EINVAL;
 }
 
-
+/* 全局唯一的变量，不是指针
+ * */
 struct security_operations dummy_security_ops;
 
 #define set_to_dummy_if_null(ops, function)				\
@@ -845,6 +846,7 @@ struct security_operations dummy_security_ops;
 			}						\
 	} while (0)
 
+// 把dummy_xxx函数设置到dummy_security_ops结构中
 void security_fixup_ops (struct security_operations *ops)
 {
 	set_to_dummy_if_null(ops, ptrace);

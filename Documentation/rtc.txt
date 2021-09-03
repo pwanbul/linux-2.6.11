@@ -2,10 +2,9 @@
 	Real Time Clock Driver for Linux
 	================================
 
-All PCs (even Alpha machines) have a Real Time Clock built into them.
-Usually they are built into the chipset of the computer, but some may
-actually have a Motorola MC146818 (or clone) on the board. This is the
-clock that keeps the date and time while your computer is turned off.
+所有 PC（甚至 Alpha 机器）都内置有实时时钟。通常它们内置在计算机的芯片组中，
+但有些实际上可能在板上安装了摩托罗拉 MC146818（或克隆）。
+这是在计算机关闭时保持日期和时间的时钟。
 
 However it can also be used to generate signals from a slow 2Hz to a
 relatively fast 8192Hz, in increments of powers of two. These signals
@@ -26,11 +25,9 @@ the last read.  Status information is reported through the pseudo-file
 built in locking so that only one process is allowed to have the /dev/rtc
 interface open at a time.
 
-A user process can monitor these interrupts by doing a read(2) or a
-select(2) on /dev/rtc -- either will block/stop the user process until
-the next interrupt is received. This is useful for things like
-reasonably high frequency data acquisition where one doesn't want to
-burn up 100% CPU by polling gettimeofday etc. etc.
+用户进程可以通过在 /dev/rtc 上执行 read(2) 或 select(2) 来监视这些中断——要么将阻止用户进程，
+直到接收到下一个中断。这对于诸如不希望通过轮询 gettimeofday 等来消耗 100% CPU 的合理
+高频数据采集之类的事情很有用。
 
 At high frequencies, or under high loads, the user process should check
 the number of interrupts received since the last read to determine if

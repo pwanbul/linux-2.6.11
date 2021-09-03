@@ -238,31 +238,31 @@ sysenter_past_esp:
 
 
 // system call handler stub
-// TI_flags 为flags在struct thread_info中偏移量
+// TI_flags 为flags在struct thread_info中偏移量，即8
 ENTRY(system_call)
 	pushl %eax			// save orig_eax
 	SAVE_ALL
-	GET_THREAD_INFO(%ebp)
+	GET_THREAD_INFO(%ebp)		# thread_info的地址放在ebp中
 					# system call tracing in operation
 	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)		// 被跟踪或者被审计
-	jnz syscall_trace_entry
-	cmpl $(nr_syscalls), %eax		// 检查调用号是否越界
+	jnz syscall_trace_entry			// 第一次处理跟踪或者审计
+	cmpl $(nr_syscalls), %eax		# 检查调用号是否越界
 	jae syscall_badsys
 syscall_call:
-	call *sys_call_table(,%eax,4)
-	movl %eax,EAX(%esp)		# store the return value
+	call *sys_call_table(,%eax,4)		# 调用服务器例程
+	movl %eax,EAX(%esp)		# 存储返回值
 syscall_exit:
-	cli				# make sure we don't miss an interrupt		// 关闭本地中断
+	cli				# make sure we don't miss an interrupt		关闭本地中断
 					# setting need_resched or sigpending
 					# between sampling and the iret
-	movl TI_flags(%ebp), %ecx
+	movl TI_flags(%ebp), %ecx		# thread_info中的flag放在ebp中
 	// 当TI_flags(%ebp)中的低16位全部为0，那么执行restore_all，存在置1的位，就跳转到syscall_exit_work
 	testw $_TIF_ALLWORK_MASK, %cx	# current->work
 	jne syscall_exit_work		// jnz syscall_exit_work
 restore_all:
-	RESTORE_ALL
+	RESTORE_ALL		# iret返回用户空间，不会接着往下走
 
-	# perform work that needs to be done immediately before resumption
+	# 执行需要在恢复前立即完成的工作
 	ALIGN
 work_pending:
 	testb $_TIF_NEED_RESCHED, %cl		// 如果置1，则work_resched
@@ -299,13 +299,13 @@ work_notifysig_v86:
 	call do_notify_resume
 	jmp restore_all
 
-	# perform syscall exit tracing
+	# 执行系统调用退出跟踪
 	ALIGN
 syscall_trace_entry:
 	movl $-ENOSYS,EAX(%esp)			/* Function not implemented */
 	movl %esp, %eax
 	xorl %edx,%edx
-	call do_syscall_trace
+	call do_syscall_trace		// 真正的第一次处理跟踪或者审计在这里
 	movl ORIG_EAX(%esp), %eax
 	cmpl $(nr_syscalls), %eax
 	jnae syscall_call
@@ -314,13 +314,14 @@ syscall_trace_entry:
 	# perform syscall exit tracing
 	ALIGN
 syscall_exit_work:
-	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP), %cl	// 3位中存在置1的情况，就执行do_syscall_trace
+	// 3位中存在置1的情况，就执行do_syscall_trace，否则执行work_pending
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP), %cl
 	jz work_pending
 	sti				# could let do_syscall_trace() call
 					# schedule() instead
 	movl %esp, %eax
 	movl $1, %edx
-	call do_syscall_trace
+	call do_syscall_trace		// 第二次处理跟踪或者审计
 	jmp resume_userspace
 
 	ALIGN
@@ -386,7 +387,7 @@ ENTRY(name)				\
 
 ENTRY(divide_error)
 	pushl $0			# no error code                                 9
-	pushl $do_divide_error      # do_name，这个符号由宏代码生成             8
+	pushl $do_divide_error      # do_name这个符号由宏代码生成               8
 	ALIGN
 error_code:     # 所有的异常函数共用这个error_code
     /* 1. 为do_handler_name准备参数
@@ -406,16 +407,16 @@ error_code:     # 所有的异常函数共用这个error_code
 	pushl %ebx      # 以上把do_name可能用到的寄存器保存现场                   0
 	cld     # 清除eflags中DF
 	movl %es, %ecx
-	movl ES(%esp), %edi		# get the function address，即$do_divide_error
-	movl ORIG_EAX(%esp), %edx	# get the error code，即编号9处的值
-	movl %eax, ORIG_EAX(%esp)   # 把-1放入编号9处，以区分系统调用
-	movl %ecx, ES(%esp)         # 在8处写入，es的值
+	movl ES(%esp), %edi		# get the function address 即$do_divide_error
+	movl ORIG_EAX(%esp), %edx	# get the error code 即编号9处的值
+	movl %eax, ORIG_EAX(%esp)   # 把-1放入编号9处以区分系统调用
+	movl %ecx, ES(%esp)         # 在8处写入es的值
 	movl $(__USER_DS), %ecx
 	movl %ecx, %ds          # 设置用户数据段的段描述符
 	movl %ecx, %es          # 设置用户数据段的段描述符
-	movl %esp,%eax			# pt_regs pointer， 把0处(当前栈顶)的地址放入eax中
+	movl %esp,%eax			# pt_regs pointer 把0处(当前栈顶)的地址放入eax中
 	call *%edi          # 参数通过eax和edx传递,fastcall方式
-	jmp ret_from_exception
+	jmp ret_from_exception			// 从异常返回
 
 ENTRY(coprocessor_error)
 	pushl $0
@@ -732,7 +733,7 @@ ENTRY(sys_call_table)		// 服务例程数组
 	.long sys_setfsgid16
 	.long sys_llseek	/* 140 */
 	.long sys_getdents
-	.long sys_select                // 多路IO复用 select
+	.long sys_select				// 多路IO复用 select
 	.long sys_flock
 	.long sys_msync
 	.long sys_readv		/* 145 */
@@ -758,7 +759,7 @@ ENTRY(sys_call_table)		// 服务例程数组
 	.long sys_getresuid16	/* 165 */
 	.long sys_vm86
 	.long sys_ni_syscall	/* Old sys_query_module */
-	.long sys_poll
+	.long sys_poll						// 多路IO复用 poll
 	.long sys_nfsservctl
 	.long sys_setresgid16	/* 170 */
 	.long sys_getresgid16

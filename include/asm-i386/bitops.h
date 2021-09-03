@@ -74,6 +74,7 @@ static inline void __set_bit(int nr, volatile unsigned long * addr)
  * you should call smp_mb__before_clear_bit() and/or smp_mb__after_clear_bit()
  * in order to ensure changes are visible on other processors.
  */
+// 把在addr中偏移量为nr的位清除(置0)
 static inline void clear_bit(int nr, volatile unsigned long * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
@@ -136,14 +137,16 @@ static inline void change_bit(int nr, volatile unsigned long * addr)
  * It may be reordered on other architectures than x86.
  * It also implies a memory barrier.
  */
+ // 把在addr中偏移量为nr的位置1，原值返回
 static inline int test_and_set_bit(int nr, volatile unsigned long * addr)
 {
 	int oldbit;
 
 	__asm__ __volatile__( LOCK_PREFIX
-		"btsl %2,%1\n\tsbbl %0,%0"
-		:"=r" (oldbit),"=m" (ADDR)
-		:"Ir" (nr) : "memory");
+		"btsl %2,%1\n\t"        // bit test set
+        "sbbl %0,%0"
+		:"=r" (oldbit),"=m" (ADDR)      // addr表示基地址
+		:"Ir" (nr) : "memory");         // nr表示offset
 	return oldbit;
 }
 

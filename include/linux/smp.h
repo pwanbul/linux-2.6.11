@@ -128,14 +128,17 @@ static inline void smp_send_reschedule(int cpu) { }
  * real bugs.
  */
 #ifdef __smp_processor_id
+
 # if defined(CONFIG_PREEMPT) && defined(CONFIG_DEBUG_PREEMPT)
    extern unsigned int smp_processor_id(void);
 # else
 #  define smp_processor_id() __smp_processor_id()
 # endif
 # define _smp_processor_id() __smp_processor_id()
+
 #else
 # define _smp_processor_id() smp_processor_id()
+
 #endif
 
 #define get_cpu()		({ preempt_disable(); smp_processor_id(); })

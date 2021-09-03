@@ -32,6 +32,7 @@ static inline void wrmsrl (unsigned long msr, unsigned long long val)
 	wrmsr (msr, lo, hi);
 }
 
+// rdtsc返回你的值是64位的，保存在EDX:EAX中
 #define rdtsc(low,high) \
      __asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high))
 
@@ -39,7 +40,7 @@ static inline void wrmsrl (unsigned long msr, unsigned long long val)
      __asm__ __volatile__("rdtsc" : "=a" (low) : : "edx")
 
 #define rdtscll(val) \
-     __asm__ __volatile__("rdtsc" : "=A" (val))
+     __asm__ __volatile__("rdtsc" : "=A" (val))     // "=A"表示使用%edx和%eax
 
 #define write_tsc(val1,val2) wrmsr(0x10, val1, val2)
 

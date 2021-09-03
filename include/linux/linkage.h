@@ -19,7 +19,7 @@
 #endif
 
 #ifndef __ALIGN
-#define __ALIGN		.align 4,0x90
+#define __ALIGN		.align 4,0x90		// 对齐的空间用0x90 nop填充
 #define __ALIGN_STR	".align 4,0x90"
 #endif
 
@@ -28,6 +28,7 @@
 #define ALIGN __ALIGN
 #define ALIGN_STR __ALIGN_STR
 
+// 内核控制路径定义
 #define ENTRY(name) \
   .globl name; \
   ALIGN; \

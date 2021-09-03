@@ -41,10 +41,16 @@
 #include <linux/wait.h>
 #include <linux/rwsem.h>
 
+// 信号量实现
 struct semaphore {
+	/* count统计量，表示资源的数量，
+	 * 大于0时表示资源还未占用完，
+	 * 等于0时表示资源已经占用完但还没有等待的进程，
+	 * 小于0时表示资源不可用，并且有进程在等待
+	 * */
 	atomic_t count;
-	int sleepers;
-	wait_queue_head_t wait;
+	int sleepers;		// 取值为0和1，0表示没有进程等待，1表示有进程等待
+	wait_queue_head_t wait;		// 等待进程的队列
 };
 
 
@@ -61,9 +67,11 @@ struct semaphore {
 #define __DECLARE_SEMAPHORE_GENERIC(name,count) \
 	struct semaphore name = __SEMAPHORE_INITIALIZER(name,count)
 
+// 二值信号量(互斥信号量)
 #define DECLARE_MUTEX(name) __DECLARE_SEMAPHORE_GENERIC(name,1)
 #define DECLARE_MUTEX_LOCKED(name) __DECLARE_SEMAPHORE_GENERIC(name,0)
 
+// 动态初始化信号量
 static inline void sema_init (struct semaphore *sem, int val)
 {
 /*
@@ -77,11 +85,13 @@ static inline void sema_init (struct semaphore *sem, int val)
 	init_waitqueue_head(&sem->wait);
 }
 
+// 初始化空闲信号量
 static inline void init_MUTEX (struct semaphore *sem)
 {
 	sema_init(sem, 1);
 }
 
+// 初始化忙的信号量
 static inline void init_MUTEX_LOCKED (struct semaphore *sem)
 {
 	sema_init(sem, 0);
@@ -98,20 +108,23 @@ fastcall int  __down_trylock(struct semaphore * sem);
 fastcall void __up(struct semaphore * sem);
 
 /*
- * This is ugly, but we want the default case to fall through.
- * "__down_failed" is a special asm handler that calls the C
- * routine that actually waits. See arch/i386/kernel/semaphore.c
+ * 这很丑陋，但我们希望默认情况下通过。
+ * “__down_failed”是一个特殊的asm处理程序，
+ * 它调用实际等待的C例程。
+ * 参见 arch/i386/kernel/semaphore.c
+ *
+ * 加锁信号量
  */
 static inline void down(struct semaphore * sem)
 {
 	might_sleep();
 	__asm__ __volatile__(
 		"# atomic down operation\n\t"
-		LOCK "decl %0\n\t"     /* --sem->count */
-		"js 2f\n"
-		"1:\n"
+		LOCK "decl %0\n\t"     /* --sem->count 只有这一行代码是临界区*/
+		"js 2f\n"			// 变成负数则跳转到2f
+		"1:\n"		// 下面没有指令了
 		LOCK_SECTION_START("")
-		"2:\tlea %0,%%eax\n\t"
+		"2:\tlea %0,%%eax\n\t"			// fastcall
 		"call __down_failed\n\t"
 		"jmp 1b\n"
 		LOCK_SECTION_END
@@ -121,8 +134,7 @@ static inline void down(struct semaphore * sem)
 }
 
 /*
- * Interruptible try to acquire a semaphore.  If we obtained
- * it, return zero.  If we were interrupted, returns -EINTR
+ * 可中断尝试获取信号量。如果我们得到它，返回零。如果我们被打断，返回 -EINTR
  */
 static inline int down_interruptible(struct semaphore * sem)
 {
@@ -147,8 +159,7 @@ static inline int down_interruptible(struct semaphore * sem)
 }
 
 /*
- * Non-blockingly attempt to down() a semaphore.
- * Returns zero if we acquired it
+ * 非阻塞地尝试 down() 一个信号量。如果我们获得它，则返回零
  */
 static inline int down_trylock(struct semaphore * sem)
 {
@@ -172,17 +183,18 @@ static inline int down_trylock(struct semaphore * sem)
 }
 
 /*
- * Note! This is subtle. We jump to wake people up only if
- * the semaphore was negative (== somebody was waiting on it).
- * The default case (no contention) will result in NO
- * jumps for both down() and up().
+ * 笔记！这是微妙的。仅当信号量为负时（== 有人在等待），
+ * 我们才会跳转唤醒人们。
+ * 默认情况下（无争用）将导致 down() 和 up() 都没有跳转。
+ *
+ * 释放信号量
  */
 static inline void up(struct semaphore * sem)
 {
 	__asm__ __volatile__(
 		"# atomic up operation\n\t"
 		LOCK "incl %0\n\t"     /* ++sem->count */
-		"jle 2f\n"
+		"jle 2f\n"		// 小于等于0，即ZF==1，但从负数变成0才会唤醒
 		"1:\n"
 		LOCK_SECTION_START("")
 		"2:\tlea %0,%%eax\n\t"

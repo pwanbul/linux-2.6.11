@@ -11,28 +11,27 @@
 #include <linux/string.h>
 #include <asm/page.h>
 
-#define VERIFY_READ 0
-#define VERIFY_WRITE 1
+#define VERIFY_READ 0		// 可读不一定可写
+#define VERIFY_WRITE 1		// 可写必定可读
 
 /*
- * The fs value determines whether argument validity checking should be
- * performed or not.  If get_fs() == USER_DS, checking is performed, with
- * get_fs() == KERNEL_DS, checking is bypassed.
+ * fs 值确定是否应执行参数有效性检查。如果 get_fs() == USER_DS，
+ * 则执行检查，使用 get_fs() == KERNEL_DS，则绕过检查。
  *
- * For historical reasons, these macros are grossly misnamed.
+ * 由于历史原因，这些宏被严重错误命名。
  */
 
 #define MAKE_MM_SEG(s)	((mm_segment_t) { (s) })
 
 
-#define KERNEL_DS	MAKE_MM_SEG(0xFFFFFFFFUL)
-#define USER_DS		MAKE_MM_SEG(PAGE_OFFSET)
+#define KERNEL_DS	MAKE_MM_SEG(0xFFFFFFFFUL)           // 内核空间限制
+#define USER_DS		MAKE_MM_SEG(PAGE_OFFSET)            // 用户空间限制
 
 #define get_ds()	(KERNEL_DS)
 #define get_fs()	(current_thread_info()->addr_limit)
 #define set_fs(x)	(current_thread_info()->addr_limit = (x))
 
-#define segment_eq(a,b)	((a).seg == (b).seg)
+#define segment_eq(a,b)	((a).seg == (b).seg)        // a和b的限制是否相同
 
 /*
  * movsl can be slow when source and dest are not both 8-byte aligned
@@ -46,13 +45,16 @@ extern struct movsl_mask {
 #define __addr_ok(addr) ((unsigned long __force)(addr) < (current_thread_info()->addr_limit.seg))
 
 /*
- * Test whether a block of memory is a valid user space address.
- * Returns 0 if the range is valid, nonzero otherwise.
+ * 测试内存块是否是有效的用户空间地址。
+ * 如果范围有效，则返回0，否则返回非零。
  *
  * This is equivalent to the following test:
  * (u33)addr + (u33)size >= (u33)current->addr_limit.seg
  *
- * This needs 33-bit arithmetic. We have a carry...
+ * 这需要 33 位算法。我们有一个携带...
+ *
+ * 如果(addr + size) >= (current_thread_info()->addr_limit) - 1，返回非零值
+ * 如果(addr + size) < (current_thread_info()->addr_limit)，返回零
  */
 #define __range_ok(addr,size) ({ \
 	unsigned long flag,sum; \
@@ -64,29 +66,30 @@ extern struct movsl_mask {
 
 /**
  * access_ok: - Checks if a user space pointer is valid
- * @type: Type of access: %VERIFY_READ or %VERIFY_WRITE.  Note that
- *        %VERIFY_WRITE is a superset of %VERIFY_READ - if it is safe
- *        to write to a block, it is always safe to read from it.
- * @addr: User space pointer to start of block to check
- * @size: Size of block to check
+ * @type: 访问类型：%VERIFY_READ 或 %VERIFY_WRITE。
+ * 			请注意， %VERIFY_WRITE 是 %VERIFY_READ 的超集，
+ * 			如果写入块是安全的，那么读取它总是安全的。
+ * @addr: 指向要检查的块开始的用户空间指针
+ * @size: 要检查的块大小
  *
- * Context: User context only.  This function may sleep.
+ * 上下文：仅用户上下文。此功能可能会休眠。
  *
- * Checks if a pointer to a block of memory in user space is valid.
+ * 检查指向用户空间内存块的指针是否有效。
  *
- * Returns true (nonzero) if the memory block may be valid, false (zero)
- * if it is definitely invalid.
+ * 如果内存块可能有效，则返回真（非零），如果绝对无效，则返回假（零）。
  *
- * Note that, depending on architecture, this function probably just
- * checks that the pointer is in the user space range - after calling
- * this function, memory access functions may still return -EFAULT.
+ * 请注意，根据体系结构，此函数可能只是检查指针是否在用户空间范围内
+ * - 调用此函数后，内存访问函数可能仍会返回 -EFAULT。
+ *
+ * 这里检查是很粗糙的，细致的权限检查使用 异常表机制，即将验证的
+ * 工作交给虚存中的硬件设备来完成。
  */
 #define access_ok(type,addr,size) (likely(__range_ok(addr,size) == 0))
 
 /**
- * verify_area: - Obsolete, use access_ok()
- * @type: Type of access: %VERIFY_READ or %VERIFY_WRITE
- * @addr: User space pointer to start of block to check
+ * verify_area: - 已过时，请使用 access_ok()
+ * @type: 访问类型：%VERIFY_READ 或 %VERIFY_WRITE
+ * @addr: 指向要检查的块开始的用户空间指针
  * @size: Size of block to check
  *
  * Context: User context only.  This function may sleep.
@@ -432,21 +435,19 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 }
 
 /**
- * __copy_from_user: - Copy a block of data from user space, with less checking.
- * @to:   Destination address, in kernel space.
- * @from: Source address, in user space.
- * @n:    Number of bytes to copy.
+ * __copy_from_user: - 从用户空间复制数据块，不带检查。
+ * @to:   目标地址，在内核空间中。
+ * @from: 源地址，在用户空间。
+ * @n:    要复制的字节数。
  *
- * Context: User context only.  This function may sleep.
+ * 上下文：仅用户上下文。此功能可能会休眠。
  *
- * Copy data from user space to kernel space.  Caller must check
- * the specified block with access_ok() before calling this function.
+ * 将数据从用户空间复制到内核空间。在调用此函数之前，
+ * 调用者必须使用 access_ok() 检查指定的块。
  *
- * Returns number of bytes that could not be copied.
- * On success, this will be zero.
+ * 返回无法复制的字节数。成功时，这将为零。
  *
- * If some data could not be copied, this function will pad the copied
- * data to the requested size using zero bytes.
+ * 如果无法复制某些数据，此函数将使用零字节将复制的数据填充到请求的大小。
  */
 static inline unsigned long
 __copy_from_user_inatomic(void *to, const void __user *from, unsigned long n)

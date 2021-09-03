@@ -54,7 +54,7 @@
  * to static priority [ MAX_RT_PRIO..MAX_PRIO-1 ],
  * and back.
  */
-#define NICE_TO_PRIO(nice)	(MAX_RT_PRIO + (nice) + 20)
+#define NICE_TO_PRIO(nice)	(MAX_RT_PRIO + (nice) + 20)     // MAX_RT_PRIO为100
 #define PRIO_TO_NICE(prio)	((prio) - MAX_RT_PRIO - 20)
 #define TASK_NICE(p)		PRIO_TO_NICE((p)->static_prio)
 
@@ -75,13 +75,11 @@
 
 /*
  * These are the 'tuning knobs' of the scheduler:
- *
- * Minimum timeslice is 5 msecs (or 1 jiffy, whichever is larger),
- * default timeslice is 100 msecs, maximum timeslice is 800 msecs.
- * Timeslices get refilled after they expire.
+ * 最小时间片为5毫秒（或1个jiffy，以较大者为准），
+ * 默认时间片为100毫秒，最大时间片为800毫秒。时标过期后会重新填充。
  */
-#define MIN_TIMESLICE		max(5 * HZ / 1000, 1)
-#define DEF_TIMESLICE		(100 * HZ / 1000)
+#define MIN_TIMESLICE		max(5 * HZ / 1000, 1)       // 最小时间片5ms
+#define DEF_TIMESLICE		(100 * HZ / 1000)       // 默认时间片100ms
 #define ON_RUNQUEUE_WEIGHT	 30
 #define CHILD_PENALTY		 95
 #define PARENT_PENALTY		100
@@ -182,9 +180,9 @@ static unsigned int task_timeslice(task_t *p)
 
 typedef struct runqueue runqueue_t;
 
-struct prio_array {
-	unsigned int nr_active;
-	unsigned long bitmap[BITMAP_SIZE];
+struct prio_array {			// 进程优先级管理
+	unsigned int nr_active;			// 链表中进程描述符的数量
+	unsigned long bitmap[BITMAP_SIZE];	///
 	struct list_head queue[MAX_PRIO];
 };
 
@@ -194,6 +192,8 @@ struct prio_array {
  * Locking rule: those places that want to lock multiple runqueues
  * (such as the load balancing or the thread migration code), lock
  * acquire operations must be ordered by ascending &runqueue.
+ *
+ * 每CPU运行队列结构
  */
 struct runqueue {
 	spinlock_t lock;
@@ -283,8 +283,8 @@ static DEFINE_PER_CPU(struct runqueue, runqueues);
 #define for_each_domain(cpu, domain) \
 	for (domain = cpu_rq(cpu)->sd; domain; domain = domain->parent)
 
-#define cpu_rq(cpu)		(&per_cpu(runqueues, (cpu)))
-#define this_rq()		(&__get_cpu_var(runqueues))
+#define cpu_rq(cpu)		(&per_cpu(runqueues, (cpu)))        // 指定CPU的运行队列
+#define this_rq()		(&__get_cpu_var(runqueues))     // 本地CPU的运行队列
 #define task_rq(p)		cpu_rq(task_cpu(p))
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
 
@@ -974,13 +974,12 @@ static inline int wake_idle(int cpu, task_t *p)
  * @state: the mask of task states that can be woken
  * @sync: do a synchronous wakeup?
  *
- * Put it on the run-queue if it's not already there. The "current"
- * thread is always on the run-queue (except when the actual
- * re-schedule is in progress), and as such you're allowed to do
- * the simpler "current->state = TASK_RUNNING" to mark yourself
- * runnable without the overhead of this.
+ * 如果它不在run queue中，则将它放在运行队列中。
+ * “current”线程始终在运行队列中（除非正在进行实际的重新调度），
+ * 因此，您可以执行更简单的“current->state = TASK_RUNNING”来标记自己可运行，
+ * 而不会产生此开销.
  *
- * returns failure only if the task is already active.
+ * 仅当任务已处于活动状态时才返回失败。
  */
 static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 {
@@ -1120,6 +1119,7 @@ out:
 	return success;
 }
 
+// 通用接口，唤醒进程或者线程
 int fastcall wake_up_process(task_t * p)
 {
 	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
@@ -1128,6 +1128,7 @@ int fastcall wake_up_process(task_t * p)
 
 EXPORT_SYMBOL(wake_up_process);
 
+// 通用接口，唤醒指定状态的进程或者线程
 int fastcall wake_up_state(task_t *p, unsigned int state)
 {
 	return try_to_wake_up(p, state, 0);
@@ -2658,10 +2659,27 @@ EXPORT_SYMBOL(sub_preempt_count);
 
 /*
  * schedule() is the main scheduler function.
+ * 主调读器函数
+ * 从运行队列中找到一个进程，随后将CPU分配这个进程
+ * 该函数可以由内核控制路径调用如：直接调用或延迟调用
+ *
+ * 1. 直接调用：current进程因不能获得必须的资源而要立刻被阻塞时，
+ *    此时要阻塞进程的内核要执行一下步骤：
+ *    1. 把current进程加入适当的等待队列
+ *    2. 把current进程设置为TASK_INTERRUPTIBLE或者TASK_UNINTERRUPTIBLE
+ *    3. 调用schedule()
+ *    4. 检查资源是否可用，如果不可用转到第2步
+ *    5. 一旦资源可用，就从等待队列中删除
+ * 2. 延迟调用：看到实例了再补充
  */
 asmlinkage void __sched schedule(void)
 {
 	long *switch_count;
+	/* next指向被选举出的进程，它将取代current进程，如果没有优先级高于current的可运行进程，
+	 * 那么next指向current，即不发生切换
+	 *
+	 * prev指向current
+	 * */
 	task_t *prev, *next;
 	runqueue_t *rq;
 	prio_array_t *array;
@@ -2686,11 +2704,11 @@ asmlinkage void __sched schedule(void)
 	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
 
 need_resched:
-	preempt_disable();
+	preempt_disable();      // 禁用抢占
 	prev = current;
-	release_kernel_lock(prev);
+	release_kernel_lock(prev);			// 释放当前进程持有的大内核锁
 need_resched_nonpreemptible:
-	rq = this_rq();
+	rq = this_rq();     // 本地CPU的运行队列，per CPU变量
 
 	/*
 	 * The idle thread is not allowed to schedule!
@@ -2702,7 +2720,7 @@ need_resched_nonpreemptible:
 	}
 
 	schedstat_inc(rq, sched_cnt);
-	now = sched_clock();
+	now = sched_clock();    // 系统reset后到此刻的纳秒时间
 	if (likely(now - prev->timestamp < NS_MAX_SLEEP_AVG))
 		run_time = now - prev->timestamp;
 	else
@@ -2819,6 +2837,9 @@ switch_tasks:
 	} else
 		spin_unlock_irq(&rq->lock);
 
+	/* 尝试重新请求大内核锁
+	 *
+	 * */
 	prev = current;
 	if (unlikely(reacquire_kernel_lock(prev) < 0))
 		goto need_resched_nonpreemptible;
@@ -2829,11 +2850,10 @@ switch_tasks:
 
 EXPORT_SYMBOL(schedule);
 
-#ifdef CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPT		// 配置成可抢占内核
 /*
- * this is is the entry point to schedule() from in-kernel preemption
- * off of preempt_enable.  Kernel preemptions off return from interrupt
- * occur there and call schedule directly.
+ * 这是从 preempt_enable 的内核抢占到 schedule() 的入口点。
+ * 从中断返回的内核抢占发生在那里并直接调用调度。
  */
 asmlinkage void __sched preempt_schedule(void)
 {
@@ -2843,8 +2863,8 @@ asmlinkage void __sched preempt_schedule(void)
 	int saved_lock_depth;
 #endif
 	/*
-	 * If there is a non-zero preempt_count or interrupts are disabled,
-	 * we do not want to preempt the current task.  Just return..
+	 * 如果有一个非零的 preempt_count 或中断被禁用，
+	 * 我们不想抢占当前任务。
 	 */
 	if (unlikely(ti->preempt_count || irqs_disabled()))
 		return;
@@ -2866,7 +2886,7 @@ need_resched:
 #endif
 	sub_preempt_count(PREEMPT_ACTIVE);
 
-	/* we could miss a preemption opportunity between schedule and now */
+	/* 我们可能会错过计划和现在之间的抢占机会 */
 	barrier();
 	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
@@ -2916,7 +2936,7 @@ need_resched:
 }
 
 #endif /* CONFIG_PREEMPT */
-
+// 等待成员的默认唤醒方式
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync, void *key)
 {
 	task_t *p = curr->task;
@@ -2926,19 +2946,20 @@ int default_wake_function(wait_queue_t *curr, unsigned mode, int sync, void *key
 EXPORT_SYMBOL(default_wake_function);
 
 /*
- * The core wakeup function.  Non-exclusive wakeups (nr_exclusive == 0) just
- * wake everything up.  If it's an exclusive wakeup (nr_exclusive == small +ve
- * number) then we wake all the non-exclusive tasks and one exclusive task.
- *
- * There are circumstances in which we can try to wake a task which has already
- * started to run but is not in state TASK_RUNNING.  try_to_wake_up() returns
- * zero in this (rare) case, and we handle it by continuing to scan the queue.
+ 核心唤醒功能。非排他性唤醒（nr_exclusive == 0）只会唤醒所有内容。
+ 如果是排它性唤醒（nr_exclusive ==small + ve * number），那么我们将唤醒所有非排他性任务和一个排他性任务。
+ 在某些情况下，我们可以尝试唤醒已经开始运行但未处于TASK_RUNNING状态的任务。
+ 在这种（罕见）情况下，try_to_wake_up（）返回零，我们通过继续扫描队列来处理它。
  */
+// 唤醒线程/进程核心函数
 static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
 			     int nr_exclusive, int sync, void *key)
 {
 	struct list_head *tmp, *next;
 
+	/* 排他性的task尾插链表
+	 * 非排他性的task头插链表
+	 * */
 	list_for_each_safe(tmp, next, &q->task_list) {
 		wait_queue_t *curr;
 		unsigned flags;
@@ -2957,6 +2978,7 @@ static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
  * @mode: which threads
  * @nr_exclusive: how many wake-one or wake-many threads to wake up
  */
+ // 唤醒线程/进程函数
 void fastcall __wake_up(wait_queue_head_t *q, unsigned int mode,
 				int nr_exclusive, void *key)
 {
@@ -2970,7 +2992,7 @@ void fastcall __wake_up(wait_queue_head_t *q, unsigned int mode,
 EXPORT_SYMBOL(__wake_up);
 
 /*
- * Same as __wake_up but called with the spinlock in wait_queue_head_t held.
+ * 与 __wake_up 相同，但使用 wait_queue_head_t 中的自旋锁调用。
  */
 void fastcall __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
 {
@@ -3007,6 +3029,7 @@ void fastcall __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exc
 }
 EXPORT_SYMBOL_GPL(__wake_up_sync);	/* For internal use only */
 
+// 完成体完成
 void fastcall complete(struct completion *x)
 {
 	unsigned long flags;
@@ -3031,25 +3054,26 @@ void fastcall complete_all(struct completion *x)
 }
 EXPORT_SYMBOL(complete_all);
 
+// 等待完成体完成
 void fastcall __sched wait_for_completion(struct completion *x)
 {
 	might_sleep();
-	spin_lock_irq(&x->wait.lock);
-	if (!x->done) {
-		DECLARE_WAITQUEUE(wait, current);
+	spin_lock_irq(&x->wait.lock);       // 加自旋锁
+	if (!x->done) {     // done为0时，才会进入休眠
+		DECLARE_WAITQUEUE(wait, current);       // 创建一个名叫wait的等待成员，并指向当前进程
 
-		wait.flags |= WQ_FLAG_EXCLUSIVE;
-		__add_wait_queue_tail(&x->wait, &wait);
+		wait.flags |= WQ_FLAG_EXCLUSIVE;        // 排他唤醒
+		__add_wait_queue_tail(&x->wait, &wait);     // 加入完成体中等待队列的队尾
 		do {
 			__set_current_state(TASK_UNINTERRUPTIBLE);
 			spin_unlock_irq(&x->wait.lock);
 			schedule();
 			spin_lock_irq(&x->wait.lock);
-		} while (!x->done);
+		} while (!x->done);     // done为0时循环
 		__remove_wait_queue(&x->wait, &wait);
 	}
 	x->done--;
-	spin_unlock_irq(&x->wait.lock);
+	spin_unlock_irq(&x->wait.lock);     // 释放自旋锁
 }
 EXPORT_SYMBOL(wait_for_completion);
 

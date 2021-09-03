@@ -40,7 +40,13 @@ static inline int generic_ffs(int x)
 /*
  * fls: find last bit set.
  */
-
+/* #define fls(x) generic_fls(x)
+ * 返回从右开始数，最后一个为1的位(从1开始计)，例如：
+ * x为0，返回0
+ * x为2，返回2
+ * x为6，返回3
+ * x为7，返回3
+ * */
 static __inline__ int generic_fls(int x)
 {
 	int r = 32;
@@ -85,8 +91,7 @@ static __inline__ int get_bitmask_order(unsigned int count)
 }
 
 /*
- * hweightN: returns the hamming weight (i.e. the number
- * of bits set) of a N-bit word
+ * hweightN：返回 N 位字的汉明权重（即设置的位数）
  */
 
 static inline unsigned int generic_hweight32(unsigned int w)

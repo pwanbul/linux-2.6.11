@@ -40,7 +40,7 @@
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
 
-unsigned int __VMALLOC_RESERVE = 128 << 20;
+unsigned int __VMALLOC_RESERVE = 128 << 20;     // vmalloc区域为128MB
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 unsigned long highstart_pfn, highend_pfn;
@@ -48,9 +48,8 @@ unsigned long highstart_pfn, highend_pfn;
 static int noinline do_test_wp_bit(void);
 
 /*
- * Creates a middle page table and puts a pointer to it in the
- * given global directory entry. This only returns the gd entry
- * in non-PAE compilation mode, since the middle layer is folded.
+ * 创建一个中间页表，并在给定的全局目录条目中放置一个指向它的指针。
+ * 由于中间层已折叠，因此仅在非PAE编译模式下返回gd条目。
  */
 static pmd_t * __init one_md_table_init(pgd_t *pgd)
 {
@@ -72,8 +71,7 @@ static pmd_t * __init one_md_table_init(pgd_t *pgd)
 }
 
 /*
- * Create a page table and place a pointer to it in a middle page
- * directory entry.
+ * 创建一个页表并将指向它的指针放在中间页目录条目中。
  */
 static pte_t * __init one_page_table_init(pmd_t *pmd)
 {
@@ -96,9 +94,7 @@ static pte_t * __init one_page_table_init(pmd_t *pmd)
  */
 
 /*
- * NOTE: The pagetables are allocated contiguous on the physical space 
- * so we can cache the place of the first one and move around without 
- * checking the pgd every time.
+ * 注意：这些页表在物理空间上是连续分配的，因此我们可以缓存第一个表的位置并四处移动，而不必每次都检查pgd。
  */
 static void __init page_table_range_init (unsigned long start, unsigned long end, pgd_t *pgd_base)
 {
@@ -128,6 +124,7 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 	}
 }
 
+//
 static inline int is_kernel_text(unsigned long addr)
 {
 	if (addr >= PAGE_OFFSET && addr <= (unsigned long)__init_end)
@@ -136,30 +133,31 @@ static inline int is_kernel_text(unsigned long addr)
 }
 
 /*
- * This maps the physical memory to kernel virtual address space, a total 
- * of max_low_pfn pages, by creating page tables starting from address 
- * PAGE_OFFSET.
+ * 通过创建从地址PAGE_OFFSET开始的页表，将物理内存映射到内核虚拟地址空间（总共max_low_pfn页）。
+ * 内核支持4级，目的是为了支持64位的机器，在32位中：
+ * 1. 非PAE，2级，10 - 0 - 10 - 12
+ * 2. PAE，3级，  2  - 9 - 9  - 12
  */
 static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 {
 	unsigned long pfn;
-	pgd_t *pgd;
-	pmd_t *pmd;
-	pte_t *pte;
+	pgd_t *pgd;     // 页全局目录项指针,4字节
+	pmd_t *pmd;     // 页中间目录项指针,PAE，8字节
+	pte_t *pte;     // 页表项指针，4字节
 	int pgd_idx, pmd_idx, pte_ofs;
 
-	pgd_idx = pgd_index(PAGE_OFFSET);
-	pgd = pgd_base + pgd_idx;
+	pgd_idx = pgd_index(PAGE_OFFSET);      // pgd_idx:768
+	pgd = pgd_base + pgd_idx;       // pgd:第768项的地址
 	pfn = 0;
 
-	for (; pgd_idx < PTRS_PER_PGD; pgd++, pgd_idx++) {
-		pmd = one_md_table_init(pgd);
-		if (pfn >= max_low_pfn)
+	for (; pgd_idx < PTRS_PER_PGD; pgd++, pgd_idx++) {      // PTRS_PER_PGD为1024
+		pmd = one_md_table_init(pgd);       // 页中间目录初始化，在非PAE时，pmd==pgd
+		if (pfn >= max_low_pfn)     // 最多max_low_pfn个页框
 			continue;
-		for (pmd_idx = 0; pmd_idx < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_idx++) {
-			unsigned int address = pfn * PAGE_SIZE + PAGE_OFFSET;
+		for (pmd_idx = 0; pmd_idx < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_idx++) {  // PTRS_PER_PMD：1或者512
+			unsigned int address = pfn * PAGE_SIZE + PAGE_OFFSET;   // 第pfn号页框对应的虚拟地址
 
-			/* Map with big pages if possible, otherwise create normal page tables. */
+			/* 如果可能，用大页面映射，否则创建普通页表。 */
 			if (cpu_has_pse) {
 				unsigned int address2 = (pfn + PTRS_PER_PTE - 1) * PAGE_SIZE + PAGE_OFFSET + PAGE_SIZE-1;
 
@@ -171,7 +169,6 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 			} else {
 				pte = one_page_table_init(pmd);
 
-				for (pte_ofs = 0; pte_ofs < PTRS_PER_PTE && pfn < max_low_pfn; pte++, pfn++, pte_ofs++) {
 						if (is_kernel_text(address))
 							set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
 						else
@@ -250,7 +247,7 @@ void __init kmap_init(void)
 	kmap_prot = PAGE_KERNEL;
 }
 
-void __init permanent_kmaps_init(pgd_t *pgd_base)
+void __init permanent_kmaps_init(pgd_t *pgd_base)       // 永久内核映射页表初始化
 {
 	pgd_t *pgd;
 	pud_t *pud;
@@ -258,10 +255,11 @@ void __init permanent_kmaps_init(pgd_t *pgd_base)
 	pte_t *pte;
 	unsigned long vaddr;
 
-	vaddr = PKMAP_BASE;
-	page_table_range_init(vaddr, vaddr + PAGE_SIZE*LAST_PKMAP, pgd_base);
+	vaddr = PKMAP_BASE;     // 永久内核映射起始地址
+	page_table_range_init(vaddr, vaddr + PAGE_SIZE*LAST_PKMAP, pgd_base);       // NON PAE时LAST_PKMAP为1024
 
-	pgd = swapper_pg_dir + pgd_index(vaddr);
+	// swapper_pg_dir       .fill 1024,4,0
+	pgd = swapper_pg_dir + pgd_index(vaddr);        //
 	pud = pud_offset(pgd, vaddr);
 	pmd = pmd_offset(pud, vaddr);
 	pte = pte_offset_kernel(pmd, vaddr);
@@ -307,20 +305,20 @@ unsigned long long __PAGE_KERNEL_EXEC = _PAGE_KERNEL_EXEC;
 extern void __init remap_numa_kva(void);
 #endif
 
-static void __init pagetable_init (void)
+static void __init pagetable_init (void)        // 页表初始化
 {
 	unsigned long vaddr;
 	pgd_t *pgd_base = swapper_pg_dir;
 
-#ifdef CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE       // 开启物理地址扩展
 	int i;
-	/* Init entries of the first-level page table to the zero page */
+	/* 将一级页表的条目初始化到零页 */
 	for (i = 0; i < PTRS_PER_PGD; i++)
 		set_pgd(pgd_base + i, __pgd(__pa(empty_zero_page) | _PAGE_PRESENT));
 #endif
 
 	/* Enable PSE if available */
-	if (cpu_has_pse) {
+	if (cpu_has_pse) {      // 开启36位页尺寸扩展
 		set_in_cr4(X86_CR4_PSE);
 	}
 
@@ -331,17 +329,19 @@ static void __init pagetable_init (void)
 		__PAGE_KERNEL_EXEC |= _PAGE_GLOBAL;
 	}
 
+	/* 借助于kernel_physical_mapping_init，将物理内存页（或前896 MiB）映射
+	 * 到虚拟地址空间中从PAGE_OFFSET开始的位置。内核接下来扫描各个页目录的所有相关项，将指针设置为正确的值。
+	 * */
 	kernel_physical_mapping_init(pgd_base);
 	remap_numa_kva();
 
 	/*
-	 * Fixed mappings, only the page table structure has to be
-	 * created - mappings will be set by set_fixmap():
+	 * 固定的映射，只需要创建页表结构-映射将由set_fixmap（）设置：
 	 */
 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
 	page_table_range_init(vaddr, 0, pgd_base);
 
-	permanent_kmaps_init(pgd_base);
+	permanent_kmaps_init(pgd_base);         // 永久内核映射页表初始化
 
 #ifdef CONFIG_X86_PAE
 	/*
@@ -394,29 +394,34 @@ void zap_low_mappings (void)
 	flush_tlb_all();
 }
 
+// 没有配置非连续内存
 #ifndef CONFIG_DISCONTIGMEM
+/*
+ * 计算每个zone中管理的页框数
+ * */
 void __init zone_sizes_init(void)
 {
-	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
+	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0}; // 保存的是管理的页框数
 	unsigned int max_dma, high, low;
 	
-	max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-	low = max_low_pfn;
-	high = highend_pfn;
+	max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;  // MAX_DMA_ADDRESS:PAGE_OFFSET+0x1000000，即16M
+	low = max_low_pfn;  // 低端内存的最大页框号，即0x38000000
+	high = highend_pfn; // 高端内存的最大页框号，即1M
 	
-	if (low < max_dma)
+	if (low < max_dma)      // max_dma:0x1000，即DMA区域的最大页框号
 		zones_size[ZONE_DMA] = low;
 	else {
-		zones_size[ZONE_DMA] = max_dma;
-		zones_size[ZONE_NORMAL] = low - max_dma;
-#ifdef CONFIG_HIGHMEM
+	    // 正常应该走这里
+		zones_size[ZONE_DMA] = max_dma;         // 即DMA区域为16MB
+		zones_size[ZONE_NORMAL] = low - max_dma;    // 即DMA+NORMAL区域为896MB
+#ifdef CONFIG_HIGHMEM   // highmem在64位系统上不需要
 		zones_size[ZONE_HIGHMEM] = high - low;
 #endif
 	}
 	free_area_init(zones_size);	
 }
 #else
-extern void zone_sizes_init(void);
+extern void zone_sizes_init(void);      // 非连续内存
 #endif /* !CONFIG_DISCONTIGMEM */
 
 static int disable_nx __initdata = 0;
@@ -490,13 +495,11 @@ out:
 #endif
 
 /*
- * paging_init() sets up the page tables - note that the first 8MB are
- * already mapped by head.S.
+ * paging_init() 设置页表——注意前 8MB 已经被 head.S 映射了。
  *
- * This routines also unmaps the page at virtual kernel address 0, so
- * that we can trap those pesky NULL-reference errors in the kernel.
+ * 此例程还取消映射虚拟内核地址 0 处的页面，以便我们可以在内核中捕获那些讨厌的 NULL 引用错误。
  */
-void __init paging_init(void)
+void __init paging_init(void)           // 分页初始化
 {
 #ifdef CONFIG_X86_PAE
 	set_nx();
@@ -504,9 +507,9 @@ void __init paging_init(void)
 		printk("NX (Execute Disable) protection: active\n");
 #endif
 
-	pagetable_init();
+	pagetable_init();       // 页表初始化
 
-	load_cr3(swapper_pg_dir);
+	load_cr3(swapper_pg_dir);       // 将cr3寄存器设置为指向全局页目录（swapper_pg_dir）的指针
 
 #ifdef CONFIG_X86_PAE
 	/*
@@ -516,9 +519,17 @@ void __init paging_init(void)
 	if (cpu_has_pae)
 		set_in_cr4(X86_CR4_PAE);
 #endif
+    /* 由于TLB缓存项仍然包含了启动时分配的一些内存地址数据，此时也必须刷出。
+     * __flush_all_tlb可完成所需的工作。与上下文切换期间相反，设置了_PAGE_GLOBAL位的页也要刷出。
+     * */
 	__flush_tlb_all();
 
+	/* kmap_init初始化全局变量kmap_pte。在从高端内存域将页映射到内核地址空间时，会使用该变量存入相应内存区的页表项。
+	 * 此外，用于高端内存内核映射的第一个固定映射内存区的地址保存在全局变量kmem_vstart中。
+	 * */
 	kmap_init();
+
+    // 初始化系统中所有结点的pgdat_t实例，该函数有2个定义，一个是在非连续内存中的，一个在连续内存中的
 	zone_sizes_init();
 }
 
@@ -591,6 +602,7 @@ void __init mem_init(void)
  
 	set_max_mapnr_init();
 
+// 设置highmem的起始地址
 #ifdef CONFIG_HIGHMEM
 	high_memory = (void *) __va(highstart_pfn * PAGE_SIZE);
 #else
@@ -610,9 +622,9 @@ void __init mem_init(void)
 
 	set_highmem_pages_init(bad_ppro);
 
-	codesize =  (unsigned long) &_etext - (unsigned long) &_text;
-	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;
-	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
+	codesize =  (unsigned long) &_etext - (unsigned long) &_text;		// 正文段大小
+	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;		// 数据段大小
+	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;		// 初始化数据段大小
 
 	kclist_add(&kcore_mem, __va(0), max_low_pfn << PAGE_SHIFT); 
 	kclist_add(&kcore_vmalloc, (void *)VMALLOC_START, 
@@ -697,16 +709,16 @@ static int noinline do_test_wp_bit(void)
 	
 	return flag;
 }
-
+/* 释放init相关的代码和数据*/
 void free_initmem(void)
 {
 	unsigned long addr;
 
 	addr = (unsigned long)(&__init_begin);
 	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(addr));
-		set_page_count(virt_to_page(addr), 1);
-		memset((void *)addr, 0xcc, PAGE_SIZE);
+		ClearPageReserved(virt_to_page(addr));		// 清除页框永不换出标记
+		set_page_count(virt_to_page(addr), 1);		// 页框引用设置为1
+		memset((void *)addr, 0xcc, PAGE_SIZE);		// 页框数据设置为0xcc
 		free_page(addr);
 		totalram_pages++;
 	}

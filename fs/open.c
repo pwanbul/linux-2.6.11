@@ -737,7 +737,7 @@ asmlinkage long sys_fchown(unsigned int fd, uid_t user, gid_t group)
 }
 
 /*
- * Note that while the flag value (low two bits) for sys_open means:
+ * 请注意，虽然 sys_open 的标志值（低两位）表示：
  *	00 - read-only
  *	01 - write-only
  *	10 - read-write
@@ -749,6 +749,8 @@ asmlinkage long sys_fchown(unsigned int fd, uid_t user, gid_t group)
  *	11 - read-write
  * for the internal routines (ie open_namei()/follow_link() etc). 00 is
  * used by symlinks.
+ *
+ * 打开文件
  */
 struct file *filp_open(const char * filename, int flags, int mode)
 {
@@ -833,7 +835,8 @@ cleanup_dentry:
 EXPORT_SYMBOL(dentry_open);
 
 /*
- * Find an empty file descriptor entry, and mark it busy.
+ * 找到一个空的文件描述符条目，并将其标记为忙碌。
+ *
  */
 int get_unused_fd(void)
 {
@@ -844,34 +847,33 @@ int get_unused_fd(void)
 	spin_lock(&files->file_lock);
 
 repeat:
- 	fd = find_next_zero_bit(files->open_fds->fds_bits, 
-				files->max_fdset, 
-				files->next_fd);
+	// 找到一个没有使用的fd
+ 	fd = find_next_zero_bit(files->open_fds->fds_bits, files->max_fdset, files->next_fd);
 
 	/*
 	 * N.B. For clone tasks sharing a files structure, this test
 	 * will limit the total number of files that can be opened.
+	 * 超限检查
 	 */
 	if (fd >= current->signal->rlim[RLIMIT_NOFILE].rlim_cur)
 		goto out;
 
-	/* Do we need to expand the fd array or fd set?  */
+	/* 我们是否需要扩展 fd 数组或 fd 集？  */
 	error = expand_files(files, fd);
 	if (error < 0)
 		goto out;
 
 	if (error) {
 		/*
-	 	 * If we needed to expand the fs array we
-		 * might have blocked - try again.
+	 	 * 如果我们需要扩展 fs 数组，我们可能会阻止 - 再试一次。
 		 */
 		error = -EMFILE;
 		goto repeat;
 	}
 
-	FD_SET(fd, files->open_fds);
+	FD_SET(fd, files->open_fds);			// 设置进位图
 	FD_CLR(fd, files->close_on_exec);
-	files->next_fd = fd + 1;
+	files->next_fd = fd + 1;		// 已分配的fd+1
 #if 1
 	/* Sanity check */
 	if (files->fd[fd] != NULL) {
@@ -906,13 +908,11 @@ void fastcall put_unused_fd(unsigned int fd)
 EXPORT_SYMBOL(put_unused_fd);
 
 /*
- * Install a file pointer in the fd array.  
+ * 在 fd 数组中安装文件指针。
  *
- * The VFS is full of places where we drop the files lock between
- * setting the open_fds bitmap and installing the file in the file
- * array.  At any such point, we are vulnerable to a dup2() race
- * installing a file in the array before us.  We need to detect this and
- * fput() the struct file we are about to overwrite in this case.
+ * VFS 充满了我们在设置 open_fds 位图和在文件数组中安装文件之间删除文件锁定的地方。
+ * 在任何时候，我们都容易受到在我们面前的阵列中安装文件的 dup2() 竞争的影响。
+ * 在这种情况下，我们需要检测这个和 fput() 我们将要覆盖的结构文件。
  *
  * It should never happen - if we allow dup2() do it, _really_ bad things
  * will follow.
@@ -930,6 +930,11 @@ void fastcall fd_install(unsigned int fd, struct file * file)
 
 EXPORT_SYMBOL(fd_install);
 
+/* open系统调用实现
+ * @filename 文件名
+ * @flags O_RDONLY，O_WRONLY，O_RDWR...
+ * @mode S_IRWXU，S_IRUSR...
+ * */
 asmlinkage long sys_open(const char __user * filename, int flags, int mode)
 {
 	char * tmp;
@@ -938,10 +943,10 @@ asmlinkage long sys_open(const char __user * filename, int flags, int mode)
 #if BITS_PER_LONG != 32
 	flags |= O_LARGEFILE;
 #endif
-	tmp = getname(filename);
-	fd = PTR_ERR(tmp);
+	tmp = getname(filename);		// 1.tmp是指向一片内存空间，里面存有文件名绝对路径字符串，还有些剩余空间
+	fd = PTR_ERR(tmp);		// 错误码先保存在fd中，以防下面的代码不能执行
 	if (!IS_ERR(tmp)) {
-		fd = get_unused_fd();
+		fd = get_unused_fd();		// 获得fd
 		if (fd >= 0) {
 			struct file *f = filp_open(tmp, flags, mode);
 			error = PTR_ERR(f);
@@ -950,7 +955,7 @@ asmlinkage long sys_open(const char __user * filename, int flags, int mode)
 			fd_install(fd, f);
 		}
 out:
-		putname(tmp);
+		putname(tmp);		// 归还空间
 	}
 	return fd;
 

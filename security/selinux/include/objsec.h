@@ -26,6 +26,8 @@
 #include "flask.h"
 #include "avc.h"
 
+// 对象安全相关
+
 struct task_security_struct {
         unsigned long magic;           /* magic number for this module */
 	struct task_struct *task;      /* back pointer to task object */

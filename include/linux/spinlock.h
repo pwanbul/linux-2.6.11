@@ -17,7 +17,16 @@
 #include <asm/system.h>
 
 /*
- * Must define these before including other files, inline functions need them
+ * 必须在包含其他文件之前定义这些，内联函数需要它们
+ *
+ * LOCK_SECTION_START，LOCK_SECTION_END中间的
+ * 内容是把这一段的代码汇编到一个叫.text.lock的节中，
+ * 并且这个节的属性是可重定位和可执行的，
+ * 这样在代码的执行过程中，因为不同的节会
+ * 被加载到不同的页去，所以如果前面不出现jmp就在1: 处结束了。
+ *
+ * 2:后面的指令大部分情况下不会发生，这样这些"多余"的指令
+ * 不会影响常规指令的命中率
  */
 #define LOCK_SECTION_NAME                       \
         ".text.lock." __stringify(KBUILD_BASENAME)
@@ -32,42 +41,46 @@
 #define LOCK_SECTION_END                        \
         ".previous\n\t"
 
-#define __lockfunc fastcall __attribute__((section(".spinlock.text")))
+#define __lockfunc fastcall __attribute__((section(".spinlock.text")))      // 自旋锁相关的代码放入专用section中
 
 /*
- * If CONFIG_SMP is set, pull in the _raw_* definitions
+ * 如果设置了 CONFIG_SMP，拉入 _raw_ 定义
  */
 #ifdef CONFIG_SMP
 
 #define assert_spin_locked(x)	BUG_ON(!spin_is_locked(x))
 #include <asm/spinlock.h>
 
-int __lockfunc _spin_trylock(spinlock_t *lock);
+/* 自旋锁和读写自旋锁接口的声明，注意
+ * 1. __acquires和__releases
+ * 2. 不管那种形式的加锁，都会关闭抢占
+ * */
+int __lockfunc _spin_trylock(spinlock_t *lock);			// 自旋锁非阻塞加锁
 int __lockfunc _read_trylock(rwlock_t *lock);
 int __lockfunc _write_trylock(rwlock_t *lock);
 
-void __lockfunc _spin_lock(spinlock_t *lock)	__acquires(spinlock_t);
+void __lockfunc _spin_lock(spinlock_t *lock)	__acquires(spinlock_t); 	// 自旋锁加锁
 void __lockfunc _read_lock(rwlock_t *lock)	__acquires(rwlock_t);
 void __lockfunc _write_lock(rwlock_t *lock)	__acquires(rwlock_t);
 
-void __lockfunc _spin_unlock(spinlock_t *lock)	__releases(spinlock_t);
+void __lockfunc _spin_unlock(spinlock_t *lock)	__releases(spinlock_t); 	// 自旋锁释放锁
 void __lockfunc _read_unlock(rwlock_t *lock)	__releases(rwlock_t);
 void __lockfunc _write_unlock(rwlock_t *lock)	__releases(rwlock_t);
 
-unsigned long __lockfunc _spin_lock_irqsave(spinlock_t *lock)	__acquires(spinlock_t);
+unsigned long __lockfunc _spin_lock_irqsave(spinlock_t *lock)	__acquires(spinlock_t);		// 自旋锁加锁并且禁用本地中断(保存flag)
 unsigned long __lockfunc _read_lock_irqsave(rwlock_t *lock)	__acquires(rwlock_t);
 unsigned long __lockfunc _write_lock_irqsave(rwlock_t *lock)	__acquires(rwlock_t);
 
-void __lockfunc _spin_lock_irq(spinlock_t *lock)	__acquires(spinlock_t);
-void __lockfunc _spin_lock_bh(spinlock_t *lock)		__acquires(spinlock_t);
+void __lockfunc _spin_lock_irq(spinlock_t *lock)	__acquires(spinlock_t);			// 自旋锁加锁并且禁用本地中断(不保存flag)
+void __lockfunc _spin_lock_bh(spinlock_t *lock)		__acquires(spinlock_t);			// 自旋锁加锁并禁用软中断
 void __lockfunc _read_lock_irq(rwlock_t *lock)		__acquires(rwlock_t);
 void __lockfunc _read_lock_bh(rwlock_t *lock)		__acquires(rwlock_t);
 void __lockfunc _write_lock_irq(rwlock_t *lock)		__acquires(rwlock_t);
 void __lockfunc _write_lock_bh(rwlock_t *lock)		__acquires(rwlock_t);
 
-void __lockfunc _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)	__releases(spinlock_t);
-void __lockfunc _spin_unlock_irq(spinlock_t *lock)				__releases(spinlock_t);
-void __lockfunc _spin_unlock_bh(spinlock_t *lock)				__releases(spinlock_t);
+void __lockfunc _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)	__releases(spinlock_t);		// 自旋锁释放锁
+void __lockfunc _spin_unlock_irq(spinlock_t *lock)				__releases(spinlock_t);		// 自旋锁释放锁
+void __lockfunc _spin_unlock_bh(spinlock_t *lock)				__releases(spinlock_t);		// 自旋锁释放锁
 void __lockfunc _read_unlock_irqrestore(rwlock_t *lock, unsigned long flags)	__releases(rwlock_t);
 void __lockfunc _read_unlock_irq(rwlock_t *lock)				__releases(rwlock_t);
 void __lockfunc _read_unlock_bh(rwlock_t *lock)					__releases(rwlock_t);
@@ -79,7 +92,7 @@ int __lockfunc _spin_trylock_bh(spinlock_t *lock);
 int __lockfunc generic_raw_read_trylock(rwlock_t *lock);
 int in_lock_functions(unsigned long addr);
 
-#else
+#else		// !CONFIG_SMP
 
 #define in_lock_functions(ADDR) 0
 
@@ -206,7 +219,7 @@ typedef struct {
 #endif
 
 /*
- * If CONFIG_SMP is unset, declare the _raw_* definitions as nops
+ * 如果未设置 CONFIG_SMP，则将 _raw_ 定义声明为 nops
  */
 #define spin_lock_init(lock)	do { (void)(lock); } while(0)
 #define _raw_spin_lock(lock)	do { (void)(lock); } while(0)
@@ -439,15 +452,15 @@ do { \
 #endif /* !SMP */
 
 /*
- * Define the various spin_lock and rw_lock methods.  Note we define these
- * regardless of whether CONFIG_SMP or CONFIG_PREEMPT are set. The various
- * methods are defined as nops in the case they are not required.
+ * 定义各种 spin_lock 和 rw_lock 方法。
+ * 请注意，无论是否设置了 CONFIG_SMP 或 CONFIG_PREEMPT，
+ * 我们都会定义这些。在不需要的情况下，各种方法被定义为 nops。
  */
-#define spin_trylock(lock)	__cond_lock(_spin_trylock(lock))
+#define spin_trylock(lock)	__cond_lock(_spin_trylock(lock))		// 加锁宏
 #define read_trylock(lock)	__cond_lock(_read_trylock(lock))
 #define write_trylock(lock)	__cond_lock(_write_trylock(lock))
 
-#define spin_lock(lock)		_spin_lock(lock)
+#define spin_lock(lock)		_spin_lock(lock)		// 加锁宏
 #define write_lock(lock)	_write_lock(lock)
 #define read_lock(lock)		_read_lock(lock)
 

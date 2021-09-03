@@ -456,8 +456,8 @@ asmlinkage long sys_rt_sigaction(int sig,
 /*
  * "Conditional" syscalls
  *
- * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
- * but it doesn't work on all toolchains, so we just do it by hand
+ * 我们想要的是 __attribute__((weak,alias("sys_ni_syscall"))),
+ * 但它不适用于所有工具链，所以我们只能手工完成
  */
 #ifndef cond_syscall
 #define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall");

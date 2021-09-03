@@ -103,12 +103,13 @@ extern unsigned long nr_iowait(void);
 
 #include <asm/processor.h>
 
-#define TASK_RUNNING		0
-#define TASK_INTERRUPTIBLE	1
-#define TASK_UNINTERRUPTIBLE	2
-#define TASK_STOPPED		4
-#define TASK_TRACED		8
-#define EXIT_ZOMBIE		16
+// 进程状态
+#define TASK_RUNNING		0		// 处在run queue中的进程
+#define TASK_INTERRUPTIBLE	1		// 可被信号唤醒的休眠
+#define TASK_UNINTERRUPTIBLE	2		// 不可被信号唤醒的休眠
+#define TASK_STOPPED		4		// 暂停
+#define TASK_TRACED		8			// 被跟踪
+#define EXIT_ZOMBIE		16			// 僵死
 #define EXIT_DEAD		32
 
 #define __set_task_state(tsk, state_value)		\
@@ -127,9 +128,9 @@ extern unsigned long nr_iowait(void);
 /*
  * Scheduling policies
  */
-#define SCHED_NORMAL		0
-#define SCHED_FIFO		1
-#define SCHED_RR		2
+#define SCHED_NORMAL		0       // 普通分时进程
+#define SCHED_FIFO		1       // 先进先出的实时进程
+#define SCHED_RR		2       // 时间片轮转的实时进程
 
 struct sched_param {
 	int sched_priority;
@@ -148,7 +149,7 @@ struct sched_param {
 extern rwlock_t tasklist_lock;
 extern spinlock_t mmlist_lock;
 
-typedef struct task_struct task_t;
+typedef struct task_struct task_t;      // 别名
 
 extern void sched_init(void);
 extern void sched_init_smp(void);
@@ -175,7 +176,10 @@ extern void update_process_times(int user);
 extern void scheduler_tick(void);
 extern unsigned long cache_decay_ticks;
 
-/* Attach to any functions which should be ignored in wchan output. */
+/* Attach to any functions which should be ignored in wchan output.
+ * 该信息使得内核在显示栈转储或类似信息时，忽略所有与调度有关的调用。
+ * 由于调度器函数调用不是普通代码流程的一部分，因此在这种情况下是没有意义的。
+ * */
 #define __sched		__attribute__((__section__(".sched.text")))
 /* Is this address in the __sched functions? */
 extern int in_sched_functions(unsigned long addr);
@@ -203,32 +207,35 @@ arch_get_unmapped_area_topdown(struct file *filp, unsigned long addr,
 extern void arch_unmap_area(struct vm_area_struct *area);
 extern void arch_unmap_area_topdown(struct vm_area_struct *area);
 
-
+// 内存描述符
 struct mm_struct {
 	struct vm_area_struct * mmap;		/* list of VMAs */
 	struct rb_root mm_rb;
-	struct vm_area_struct * mmap_cache;	/* last find_vma result */
-	unsigned long (*get_unmapped_area) (struct file *filp,
+	struct vm_area_struct * mmap_cache;	/* last find_vma result 最近一个find_vma返回的VMA*/
+	unsigned long (*get_unmapped_area) (struct file *filp,		// 获取mmap空间
 				unsigned long addr, unsigned long len,
 				unsigned long pgoff, unsigned long flags);
-	void (*unmap_area) (struct vm_area_struct *area);
-	unsigned long mmap_base;		/* base of mmap area */
-	unsigned long free_area_cache;		/* first hole */
+	void (*unmap_area) (struct vm_area_struct *area);		// 释放mmap空间
+	unsigned long mmap_base;		/* base of mmap area mmap基地址*/
+	unsigned long free_area_cache;		/* first hole 搜索起始地址*/
+	
 	pgd_t * pgd;
 	atomic_t mm_users;			/* How many users with user space? */
 	atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */
 	int map_count;				/* number of VMAs */
-	struct rw_semaphore mmap_sem;
+	struct rw_semaphore mmap_sem;		// 修改进程地址空间时需要加读写信号量
 	spinlock_t page_table_lock;		/* Protects page tables, mm->rss, mm->anon_rss */
 
 	struct list_head mmlist;		/* List of maybe swapped mm's.  These are globally strung
 						 * together off init_mm.mmlist, and are protected
 						 * by mmlist_lock
 						 */
-
+	
+	// 各个段的起始地址
 	unsigned long start_code, end_code, start_data, end_data;
-	unsigned long start_brk, brk, start_stack;
-	unsigned long arg_start, arg_end, env_start, env_end;
+	unsigned long start_brk, brk, start_stack;		// brk区域的起止地址，栈的开始地址
+	unsigned long arg_start, arg_end, env_start, env_end;		// 命令行参数和环境变量的起止地址
+	//
 	unsigned long rss, anon_rss, total_vm, locked_vm, shared_vm;
 	unsigned long exec_vm, stack_vm, reserved_vm, def_flags, nr_ptes;
 
@@ -301,9 +308,9 @@ struct signal_struct {
 	struct list_head posix_timers;
 
 	/* job control IDs */
-	pid_t pgrp;
+	pid_t pgrp;     // 进程组ID
 	pid_t tty_old_pgrp;
-	pid_t session;
+	pid_t session;      // 会话ID
 	/* boolean value for session group leader */
 	int leader;
 
@@ -328,7 +335,7 @@ struct signal_struct {
 	 * protect this instead of the siglock, because they really
 	 * have no need to disable irqs.
 	 */
-	struct rlimit rlim[RLIM_NLIMITS];
+	struct rlimit rlim[RLIM_NLIMITS];       // resource limit
 };
 
 /*
@@ -341,19 +348,16 @@ struct signal_struct {
 
 
 /*
- * Priority of a process goes from 0..MAX_PRIO-1, valid RT
- * priority is 0..MAX_RT_PRIO-1, and SCHED_NORMAL tasks are
- * in the range MAX_RT_PRIO..MAX_PRIO-1. Priority values
- * are inverted: lower p->prio value means higher priority.
+ * 进程的优先级从0..MAX_PRIO-1开始，有效的RT(实时)优先级为0..MAX_RT_PRIO-1，
+ * SCHED_NORMAL任务的范围为MAX_RT_PRIO..MAX_PRIO-1。
+ * 优先级值倒置：较低的p-> prior值表示较高的优先级。
  *
- * The MAX_USER_RT_PRIO value allows the actual maximum
- * RT priority to be separate from the value exported to
- * user-space.  This allows kernel threads to set their
- * priority to a value higher than any user task. Note:
- * MAX_RT_PRIO must not be smaller than MAX_USER_RT_PRIO.
+ * MAX_USER_RT_PRIO值允许将实际的最大RT优先级与导出到用户空间的值分开。
+ * 这允许内核线程将其优先级设置为高于任何用户任务的值。
+ * 注意：MAX_RT_PRIO不能小于MAX_USER_RT_PRIO。
  */
 
-#define MAX_USER_RT_PRIO	100
+#define MAX_USER_RT_PRIO	100     // 导出到用户空间时使用，见sys_sched_get_priority_max()
 #define MAX_RT_PRIO		MAX_USER_RT_PRIO
 
 #define MAX_PRIO		(MAX_RT_PRIO + 40)
@@ -526,21 +530,22 @@ struct audit_context;		/* See audit.c */
 struct mempolicy;
 
 struct task_struct {
-	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
-	struct thread_info *thread_info;
+	volatile long state;	/* 进程状态 -1 unrunnable, 0 runnable, >0 stopped */
+	struct thread_info *thread_info;     // 线程描述符指针
 	atomic_t usage;
 	unsigned long flags;	/* per process flags, defined below */
-	unsigned long ptrace;
+	unsigned long ptrace;	// 进程跟踪
 
 	int lock_depth;		/* Lock depth */
-
-	int prio, static_prio;
+	
+	// 优先级相关
+	int prio, static_prio;      // 动态优先级，静态优先级
 	struct list_head run_list;
 	prio_array_t *array;
 
 	unsigned long sleep_avg;
 	unsigned long long timestamp, last_ran;
-	int activated;
+	int activated;lis
 
 	unsigned long policy;
 	cpumask_t cpus_allowed;
@@ -550,7 +555,7 @@ struct task_struct {
 	struct sched_info sched_info;
 #endif
 
-	struct list_head tasks;
+	struct list_head tasks;		// 所有task_struct通过这个链表串起来
 	/*
 	 * ptrace_list/ptrace_children forms the list of my children
 	 * that were stolen by a ptracer.
@@ -558,35 +563,35 @@ struct task_struct {
 	struct list_head ptrace_children;
 	struct list_head ptrace_list;
 
-	struct mm_struct *mm, *active_mm;
+	struct mm_struct *mm, *active_mm;		// 内存描述符，进程地址空间
 
 /* task state */
-	struct linux_binfmt *binfmt;
-	long exit_state;
-	int exit_code, exit_signal;
+	struct linux_binfmt *binfmt;		// 二进制可执行文件相关
+	long exit_state;		// 退出状态
+	int exit_code, exit_signal;		// 退出码和退出信号
 	int pdeath_signal;  /*  The signal sent when the parent dies  */
 	/* ??? */
 	unsigned long personality;
 	unsigned did_exec:1;
-	pid_t pid;
-	pid_t tgid;
+	pid_t pid;		// 进程ID
+	pid_t tgid;		// 进程组ID
 	/* 
 	 * pointers to (original) parent process, youngest child, younger sibling,
 	 * older sibling, respectively.  (p->father can be replaced with 
 	 * p->parent->pid)
 	 */
-	struct task_struct *real_parent; /* real parent process (when being debugged) */
-	struct task_struct *parent;	/* parent process */
+	struct task_struct *real_parent; /* 亲爹 real parent process (when being debugged) */
+	struct task_struct *parent;	/* 干爹，被跟踪时设置 parent process */
 	/*
 	 * children/sibling forms the list of my children plus the
 	 * tasks I'm ptracing.
 	 */
 	struct list_head children;	/* list of my children */
 	struct list_head sibling;	/* linkage in my parent's children list */
-	struct task_struct *group_leader;	/* threadgroup leader */
+	struct task_struct *group_leader;	/* 指向进程组组长 threadgroup leader */
 
-	/* PID/PID hash table linkage. */
-	struct pid pids[PIDTYPE_MAX];
+	/* PID/PID hash table linkage. 进程标识符*/
+	struct pid pids[PIDTYPE_MAX];       // 链入pid_chain和pid_list
 
 	struct completion *vfork_done;		/* for vfork() */
 	int __user *set_child_tid;		/* CLONE_CHILD_SETTID */
@@ -606,6 +611,22 @@ struct task_struct {
 	uid_t uid,euid,suid,fsuid;
 	gid_t gid,egid,sgid,fsgid;
 	struct group_info *group_info;
+	/* 进程权能，2.6.11中还未实现文件的权能
+	 * 每一个进程，具有3个capabilities的集合，分别是：
+	 * cap_permitted: 这个集合定义了线程所能够拥有的特权的上限。
+	 * 		换句话说，如果某个capability不在Permitted集合中，
+	 * 		那么该线程便不能进行这个capability所对应的特权操作。
+	 * 		Permitted集合是Inheritable和Effective集合的的超集。
+	 *
+	 * cap_inheritable: 当执行exec()系运行其他命令时，
+	 * 		能够被新命令继承的capabilities，被包含在Inheritable集合中。
+	 * cap_effective: 内核检查该线程是否可以进行特权操作时，
+	 * 		检查的对象便是Effective集合。如之前所说，
+	 * 		Permitted集合定义了上限。线程可以删除Effective集合
+	 * 		中的某capability，随后在需要时，再从Permitted集合
+	 * 		中恢复该capability，以此达到临时禁用capability的功能。
+	 * 	http://rk700.github.io/2016/10/26/linux-capabilities/
+	 * */
 	kernel_cap_t   cap_effective, cap_inheritable, cap_permitted;
 	unsigned keep_capabilities:1;
 	struct user_struct *user;
@@ -622,18 +643,18 @@ struct task_struct {
 	struct sysv_sem sysvsem;
 /* CPU-specific state of this task */
 	struct thread_struct thread;
-/* filesystem information */
+/* filesystem information 文件系统相关*/
 	struct fs_struct *fs;
-/* open file information */
+/* open file information 打开的文件相关*/
 	struct files_struct *files;
-/* namespace */
+/* namespace 命名空间相关*/
 	struct namespace *namespace;
-/* signal handlers */
+/* signal handlers 信号处理相关*/
 	struct signal_struct *signal;
-	struct sighand_struct *sighand;
+	struct sighand_struct *sighand;     // 信号行为相关
 
-	sigset_t blocked, real_blocked;
-	struct sigpending pending;
+	sigset_t blocked, real_blocked;     // 阻塞信号集
+	struct sigpending pending;      // 未决信号
 
 	unsigned long sas_ss_sp;
 	size_t sas_ss_size;
@@ -641,8 +662,8 @@ struct task_struct {
 	void *notifier_data;
 	sigset_t *notifier_mask;
 	
-	void *security;
-	struct audit_context *audit_context;
+	void *security;		// LSM相关
+	struct audit_context *audit_context;        // 审计上下文
 
 /* Thread group tracking */
    	u32 parent_exec_id;
@@ -1166,6 +1187,9 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 
 #endif /* CONFIG_SMP */
 
+/* 如果有HAVE_ARCH_PICK_MMAP_LAYOUT，那么使用mmap.c下的arch_pick_mmap_layout，按实际情况来决定是否经典布局还是新布局
+ * 如果没有HAVE_ARCH_PICK_MMAP_LAYOUT，那么使用本文件中的arch_pick_mmap_layout，只能是经典布局
+ */
 #ifdef HAVE_ARCH_PICK_MMAP_LAYOUT
 extern void arch_pick_mmap_layout(struct mm_struct *mm);
 #else

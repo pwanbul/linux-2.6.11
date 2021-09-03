@@ -6,14 +6,16 @@
 #include <linux/string.h> /* For memset() */
 #include <asm/percpu.h>
 
-/* Enough to cover all DEFINE_PER_CPUs in kernel, including modules. */
+// 动态的per cpu
+
+/* 足以涵盖内核中的所有 DEFINE_PER_CPU，包括模块。 */
 #ifndef PERCPU_ENOUGH_ROOM
 #define PERCPU_ENOUGH_ROOM 32768
 #endif
 
-/* Must be an lvalue. */
-#define get_cpu_var(var) (*({ preempt_disable(); &__get_cpu_var(var); }))
-#define put_cpu_var(var) preempt_enable()
+/* 必须是左值。 */
+#define get_cpu_var(var) (*({ preempt_disable(); &__get_cpu_var(var); }))       // 防止在引用var期间被抢占后切换到其他CPU上运行
+#define put_cpu_var(var) preempt_enable()       // 开启抢占
 
 #ifdef CONFIG_SMP
 
@@ -36,7 +38,7 @@ struct percpu_data {
 extern void *__alloc_percpu(size_t size, size_t align);
 extern void free_percpu(const void *);
 
-#else /* CONFIG_SMP */
+#else /* !CONFIG_SMP */
 
 #define per_cpu_ptr(ptr, cpu) (ptr)
 
@@ -54,7 +56,7 @@ static inline void free_percpu(const void *ptr)
 
 #endif /* CONFIG_SMP */
 
-/* Simple wrapper for the common case: zeros memory. */
+/* 常见情况的简单包装：零内存. */
 #define alloc_percpu(type) \
 	((type *)(__alloc_percpu(sizeof(type), __alignof__(type))))
 

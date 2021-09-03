@@ -445,6 +445,7 @@ static int cpu_swap_callback(struct notifier_block *nfb,
 #endif /* CONFIG_SMP */
 
 #ifdef CONFIG_SMP
+// 更新近似per CPU计数器
 void percpu_counter_mod(struct percpu_counter *fbc, long amount)
 {
 	long count;
@@ -453,9 +454,9 @@ void percpu_counter_mod(struct percpu_counter *fbc, long amount)
 
 	pcount = per_cpu_ptr(fbc->counters, cpu);
 	count = *pcount + amount;
-	if (count >= FBC_BATCH || count <= -FBC_BATCH) {
+	if (count >= FBC_BATCH || count <= -FBC_BATCH) {		// 超出阈值
 		spin_lock(&fbc->lock);
-		fbc->count += count;
+		fbc->count += count;		// 修改准确值
 		spin_unlock(&fbc->lock);
 		count = 0;
 	}

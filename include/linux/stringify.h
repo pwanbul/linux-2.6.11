@@ -1,9 +1,8 @@
 #ifndef __LINUX_STRINGIFY_H
 #define __LINUX_STRINGIFY_H
 
-/* Indirect stringification.  Doing two levels allows the parameter to be a
- * macro itself.  For example, compile with -DFOO=bar, __stringify(FOO)
- * converts to "bar".
+/* 间接字符串化。做两层允许参数本身是一个宏。
+ * 例如，使用 -DFOO=bar 编译，__stringify(FOO) 转换为“bar”。
  */
 
 #define __stringify_1(x)	#x

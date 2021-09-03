@@ -20,7 +20,7 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.		     */
 /* ------------------------------------------------------------------------- */
 
-/* With some changes from Ky�sti M�lkki <kmalkki@cc.hut.fi> and
+/* With some changes from Ky�sti M�lkki <kmalkki@cc.hut.fi> and
    Frodo Looijaard <frodol@dds.nl> */
 
 /* $Id: i2c.h,v 1.68 2003/01/21 08:08:16 kmalkki Exp $ */
@@ -54,6 +54,9 @@ extern int i2c_master_send(struct i2c_client *,const char* ,int);
 extern int i2c_master_recv(struct i2c_client *,char* ,int);
 
 /* Transfer num messages.
+ * 这里有个编译报错，struct i2c_msg msg[]应该写成struct i2c_msg* msg
+ * 原因：struct i2c_msg虽然前置声明了，但是定义却在下面的代码中，对于这种非
+ * 内置类型编译是会报错的。
  */
 extern int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],int num);
 
@@ -194,7 +197,7 @@ struct i2c_algorithm {
 	   to NULL. If an adapter algorithm can do SMBus access, set 
 	   smbus_xfer. If set to NULL, the SMBus protocol is simulated
 	   using common I2C messages */
-	int (*master_xfer)(struct i2c_adapter *adap,struct i2c_msg msgs[], 
+	int (*master_xfer)(struct i2c_adapter *adap,struct i2c_msg* msgs,		// 这里有个编译报错
 	                   int num);
 	int (*smbus_xfer) (struct i2c_adapter *adap, u16 addr, 
 	                   unsigned short flags, char read_write,

@@ -19,7 +19,7 @@ extern __kernel_size_t strspn(const char *,const char *);
 extern __kernel_size_t strcspn(const char *,const char *);
 
 /*
- * Include machine specific inline routines
+ * 包括机器特定的内联例程
  */
 #include <asm/string.h>
 

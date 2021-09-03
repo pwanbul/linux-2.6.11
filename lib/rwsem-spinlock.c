@@ -13,8 +13,8 @@ struct rwsem_waiter {
 	struct list_head list;
 	struct task_struct *task;
 	unsigned int flags;
-#define RWSEM_WAITING_FOR_READ	0x00000001
-#define RWSEM_WAITING_FOR_WRITE	0x00000002
+#define RWSEM_WAITING_FOR_READ	0x00000001		// 因为申请读锁不得而加入队列
+#define RWSEM_WAITING_FOR_WRITE	0x00000002		// 因为申请写锁不得而加入队列
 };
 
 #if RWSEM_DEBUG
@@ -28,7 +28,7 @@ void rwsemtrace(struct rw_semaphore *sem, const char *str)
 #endif
 
 /*
- * initialise the semaphore
+ * 初始化信号量
  */
 void fastcall init_rwsem(struct rw_semaphore *sem)
 {
@@ -41,13 +41,13 @@ void fastcall init_rwsem(struct rw_semaphore *sem)
 }
 
 /*
- * handle the lock release when processes blocked on it that can now run
- * - if we come here, then:
- *   - the 'active count' _reached_ zero
- *   - the 'waiting count' is non-zero
- * - the spinlock must be held by the caller
- * - woken process blocks are discarded from the list after having task zeroed
- * - writers are only woken if wakewrite is non-zero
+ * 当现在可以运行的进程被阻塞时处理锁定释放
+ * - 如果我们来到这里，那么：
+ *   - “活动计数”_达到_零
+ *   - “等待计数”非零
+ * - 自旋锁必须由调用者持有
+ * - 任务归零后，唤醒的进程块将从列表中丢弃
+ * - 仅当唤醒写入非零时才唤醒写入器
  */
 static inline struct rw_semaphore *
 __rwsem_do_wake(struct rw_semaphore *sem, int wakewrite)
@@ -58,6 +58,7 @@ __rwsem_do_wake(struct rw_semaphore *sem, int wakewrite)
 
 	rwsemtrace(sem, "Entering __rwsem_do_wake");
 
+	// 取出第一个等待的写者
 	waiter = list_entry(sem->wait_list.next, struct rwsem_waiter, list);
 
 	if (!wakewrite) {
@@ -66,10 +67,9 @@ __rwsem_do_wake(struct rw_semaphore *sem, int wakewrite)
 		goto dont_wake_writers;
 	}
 
-	/* if we are allowed to wake writers try to grant a single write lock
-	 * if there's a writer at the front of the queue
-	 * - we leave the 'waiting count' incremented to signify potential
-	 *   contention
+	/* 如果我们被允许唤醒写者尝试授予单个写锁
+	 * 如果队列前面有作者
+	 * - 我们让“等待计数”递增以表示潜在的争用
 	 */
 	if (waiter->flags & RWSEM_WAITING_FOR_WRITE) {
 		sem->activity = -1;
@@ -78,12 +78,12 @@ __rwsem_do_wake(struct rw_semaphore *sem, int wakewrite)
 		/* Don't touch waiter after ->task has been NULLed */
 		mb();
 		waiter->task = NULL;
-		wake_up_process(tsk);
+		wake_up_process(tsk);		// 唤醒进程
 		put_task_struct(tsk);
 		goto out;
 	}
 
-	/* grant an infinite number of read locks to the front of the queue */
+	/* 向队列前端授予无限数量的读锁 */
  dont_wake_writers:
 	woken = 0;
 	while (waiter->flags & RWSEM_WAITING_FOR_READ) {
@@ -109,7 +109,7 @@ __rwsem_do_wake(struct rw_semaphore *sem, int wakewrite)
 }
 
 /*
- * wake a single writer
+ * 唤醒一个写者
  */
 static inline struct rw_semaphore *
 __rwsem_wake_one_writer(struct rw_semaphore *sem)
@@ -131,7 +131,7 @@ __rwsem_wake_one_writer(struct rw_semaphore *sem)
 }
 
 /*
- * get a read lock on the semaphore
+ * 获得信号量的读锁
  */
 void fastcall __sched __down_read(struct rw_semaphore *sem)
 {
@@ -152,14 +152,14 @@ void fastcall __sched __down_read(struct rw_semaphore *sem)
 	tsk = current;
 	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 
-	/* set up my own style of waitqueue */
+	/* 设置我自己风格的等待队列 */
 	waiter.task = tsk;
 	waiter.flags = RWSEM_WAITING_FOR_READ;
 	get_task_struct(tsk);
 
 	list_add_tail(&waiter.list, &sem->wait_list);
 
-	/* we don't need to touch the semaphore struct anymore */
+	/* 我们不再需要接触信号量结构 */
 	spin_unlock(&sem->wait_lock);
 
 	/* wait to be given the lock */
@@ -177,7 +177,7 @@ void fastcall __sched __down_read(struct rw_semaphore *sem)
 }
 
 /*
- * trylock for reading -- returns 1 if successful, 0 if contention
+ * 用于读取的 trylock -- 如果成功则返回 1，如果争用则返回 0
  */
 int fastcall __down_read_trylock(struct rw_semaphore *sem)
 {
@@ -199,8 +199,8 @@ int fastcall __down_read_trylock(struct rw_semaphore *sem)
 }
 
 /*
- * get a write lock on the semaphore
- * - we increment the waiting count anyway to indicate an exclusive lock
+ * 在信号量上获得写锁
+ * 我们无论如何都会增加等待计数以指示排他锁
  */
 void fastcall __sched __down_write(struct rw_semaphore *sem)
 {
@@ -209,29 +209,29 @@ void fastcall __sched __down_write(struct rw_semaphore *sem)
 
 	rwsemtrace(sem, "Entering __down_write");
 
-	spin_lock(&sem->wait_lock);
+	spin_lock(&sem->wait_lock);		// 加自旋锁
 
 	if (sem->activity == 0 && list_empty(&sem->wait_list)) {
 		/* granted */
 		sem->activity = -1;
 		spin_unlock(&sem->wait_lock);
-		goto out;
+		goto out;		// 读者获得锁
 	}
 
 	tsk = current;
-	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+	set_task_state(tsk, TASK_UNINTERRUPTIBLE);		// 不可中断的睡眠
 
-	/* set up my own style of waitqueue */
+	/* 设置我自己风格的等待队列 */
 	waiter.task = tsk;
 	waiter.flags = RWSEM_WAITING_FOR_WRITE;
 	get_task_struct(tsk);
 
 	list_add_tail(&waiter.list, &sem->wait_list);
 
-	/* we don't need to touch the semaphore struct anymore */
+	/* 我们不再需要接触信号量结构 */
 	spin_unlock(&sem->wait_lock);
 
-	/* wait to be given the lock */
+	/* 等待获得锁 */
 	for (;;) {
 		if (!waiter.task)
 			break;
@@ -246,7 +246,7 @@ void fastcall __sched __down_write(struct rw_semaphore *sem)
 }
 
 /*
- * trylock for writing -- returns 1 if successful, 0 if contention
+ * 用于写入的 trylock -- 如果成功则返回 1，如果争用则返回 0
  */
 int fastcall __down_write_trylock(struct rw_semaphore *sem)
 {
@@ -268,7 +268,7 @@ int fastcall __down_write_trylock(struct rw_semaphore *sem)
 }
 
 /*
- * release a read lock on the semaphore
+ * 释放信号量上的读锁
  */
 void fastcall __up_read(struct rw_semaphore *sem)
 {
@@ -285,7 +285,7 @@ void fastcall __up_read(struct rw_semaphore *sem)
 }
 
 /*
- * release a write lock on the semaphore
+ * 释放信号量的写锁
  */
 void fastcall __up_write(struct rw_semaphore *sem)
 {
@@ -303,8 +303,8 @@ void fastcall __up_write(struct rw_semaphore *sem)
 }
 
 /*
- * downgrade a write lock into a read lock
- * - just wake up any readers at the front of the queue
+ * 将写锁降级为读锁
+ * - 唤醒队列前面的任何读者
  */
 void fastcall __downgrade_write(struct rw_semaphore *sem)
 {

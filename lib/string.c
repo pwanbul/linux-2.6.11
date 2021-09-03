@@ -461,14 +461,15 @@ EXPORT_SYMBOL(memset);
  * @src: Where to copy from
  * @count: The size of the area.
  *
- * You should not use this function to access IO space, use memcpy_toio()
- * or memcpy_fromio() instead.
+ * 您不应使用此函数访问 IO 空间，而应使用 memcpy_toio() 或 memcpy_fromio()。
+ *
+ * 通用实现
  */
 void * memcpy(void * dest,const void *src,size_t count)
 {
 	char *tmp = (char *) dest, *s = (char *) src;
 
-	while (count--)
+	while (count--)		// 当出现内存重叠时，结果是错误的
 		*tmp++ = *s++;
 
 	return dest;
@@ -483,22 +484,24 @@ EXPORT_SYMBOL(memcpy);
  * @src: Where to copy from
  * @count: The size of the area.
  *
- * Unlike memcpy(), memmove() copes with overlapping areas.
+ * 与 memcpy() 不同， memmove() 处理重叠区域。
+ *
+ * 通用实现
  */
 void * memmove(void * dest,const void *src,size_t count)
 {
 	char *tmp, *s;
-
+	// 能处理内存重叠
 	if (dest <= src) {
 		tmp = (char *) dest;
 		s = (char *) src;
-		while (count--)
+		while (count--)		// 正向复制
 			*tmp++ = *s++;
 		}
 	else {
 		tmp = (char *) dest + count;
 		s = (char *) src + count;
-		while (count--)
+		while (count--)		// 反向复制
 			*--tmp = *--s;
 		}
 

@@ -40,7 +40,7 @@
 /* MCD - HACK: Find somewhere to initialize this EARLY, or make this initializer cleaner */
 nodemask_t node_online_map = { { [0] = 1UL } };
 nodemask_t node_possible_map = NODE_MASK_ALL;
-struct pglist_data *pgdat_list;
+struct pglist_data *pgdat_list;			// 全局唯一
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
 long nr_swap_pages;
@@ -61,7 +61,7 @@ EXPORT_SYMBOL(nr_swap_pages);
  * Used by page_zone() to look up the address of the struct zone whose
  * id is encoded in the upper bits of page->flags
  */
-struct zone *zone_table[1 << (ZONES_SHIFT + NODES_SHIFT)];
+struct zone *zone_table[1 << (ZONES_SHIFT + NODES_SHIFT)];      // zone_table是为了支持从页框描述符找到其所在的内存区
 EXPORT_SYMBOL(zone_table);
 
 static char *zone_names[MAX_NR_ZONES] = { "DMA", "Normal", "HighMem" };
@@ -171,19 +171,19 @@ static void destroy_compound_page(struct page *page, unsigned long order)
 #endif		/* CONFIG_HUGETLB_PAGE */
 
 /*
- * function for dealing with page's order in buddy system.
- * zone->lock is already acquired when we use these.
- * So, we don't need atomic page->flags operations here.
+ * 伙伴系统中处理页面order的功能。
+ * 当我们使用这些时，zone->lock 已经被获取了。
+ * 所以，我们这里不需要原子 page->flags 操作。
  */
 static inline unsigned long page_order(struct page *page) {
 	return page->private;
 }
-
+// 设置页框的分配阶
 static inline void set_page_order(struct page *page, int order) {
 	page->private = order;
 	__SetPagePrivate(page);
 }
-
+// 清除页框的分配阶
 static inline void rmv_page_order(struct page *page)
 {
 	__ClearPagePrivate(page);
@@ -191,12 +191,12 @@ static inline void rmv_page_order(struct page *page)
 }
 
 /*
- * This function checks whether a page is free && is the buddy
- * we can do coalesce a page and its buddy if
- * (a) the buddy is free &&
- * (b) the buddy is on the buddy system &&
- * (c) a page and its buddy have the same order.
- * for recording page's order, we use page->private and PG_private.
+ * 此函数检查页面是否已经释放 && 释放buddy
+ * 我们可以合并一个页面和它的伙伴，如果
+ * (a) 他的伙伴已经释放 &&
+ * (b) 伙伴在伙伴系统中 &&
+ * (c) 一个页面和它的伙伴有相同的order.
+ * 为了记录页面的order，我们使用 page->private 和 PG_private。
  *
  */
 static inline int page_is_buddy(struct page *page, int order)
@@ -231,45 +231,50 @@ static inline int page_is_buddy(struct page *page, int order)
  * triggers coalescing into a block of larger size.            
  *
  * -- wli
+ *
+ * page: 要释放的页框
+ * base: zone的页框数组
+ * zone: 当前zone
+ * order: 分配阶
  */
 
-static inline void __free_pages_bulk (struct page *page, struct page *base,
-		struct zone *zone, unsigned int order)
+static inline void __free_pages_bulk (struct page *page, struct page *base, struct zone *zone, unsigned int order)
 {
 	unsigned long page_idx;
 	struct page *coalesced;
-	int order_size = 1 << order;
+	int order_size = 1 << order;		// 释放页框的数量
 
 	if (unlikely(order))
 		destroy_compound_page(page, order);
 
-	page_idx = page - base;
+	page_idx = page - base;		// 页框描述符idx
 
 	BUG_ON(page_idx & (order_size - 1));
 	BUG_ON(bad_range(zone, page));
 
-	zone->free_pages += order_size;
-	while (order < MAX_ORDER-1) {
+	zone->free_pages += order_size;		// 更新空闲页框数量
+	// 合并buddy，向前合并或者向后合并
+	while (order < MAX_ORDER-1) {		// MAX_ORDER为11，从当前order开始处理
 		struct free_area *area;
 		struct page *buddy;
 		int buddy_idx;
 
-		buddy_idx = (page_idx ^ (1 << order));
+		buddy_idx = (page_idx ^ (1 << order));		// 获得page_idx的伙伴
 		buddy = base + buddy_idx;
 		if (bad_range(zone, buddy))
 			break;
-		if (!page_is_buddy(buddy, order))
+		if (!page_is_buddy(buddy, order))		// buddy的order必须和page相同，buddy没有引用，释放在伙伴系统中
 			break;
-		/* Move the buddy up one level. */
-		list_del(&buddy->lru);
-		area = zone->free_area + order;
+		/* 将buddy提升一级。 */
+		list_del(&buddy->lru);		// 从页框高速缓存中删除
+		area = zone->free_area + order;			// 定位空闲链表
 		area->nr_free--;
-		rmv_page_order(buddy);
-		page_idx &= buddy_idx;
+		rmv_page_order(buddy);		// 清除buddy的order
+		page_idx &= buddy_idx;		// 由于向前合并和向后合并，需要修正page_idx
 		order++;
 	}
-	coalesced = base + page_idx;
-	set_page_order(coalesced, order);
+	coalesced = base + page_idx;		// 合并后起始页框描述符
+	set_page_order(coalesced, order);		// 更新order
 	list_add(&coalesced->lru, &zone->free_area[order].free_list);
 	zone->free_area[order].nr_free++;
 }
@@ -295,32 +300,28 @@ static inline void free_pages_check(const char *function, struct page *page)
 
 /*
  * Frees a list of pages. 
- * Assumes all pages on list are in same zone, and of same order.
- * count is the number of pages to free, or 0 for all on the list.
+ * 假设列表中的所有页面都在同一区域中，并且顺序相同。
+ * count 是要释放的页数，或者列表中的所有页数为 0。
  *
- * If the zone was previously in an "all pages pinned" state then look to
- * see if this freeing clears that state.
+ * 如果该区域之前处于“所有页面固定”状态，则查看此释放是否清除了该状态。
  *
- * And clear the zone's pages_scanned counter, to hold off the "all pages are
- * pinned" detection logic.
+ * 并清除区域的 pages_scanned 计数器，以阻止“所有页面都被固定”检测逻辑。
  */
-static int
-free_pages_bulk(struct zone *zone, int count,
-		struct list_head *list, unsigned int order)
+static int free_pages_bulk(struct zone *zone, int count, struct list_head *list, unsigned int order)
 {
 	unsigned long flags;
 	struct page *base, *page = NULL;
-	int ret = 0;
+	int ret = 0;		// 统计释放的页框数
 
-	base = zone->zone_mem_map;
+	base = zone->zone_mem_map;		// 当前zone的页框描述符数组
 	spin_lock_irqsave(&zone->lock, flags);
 	zone->all_unreclaimable = 0;
-	zone->pages_scanned = 0;
-	while (!list_empty(list) && count--) {
+	zone->pages_scanned = 0;		// 扫描次数置0
+	while (!list_empty(list) && count--) {		// 循环释放
 		page = list_entry(list->prev, struct page, lru);
-		/* have to delete it as __free_pages_bulk list manipulates */
-		list_del(&page->lru);
-		__free_pages_bulk(page, base, zone, order);
+		/* 必须在 __free_pages_bulk 列表操作时将其删除 */
+		list_del(&page->lru);		// 从链表移除
+		__free_pages_bulk(page, base, zone, order);		// 移除的页框使用buddy system处理
 		ret++;
 	}
 	spin_unlock_irqrestore(&zone->lock, flags);
@@ -332,7 +333,7 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	LIST_HEAD(list);
 	int i;
 
-	arch_free_page(page, order);
+	arch_free_page(page, order);		// 空定义
 
 	mod_page_state(pgfree, 1 << order);
 
@@ -345,7 +346,7 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	for (i = 0 ; i < (1 << order) ; ++i)
 		free_pages_check(__FUNCTION__, page + i);
 	list_add(&page->lru, &list);
-	kernel_map_pages(page, 1<<order, 0);
+	kernel_map_pages(page, 1<<order, 0);		// debug
 	free_pages_bulk(page_zone(page), 1, &list, order);
 }
 
@@ -566,24 +567,24 @@ static void zone_statistics(struct zonelist *zonelist, struct zone *z)
  * Free a 0-order page
  */
 static void FASTCALL(free_hot_cold_page(struct page *page, int cold));
-static void fastcall free_hot_cold_page(struct page *page, int cold)
+static void fastcall free_hot_cold_page(struct page *page, int cold)		// 0:hot,1:cold
 {
-	struct zone *zone = page_zone(page);
-	struct per_cpu_pages *pcp;
+	struct zone *zone = page_zone(page);		// 反向查找页框描述符所在zone
+	struct per_cpu_pages *pcp;			// per cpu 页框高速缓存
 	unsigned long flags;
 
-	arch_free_page(page, 0);
+	arch_free_page(page, 0);		// 空定义
 
-	kernel_map_pages(page, 1, 0);
-	inc_page_state(pgfree);
+	kernel_map_pages(page, 1, 0);		// debug
+	inc_page_state(pgfree);		// ???
 	if (PageAnon(page))
 		page->mapping = NULL;
-	free_pages_check(__FUNCTION__, page);
+	free_pages_check(__FUNCTION__, page);		// 检查页面，用问题打印堆栈
 	pcp = &zone->pageset[get_cpu()].pcp[cold];
 	local_irq_save(flags);
-	if (pcp->count >= pcp->high)
+	if (pcp->count >= pcp->high)		// 当页框数大于等于高水位时，移除页框
 		pcp->count -= free_pages_bulk(zone, pcp->batch, &pcp->list, 0);
-	list_add(&page->lru, &pcp->list);
+	list_add(&page->lru, &pcp->list);		// 当前页框加入高速缓存中
 	pcp->count++;
 	local_irq_restore(flags);
 	put_cpu();
@@ -690,6 +691,15 @@ int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
 
 /*
  * This is the 'heart' of the zoned buddy allocator.
+ * 伙伴系统核心
+ * 共有6个接口：
+ * 有些接口不能够用于分配高于896M的物理地址
+ * - alloc_pages		最终接口，—>alloc_pages_node->__alloc_pages
+ * - alloc_page
+ * - get_zeroed_page
+ * - __get_free_pages
+ * - __get_free_page
+ * - __get_dma_pages
  */
 struct page * fastcall
 __alloc_pages(unsigned int gfp_mask, unsigned int order,
@@ -859,6 +869,7 @@ EXPORT_SYMBOL(__alloc_pages);
 
 /*
  * Common helper functions.
+ * 结合了alloc_pages和page_address,返回一个页框的虚拟地址
  */
 fastcall unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int order)
 {
@@ -871,6 +882,7 @@ fastcall unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int orde
 
 EXPORT_SYMBOL(__get_free_pages);
 
+// 分配一个填充的0的页框
 fastcall unsigned long get_zeroed_page(unsigned int gfp_mask)
 {
 	struct page * page;
@@ -897,18 +909,28 @@ void __pagevec_free(struct pagevec *pvec)
 		free_hot_cold_page(pvec->pages[i], pvec->cold);
 }
 
-fastcall void __free_pages(struct page *page, unsigned int order)
-{
+// 释放页框
+fastcall void __free_pages(struct page *, unsigned int order)
+{	// 释放是必须是可换出的，并且引用计数_count为-1
 	if (!PageReserved(page) && put_page_testzero(page)) {
 		if (order == 0)
-			free_hot_page(page);
+			free_hot_page(page);		// 加入页框高速缓存，hot
 		else
-			__free_pages_ok(page, order);
+			__free_pages_ok(page, order);		// 不加入页框高速缓存，直接到buddy system合并
 	}
 }
 
 EXPORT_SYMBOL(__free_pages);
 
+/* 释放页框，order为分配阶，0表示2^0，即一个页框，...
+ * 释放内存，共有4个接口
+ * 下面2个接口需要传入虚拟地址
+ * - free_pages
+ * - free_page
+ * 下面的2个接口是需要传入页框描述符地址
+ * - __free_page
+ * - __free_pages		最终接口
+ * */
 fastcall void free_pages(unsigned long addr, unsigned int order)
 {
 	if (addr != 0) {
@@ -1267,10 +1289,11 @@ void show_free_areas(void)
 }
 
 /*
- * Builds allocation fallback zone lists.
- */
+ * 构建分配回退区域列表
+ * 按照k: ZONE_NORMAL、ZONE_DMA、ZONE_HIGHMEM的顺序初始化
+ * */
 static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist, int j, int k)
-{
+{	// 注意，case后面没有break
 	switch (k) {
 		struct zone *zone;
 	default:
@@ -1300,19 +1323,16 @@ static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zoneli
 #define MAX_NODE_LOAD (num_online_nodes())
 static int __initdata node_load[MAX_NUMNODES];
 /**
- * find_next_best_node - find the next node that should appear in a given
- *    node's fallback list
- * @node: node whose fallback list we're appending
- * @used_node_mask: nodemask_t of already used nodes
+ * find_next_best_node - 找到应该出现在给定节点的后备列表中的下一个节点
+ * @node: 我们要附加其后备列表的节点
+ * @used_node_mask: 已使用节点的 nodemask_t
  *
- * We use a number of factors to determine which is the next node that should
- * appear on a given node's fallback list.  The node should not have appeared
- * already in @node's fallback list, and it should be the next closest node
- * according to the distance array (which contains arbitrary distance values
- * from each node to each node in the system), and should also prefer nodes
- * with no CPUs, since presumably they'll have very little allocation pressure
- * on them otherwise.
- * It returns -1 if no node is found.
+ * 我们使用许多因素来确定哪个是应该出现在给定节点的后备列表中的下一个节点。
+ * 该节点不应该已经出现在@node 的回退列表中，它应该是根据距离数组
+ * （其中包含从每个节点到系统中每个节点的任意距离值）下一个最近的节点，
+ * 并且还应该优先选择没有CPU，因为否则它们对它们的分配压力可能很小。
+ *
+ * 如果未找到节点，则返回 -1。
  */
 static int __init find_next_best_node(int node, nodemask_t *used_node_mask)
 {
@@ -1323,28 +1343,28 @@ static int __init find_next_best_node(int node, nodemask_t *used_node_mask)
 	for_each_online_node(i) {
 		cpumask_t tmp;
 
-		/* Start from local node */
+		/* 从本地节点开始 */
 		n = (node+i) % num_online_nodes();
 
-		/* Don't want a node to appear more than once */
+		/* 不希望一个节点出现多次 */
 		if (node_isset(n, *used_node_mask))
 			continue;
 
-		/* Use the local node if we haven't already */
+		/* 如果我们还没有使用本地节点 */
 		if (!node_isset(node, *used_node_mask)) {
 			best_node = node;
 			break;
 		}
 
-		/* Use the distance array to find the distance */
+		/* 使用距离数组求距离 */
 		val = node_distance(node, n);
 
-		/* Give preference to headless and unused nodes */
+		/* 优先考虑无cpu和未使用的节点 */
 		tmp = node_to_cpumask(n);
 		if (!cpus_empty(tmp))
-			val += PENALTY_FOR_NODE_WITH_CPUS;
+			val += PENALTY_FOR_NODE_WITH_CPUS;		// 有cpu时+1
 
-		/* Slight preference for less loaded node */
+		/* 对负载较少的节点略有偏好 */
 		val *= (MAX_NODE_LOAD*MAX_NUMNODES);
 		val += node_load[n];
 
@@ -1360,6 +1380,8 @@ static int __init find_next_best_node(int node, nodemask_t *used_node_mask)
 	return best_node;
 }
 
+// 配置NUMA调用
+// 该函数的任务是，在当前处理的结点和系统中其他结点的内存域之间建立一种等级次序。
 static void __init build_zonelists(pg_data_t *pgdat)
 {
 	int i, j, k, node, local_node;
@@ -1367,26 +1389,24 @@ static void __init build_zonelists(pg_data_t *pgdat)
 	struct zonelist *zonelist;
 	nodemask_t used_mask;
 
-	/* initialize zonelists */
+	/* 初始化区域列表 */
 	for (i = 0; i < GFP_ZONETYPES; i++) {
-		zonelist = pgdat->node_zonelists + i;
+		zonelist = (pgdat->node_zonelists) + i;
 		memset(zonelist, 0, sizeof(*zonelist));
 		zonelist->zones[0] = NULL;
 	}
 
-	/* NUMA-aware ordering of nodes */
-	local_node = pgdat->node_id;
-	load = num_online_nodes();
+	/* NUMA 感知节点排序 */
+	local_node = pgdat->node_id;		// 当前节点id
+	load = num_online_nodes();		// 在线节点数量
 	prev_node = local_node;
-	nodes_clear(used_mask);
+	nodes_clear(used_mask);		// 处理各个节点时会清空
 	while ((node = find_next_best_node(local_node, &used_mask)) >= 0) {
 		/*
-		 * We don't want to pressure a particular node.
-		 * So adding penalty to the first node in same
-		 * distance group to make it round-robin.
+		 * 我们不想对特定节点施加压力。
+		 * 因此对相同距离组中的第一个节点添加惩罚以使其循环。
 		 */
-		if (node_distance(local_node, node) !=
-				node_distance(local_node, prev_node))
+		if (node_distance(local_node, node) != node_distance(local_node, prev_node))
 			node_load[node] += load;
 		prev_node = node;
 		load--;
@@ -1408,33 +1428,48 @@ static void __init build_zonelists(pg_data_t *pgdat)
 
 #else	/* CONFIG_NUMA */
 
+/* 配置UMA调用
+ * 假设有3个节点，分配的结果为：
+ * n0:
+ * -0: n0/d0,n1/d1,n2/d2,n3/d3,NULL
+ * -1: d0,d1,d2,d3,NULL
+ * -2: h0/n0/d0,h1/n1/d1,h2/n2/d2,h3/n3/d3,NULL
+ *
+ * n1:
+ * -0: n1/d1,n2/d2,n3/d3,n0/d0,NULL
+ * -1: d1,d2,d3,d0,NULL
+ * -2: h1/n1/d1,h2/n2/d2,h3/n3/d3,h0/n0/d0,NULL
+ *
+ * ....
+ * */
 static void __init build_zonelists(pg_data_t *pgdat)
 {
 	int i, j, k, node, local_node;
 
 	local_node = pgdat->node_id;
-	for (i = 0; i < GFP_ZONETYPES; i++) {
+	for (i = 0; i < GFP_ZONETYPES; i++) {		// GFP_ZONETYPES为3，表示后备区域列表的大小
 		struct zonelist *zonelist;
 
-		zonelist = pgdat->node_zonelists + i;
+		zonelist = (pgdat->node_zonelists) + i;
 		memset(zonelist, 0, sizeof(*zonelist));
 
 		j = 0;
-		k = ZONE_NORMAL;
+		k = ZONE_NORMAL;		// 默认区域
 		if (i & __GFP_HIGHMEM)
 			k = ZONE_HIGHMEM;
 		if (i & __GFP_DMA)
 			k = ZONE_DMA;
-
- 		j = build_zonelists_node(pgdat, zonelist, j, k);
+		/* i:0		k:ZONE_NORMAL		j:0,1,2
+		 * i:1		k:ZONE_DMA
+		 * i:2		k:ZONE_HIGHMEM
+		 * */
+ 		j = build_zonelists_node(pgdat, zonelist, j, k);		// 处理本地节点的后备列表
  		/*
- 		 * Now we build the zonelist so that it contains the zones
- 		 * of all the other nodes.
- 		 * We don't want to pressure a particular node, so when
- 		 * building the zones for node N, we make sure that the
- 		 * zones coming right after the local ones are those from
- 		 * node N+1 (modulo N)
+ 		 * 现在我们构建区域列表，以便它包含所有其他节点的区域。
+ 		 * 我们不想对特定节点施加压力，因此在为节点 N 构建区域时，
+ 		 * 我们确保紧跟在本地区域之后的区域是来自节点 N+1（模 N）的区域
  		 */
+ 		// 配置成UMA也可能会用到节点来管理
 		for (node = local_node + 1; node < MAX_NUMNODES; node++) {
 			if (!node_online(node))
 				continue;
@@ -1456,8 +1491,8 @@ void __init build_all_zonelists(void)
 {
 	int i;
 
-	for_each_online_node(i)
-		build_zonelists(NODE_DATA(i));
+	for_each_online_node(i)     // 遍历所以的online节点
+		build_zonelists(NODE_DATA(i));      // 宏NODE_DATA取到对应内存结点pd_data_t
 	printk("Built %i zonelists\n", num_online_nodes());
 }
 
@@ -1505,41 +1540,44 @@ static inline unsigned long wait_table_bits(unsigned long size)
 
 #define LONG_ALIGN(x) (((x)+(sizeof(long))-1)&~((sizeof(long))-1))
 
+/* 计算内存节点中 present和spanned的页框数
+ * */
 static void __init calculate_zone_totalpages(struct pglist_data *pgdat,
-		unsigned long *zones_size, unsigned long *zholes_size)
+		unsigned long *zones_size, unsigned long *zholes_size)      // zholes_size:NULL
 {
 	unsigned long realtotalpages, totalpages = 0;
 	int i;
 
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		totalpages += zones_size[i];
-	pgdat->node_spanned_pages = totalpages;
+	pgdat->node_spanned_pages = totalpages; // 内存节点的全部页框，含空洞
 
 	realtotalpages = totalpages;
 	if (zholes_size)
 		for (i = 0; i < MAX_NR_ZONES; i++)
-			realtotalpages -= zholes_size[i];
-	pgdat->node_present_pages = realtotalpages;
+			realtotalpages -= zholes_size[i];       // 把内存节点中各个区域的空洞数减去
+	pgdat->node_present_pages = realtotalpages;     // 真实的页框数据，即不含空洞的页框的数
 	printk(KERN_DEBUG "On node %d totalpages: %lu\n", pgdat->node_id, realtotalpages);
 }
 
 
 /*
- * Initially all pages are reserved - free ones are freed
- * up by free_all_bootmem() once the early boot process is
- * done. Non-atomic initialization, single-pass.
+ * 最初所有页面都被保留
+ * - 一旦早期启动过程完成，free_all_bootmem() 释放空闲页面。
+ * 非原子初始化，单程。
+ *
+ * 初始化当前zone管理页框描述符
  */
-void __init memmap_init_zone(unsigned long size, int nid, unsigned long zone,
-		unsigned long start_pfn)
+void __init memmap_init_zone(unsigned long size, int nid, unsigned long zone, unsigned long start_pfn)
 {
-	struct page *start = pfn_to_page(start_pfn);
+	struct page *start = pfn_to_page(start_pfn);		// 通过mem_map找到页框描述符的地址
 	struct page *page;
 
-	for (page = start; page < (start + size); page++) {
-		set_page_zone(page, NODEZONE(nid, zone));
-		set_page_count(page, 0);
-		reset_page_mapcount(page);
-		SetPageReserved(page);
+	for (page = start; page < (start + size); page++) {		// size为当前zone的页框数
+		set_page_zone(page, NODEZONE(nid, zone));		// 设置flag，反引用zone
+		set_page_count(page, 0);		// 引用次数设置为0
+		reset_page_mapcount(page);		// 重置mapcount次数
+		SetPageReserved(page);			// 设置为永不换出
 		INIT_LIST_HEAD(&page->lru);
 #ifdef WANT_PAGE_VIRTUAL
 		/* The shift won't overflow because ZONE_NORMAL is below 4G. */
@@ -1549,12 +1587,13 @@ void __init memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 		start_pfn++;
 	}
 }
-
-void zone_init_free_lists(struct pglist_data *pgdat, struct zone *zone,
-				unsigned long size)
+/*
+ * 初始化管理free_area的管理数组，为了实现buddy system
+ * */
+void zone_init_free_lists(struct pglist_data *pgdat, struct zone *zone, unsigned long size)
 {
 	int order;
-	for (order = 0; order < MAX_ORDER ; order++) {
+	for (order = 0; order < MAX_ORDER ; order++) {		// MAX_ORDER为11
 		INIT_LIST_HEAD(&zone->free_area[order].free_list);
 		zone->free_area[order].nr_free = 0;
 	}
@@ -1567,54 +1606,56 @@ void zone_init_free_lists(struct pglist_data *pgdat, struct zone *zone,
 
 /*
  * Set up the zone data structures:
- *   - mark all pages reserved
- *   - mark all memory queues empty
- *   - clear the memory bitmaps
+ *   - 标记所有页面保留
+ *   - 将所有内存队列标记为空
+ *   - 清除内存位图
  */
 static void __init free_area_init_core(struct pglist_data *pgdat,
-		unsigned long *zones_size, unsigned long *zholes_size)
+		unsigned long *zones_size, unsigned long *zholes_size)	// zholes_size:NULL
 {
 	unsigned long i, j;
 	const unsigned long zone_required_alignment = 1UL << (MAX_ORDER-1);
 	int cpu, nid = pgdat->node_id;
-	unsigned long zone_start_pfn = pgdat->node_start_pfn;
+	unsigned long zone_start_pfn = pgdat->node_start_pfn;		// 0
 
 	pgdat->nr_zones = 0;
 	init_waitqueue_head(&pgdat->kswapd_wait);
 	pgdat->kswapd_max_order = 0;
-	
-	for (j = 0; j < MAX_NR_ZONES; j++) {
-		struct zone *zone = pgdat->node_zones + j;
+
+
+	// 初始化3个zone
+	for (j = 0; j < MAX_NR_ZONES; j++) {		// MAX_NR_ZONES为3
+		struct zone *zone = pgdat->node_zones + j;		// 获取当前pgdata中各个zone的指针
 		unsigned long size, realsize;
 		unsigned long batch;
 
-		zone_table[NODEZONE(nid, j)] = zone;
-		realsize = size = zones_size[j];
-		if (zholes_size)
+		zone_table[NODEZONE(nid, j)] = zone;        // 初始化zone_table，为了支持从页框描述符找到其所在的内存区
+		realsize = size = zones_size[j];		// 当前zone中管理的页框数量
+		if (zholes_size)		// 没有hole
 			realsize -= zholes_size[j];
 
 		if (j == ZONE_DMA || j == ZONE_NORMAL)
-			nr_kernel_pages += realsize;
-		nr_all_pages += realsize;
+			nr_kernel_pages += realsize;		// 低端内存页框数，0x38000000
+		nr_all_pages += realsize;		// 总的页框数，1M
 
 		zone->spanned_pages = size;
 		zone->present_pages = realsize;
-		zone->name = zone_names[j];
+		zone->name = zone_names[j];		// 名称，一个字符串
 		spin_lock_init(&zone->lock);
 		spin_lock_init(&zone->lru_lock);
-		zone->zone_pgdat = pgdat;
-		zone->free_pages = 0;
+		zone->zone_pgdat = pgdat;		// 反引用
+		zone->free_pages = 0;		// 空闲页框
 
-		zone->temp_priority = zone->prev_priority = DEF_PRIORITY;
+		zone->temp_priority = zone->prev_priority = DEF_PRIORITY;		// 扫描优先级
 
 		/*
-		 * The per-cpu-pages pools are set to around 1000th of the
-		 * size of the zone.  But no more than 1/4 of a meg - there's
-		 * no point in going beyond the size of L2 cache.
+		 * 处理per cpu页框高速缓存
+		 * per-cpu-pages 池设置为区域大小的 1000 左右。
+		 * 但不超过 14 兆 - 超出 L2 缓存的大小没有意义。
 		 *
-		 * OK, so we don't know how big the cache is.  So guess.
+		 * 好的，所以我们不知道缓存有多大。所以猜。
 		 */
-		batch = zone->present_pages / 1024;
+		batch = zone->present_pages / 1024;		// batch为低于低水位时补充的大小，或高于高水位移除的大小
 		if (batch * PAGE_SIZE > 256 * 1024)
 			batch = (256 * 1024) / PAGE_SIZE;
 		batch /= 4;		/* We effectively *= 4 below */
@@ -1638,8 +1679,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 			pcp->batch = 1 * batch;
 			INIT_LIST_HEAD(&pcp->list);
 		}
-		printk(KERN_DEBUG "  %s zone: %lu pages, LIFO batch:%lu\n",
-				zone_names[j], realsize, batch);
+		printk(KERN_DEBUG "  %s zone: %lu pages, LIFO batch:%lu\n", zone_names[j], realsize, batch);
 		INIT_LIST_HEAD(&zone->active_list);
 		INIT_LIST_HEAD(&zone->inactive_list);
 		zone->nr_scan_active = 0;
@@ -1650,8 +1690,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 			continue;
 
 		/*
-		 * The per-page waitqueue mechanism uses hashed waitqueues
-		 * per zone.
+		 * 每页等待队列机制使用每个区域的散列等待队列。
 		 */
 		zone->wait_table_size = wait_table_size(size);
 		zone->wait_table_bits =
@@ -1671,7 +1710,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		if ((zone_start_pfn) & (zone_required_alignment-1))
 			printk(KERN_CRIT "BUG: wrong zone alignment, it will crash\n");
 
-		memmap_init(size, nid, j, zone_start_pfn);
+		memmap_init(size, nid, j, zone_start_pfn);		// 初始化当前zone中管理的页框
 
 		zone_start_pfn += size;
 
@@ -1679,38 +1718,42 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 	}
 }
 
+// 为节点分配页框数组
 void __init node_alloc_mem_map(struct pglist_data *pgdat)
 {
 	unsigned long size;
 
 	size = (pgdat->node_spanned_pages + 1) * sizeof(struct page);
-	pgdat->node_mem_map = alloc_bootmem_node(pgdat, size);
-#ifndef CONFIG_DISCONTIGMEM
-	mem_map = contig_page_data.node_mem_map;
-#endif
+	pgdat->node_mem_map = alloc_bootmem_node(pgdat, size);		// 为页框数组分配内存
+
+	// 没有配置非连续内存
+	#ifndef CONFIG_DISCONTIGMEM
+	mem_map = contig_page_data.node_mem_map;		// 初始化页框数组指针
+    #endif
 }
 
 void __init free_area_init_node(int nid, struct pglist_data *pgdat,
-		unsigned long *zones_size, unsigned long node_start_pfn,
-		unsigned long *zholes_size)
+		unsigned long *zones_size, unsigned long node_start_pfn,    // node_start_pfn:0
+		unsigned long *zholes_size)     // zholes_size:NULL
 {
-	pgdat->node_id = nid;
-	pgdat->node_start_pfn = node_start_pfn;
+	pgdat->node_id = nid;       // 内存节点编号，0
+	pgdat->node_start_pfn = node_start_pfn;     // 内存节点起始页框号，0
 	calculate_zone_totalpages(pgdat, zones_size, zholes_size);
 
-	if (!pfn_to_page(node_start_pfn))
+	if (!pfn_to_page(node_start_pfn))		// 为页框数组分配内存
 		node_alloc_mem_map(pgdat);
 
 	free_area_init_core(pgdat, zones_size, zholes_size);
 }
 
+// 没有配置非连续内存
 #ifndef CONFIG_DISCONTIGMEM
 static bootmem_data_t contig_bootmem_data;
 struct pglist_data contig_page_data = { .bdata = &contig_bootmem_data };
 
 EXPORT_SYMBOL(contig_page_data);
 
-void __init free_area_init(unsigned long *zones_size)
+void __init free_area_init(unsigned long *zones_size)       // 连续内存
 {
 	free_area_init_node(0, &contig_page_data, zones_size,
 			__pa(PAGE_OFFSET) >> PAGE_SHIFT, NULL);
@@ -2077,12 +2120,11 @@ __setup("hashdist=", set_hashdist);
 #endif
 
 /*
- * allocate a large system hash table from bootmem
- * - it is assumed that the hash table must contain an exact power-of-2
- *   quantity of entries
- * - limit is the number of hash buckets, not the total allocation size
+ * 从 bootmem 分配一个大的系统哈希表
+ * -假设哈希表必须包含精确的 2 次幂数量的条目
+ * - limit 是哈希桶的数量，而不是总分配大小
  */
-void *__init alloc_large_system_hash(const char *tablename,
+void *__init  alloc_large_system_hash(const char *tablename,
 				     unsigned long bucketsize,
 				     unsigned long numentries,
 				     int scale,
@@ -2095,7 +2137,7 @@ void *__init alloc_large_system_hash(const char *tablename,
 	unsigned long log2qty, size;
 	void *table = NULL;
 
-	/* allow the kernel cmdline to have a say */
+	/* 允许内核 cmdline 有发言权 */
 	if (!numentries) {
 		/* round applicable memory size up to nearest megabyte */
 		numentries = (flags & HASH_HIGHMEM) ? nr_all_pages : nr_kernel_pages;
@@ -2109,10 +2151,10 @@ void *__init alloc_large_system_hash(const char *tablename,
 		else
 			numentries <<= (PAGE_SHIFT - scale);
 	}
-	/* rounded up to nearest power of 2 in size */
+	/* 四舍五入到最接近的 2 的幂 */
 	numentries = 1UL << (long_log2(numentries) + 1);
 
-	/* limit allocation size to 1/16 total memory by default */
+	/* 默认情况下将分配大小限制为 1/16 总内存 */
 	if (max == 0) {
 		max = ((unsigned long long)nr_all_pages << PAGE_SHIFT) >> 4;
 		do_div(max, bucketsize);

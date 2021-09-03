@@ -1536,13 +1536,12 @@ e_inval:
 }
 
 /*
- *	NOTE. We drop all the packets that has local source
- *	addresses, because every properly looped back packet
- *	must have correct destination already attached by output routine.
+ *	笔记。我们丢弃所有具有本地源地址的数据包，
+ *	因为每个正确环回的数据包都必须具有已由输出例程附加的正确目的地。
  *
- *	Such approach solves two big problems:
- *	1. Not simplex devices are handled properly.
- *	2. IP spoofing attempts are filtered with 100% of guarantee.
+ *	这种方法解决了两个大问题：
+ *	1. 不是单工设备处理得当。
+ *	2. IP 欺骗尝试以 100% 的保证过滤。
  */
 
 static int ip_route_input_slow(struct sk_buff *skb, u32 daddr, u32 saddr,
@@ -1705,7 +1704,7 @@ done:
 		fib_res_put(&res);
 out:	return err;
 
-brd_input:
+brd_input:		// 广播
 	if (skb->protocol != htons(ETH_P_IP))
 		goto e_inval;
 
@@ -1723,7 +1722,7 @@ brd_input:
 	res.type = RTN_BROADCAST;
 	RT_CACHE_STAT_INC(in_brd);
 
-local_input:
+local_input:		// 交付上层
 	rth = dst_alloc(&ipv4_dst_ops);
 	if (!rth)
 		goto e_nobufs;
@@ -1815,6 +1814,12 @@ martian_source:
 	goto e_inval;
 }
 
+/* ip_route_input负责选择路由。判断路由的结果是，
+ * 选择一个函数，进行进一步的分组处理。
+ * 可用的函数是ip_local_deliver和ip_forward。
+ * 具体选择哪个函数，取决于分组是交付到本地计算机
+ * 下一个更高协议层的例程，还是转发到网络中的另一台计算机。
+ * */
 int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 		   u8 tos, struct net_device *dev)
 {
@@ -1859,13 +1864,13 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 	   Note, that multicast routers are not affected, because
 	   route cache entry is created eventually.
 	 */
+	// 处理组播地址
 	if (MULTICAST(daddr)) {
 		struct in_device *in_dev;
 
 		rcu_read_lock();
 		if ((in_dev = __in_dev_get(dev)) != NULL) {
-			int our = ip_check_mc(in_dev, daddr, saddr,
-				skb->nh.iph->protocol);
+			int our = ip_check_mc(in_dev, daddr, saddr, skb->nh.iph->protocol);
 			if (our
 #ifdef CONFIG_IP_MROUTE
 			    || (!LOCAL_MCAST(daddr) && IN_DEV_MFORWARD(in_dev))

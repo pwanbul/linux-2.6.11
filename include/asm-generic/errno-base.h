@@ -22,7 +22,7 @@
 #define	ENODEV		19	/* No such device */
 #define	ENOTDIR		20	/* Not a directory */
 #define	EISDIR		21	/* Is a directory */
-#define	EINVAL		22	/* Invalid argument */
+#define	EINVAL		22	/* Invalid argument 无效参数*/
 #define	ENFILE		23	/* File table overflow */
 #define	EMFILE		24	/* Too many open files */
 #define	ENOTTY		25	/* Not a typewriter */

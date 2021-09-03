@@ -59,7 +59,7 @@ struct ethtool_ops;
 					   (TC use only - dev_queue_xmit
 					   returns this as NET_XMIT_SUCCESS) */
 
-/* Backlog congestion levels */
+/* 积压拥塞程度 */
 #define NET_RX_SUCCESS		0   /* keep 'em coming, baby */
 #define NET_RX_DROP		1  /* packet dropped */
 #define NET_RX_CN_LOW		2   /* storm alert, just in case */
@@ -561,8 +561,8 @@ static inline int unregister_gifconf(unsigned int family)
 }
 
 /*
- * Incoming packets are placed on per-cpu queues so that
- * no locking is needed.
+ * 传入的数据包放置在每个 CPU 的队列中，因此不需要锁定。
+ * net_dev_init中初始化
  */
 
 struct softnet_data
@@ -570,7 +570,7 @@ struct softnet_data
 	int			throttle;
 	int			cng_level;
 	int			avg_blog;
-	struct sk_buff_head	input_pkt_queue;
+	struct sk_buff_head	input_pkt_queue;	// sk_buff队列的头结点
 	struct list_head	poll_list;
 	struct net_device	*output_queue;
 	struct sk_buff		*completion_queue;

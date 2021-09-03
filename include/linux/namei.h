@@ -3,6 +3,8 @@
 
 #include <linux/linkage.h>
 
+// 文件查找相关
+
 struct vfsmount;
 
 struct open_intent {
@@ -13,22 +15,22 @@ struct open_intent {
 enum { MAX_NESTED_LINKS = 5 };
 
 struct nameidata {
-	struct dentry	*dentry;
-	struct vfsmount *mnt;
-	struct qstr	last;
+	struct dentry	*dentry;		// 目录项
+	struct vfsmount *mnt;		// 挂载点
+	struct qstr	last;		// 快速字符串
 	unsigned int	flags;
 	int		last_type;
-	unsigned	depth;
+	unsigned	depth;		// 符号连接相关
 	char *saved_names[MAX_NESTED_LINKS + 1];
 
-	/* Intent data */
+	/* 意图数据 */
 	union {
 		struct open_intent open;
 	} intent;
 };
 
 /*
- * Type of the last component on LOOKUP_PARENT
+ * LOOKUP_PARENT 上最后一个组件的类型
  */
 enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT, LAST_BIND};
 

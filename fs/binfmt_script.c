@@ -1,7 +1,7 @@
 /*
  *  linux/fs/binfmt_script.c
  *
- *  Copyright (C) 1996  Martin von L�wis
+ *  Copyright (C) 1996  Martin von L�wis
  *  original #!-checking implemented by tytso.
  */
 
@@ -96,6 +96,10 @@ static int load_script(struct linux_binprm *bprm,struct pt_regs *regs)
 	return search_binary_handler(bprm,regs);
 }
 
+/* 解释器文件格式
+ * 1. 只有load_binary
+ * 2. 放在链表的固定位置，通过Makefile中链接顺序控制
+ * */
 static struct linux_binfmt script_format = {
 	.module		= THIS_MODULE,
 	.load_binary	= load_script,

@@ -56,7 +56,7 @@ struct inet6_protocol
 #define INET6_PROTO_FINAL	0x2
 #endif
 
-/* This is used to register socket interfaces for IP protocols.  */
+/*这用于为 IP 协议注册套接字接口。  */
 struct inet_protosw {
 	struct list_head list;
 

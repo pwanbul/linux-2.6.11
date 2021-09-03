@@ -48,11 +48,10 @@
 
 
 /*
- * 32-bit kernel entrypoint; only used by the boot CPU.  On entry,
- * %esi points to the real-mode code as a 32-bit pointer.
- * CS and DS must be 4 GB flat segments, but we don't depend on
- * any particular GDT layout, because we load our own as soon as we
- * can.
+ * 32位内核入口点；仅由引导CPU使用。
+ * 进入时，％esi指向实模式代码作为32位指针。
+ * CS和DS必须是4GB的平面段，但是我们不依赖
+ * 任何特定的GDT布局，因为我们会尽快加载自己的内容。
  */
 // startup_32
 ENTRY(startup_32)
@@ -80,36 +79,76 @@ ENTRY(startup_32)
 	rep ; stosl
 
 /*
- * Initialize page tables.  This creates a PDE and a set of page
- * tables, which are located immediately beyond _end.  The variable
- * init_pg_tables_end is set up to point to the first "safe" location.
- * Mappings are created both at virtual address 0 (identity mapping)
- * and PAGE_OFFSET for up to _end+sizeof(page tables)+INIT_MAP_BEYOND_END.
+ * 初始化页表。这将创建一个PDE和一组页表，它们位于_end之后。
+ * 变量init_pg_tables_end被设置为指向第一个“安全”位置。
+ * 映射在虚拟地址 0（身份映射）和PAGE_OFFSET处创建，
+ * 最多可达 _end+sizeof（页表）+INIT_MAP_BEYOND_END。
  *
- * Warning: don't use %esi or the stack in this code.  However, %esp
- * can be used as a GPR if you really need it...
+ * 警告：不要在此代码中使用 %esi 或堆栈。但是，如果您确实需要， %esp 可以用作 GPR...
+ *
+ * 从linux-2.4内核开始，在建立临时页表的时候，一般的教科书都说是映射了8M的物理内存，但是为什么是映射8M呢？
+ * 当时网上有资料说，8M足够了，但为什么就足够了，一直没有彻底搞清楚，今天又重新分析这部分的代码(linux-2.6.24)。
+ * 在建立临时页表时到底映射多大的内存取决于以下几个方面：
+ * 1. 保护模式下内核的尺寸： 毫无疑问内核代码必须被映射
+ * 2. 临时页表所占的空间尺寸： 假设临时页表映射整个4G的线性地址空间，那么：
+ *      页面个数 = 4G/4k = 1M个页面
+ *      每个页面对应一个页表项，占4个字节,那么总共占有4M的空间
+ * 3. bootmem allocator是用来在真正的页表建立好之前用于内存管理的，他用一个位图表来管理整个内存,
+ *    每一bit代表一个页框，假设有4G的物理内存，那么1M个页面共占有空间 = 1M/8 = 128K。
+ * 4. 由于对齐占有的空间（可以忽略，感觉k的数量级吧）
+ *
+ * 综合上述几个方面，需要映射的物理内存大约等于：
+ *      保护模式内核尺寸+临时页表占用空间尺寸+bootmem allocator位图表尺寸 =
+ *      现在内核大约4M + 最大4M + 128K = 8M +　128K
  */
+// __PAGE_OFFSET 是 0xc000 0000，所以 page_pde_offset 是 0xc00
 page_pde_offset = (__PAGE_OFFSET >> 20);
 
+    // __PAGE_OFFSET 是 3G，pg0 是虚拟地址，减去 __PAGE_OFFSET 后就得到了
+    // pg0 的物理地址。我们把 pg0 的物理地址放在了 edi 寄存器里
 	movl $(pg0 - __PAGE_OFFSET), %edi
+	// 同理，这里把 swapper_pg_dir 的物理地址放在 edx
 	movl $(swapper_pg_dir - __PAGE_OFFSET), %edx
+	// page directory/table entry 的低 12 位都是一些标志物，各个位代表的含义
+    // 读者可以参考 https://wiki.osdev.org/Paging 或者书中的第 52 页
 	movl $0x007, %eax			/* 0x007 = PRESENT+RW+USER */
 10:
+	// 下面这两行代码对熟悉 C 语言的读者可能会造成一定的困扰。如果从 C 语言的角度
+    // 来看，它们是把地址 &pg0 + 7 放到了 swapper_pg_dir 的第一项；但问题在于，
+    // 为什么要 +7？
+    // 其实这里的 7 和前面那个 7 一样，指的是页目录项的标志物 PRESENT+RW+USER，
+    // pg0 的地址是 4K 对齐的，这意味着他的地址的低 12 位都为 0，加上 7 以后，刚
+    // 好就是我们所需要的页目录项的值。
 	leal 0x007(%edi),%ecx			/* Create PDE entry */
 	movl %ecx,(%edx)			/* Store identity PDE entry */
+
+	// 书里有说明，我们要把 0x0000 0000 ~ 0x007f ffff 和 0xc000 0000 ~ 0xc07f ffff
+    // 都映射到物理地址 0x0000 0000 ~ 0x007f ffff，下面这一行设置的 0xc000 0000
+    // 对应的页目录项。
+    // 这里的问题在于，按照书里的说明，我们应该设置的是第 0x300 项，这里是加上的却是 0xc00。
+    // 这里需要提一下平时用 C 语言时编译器帮我们做的事。当我们写下 int *p = NULL; p+2
+    // 的时候，编译器知道 int 是 4 个字节，所以 p+2 会汇编代码里面是 +8。
+    // 一个 PDE 也是 32 位，所以真正的偏移量是 0x300 << 2 = 0xc00
 	movl %ecx,page_pde_offset(%edx)		/* Store kernel PDE entry */
+	// edx + 4 以后，就是下一个页目录项了，下个循环将会继续初始化（一共两个页目录项）
 	addl $4,%edx
-	movl $1024, %ecx
+    // 一个页表有 1024 个页表项，这里初始化一个在接下来的循环里面用到的计数器
+	movl $1024, %ecx        // loop用到的计数器
 11:
+    // stosl 把 %eax 的内容复制到物理地址 ES:EDI，也就是 pg0 处；并且 %edi + 4
 	stosl
+	// 加上 0x1000 后，%eax 指向下一个页
 	addl $0x1000,%eax
+	// %ecx -= 1，如果 %ecx 不为 0，跳转到 11 处。这里总共会循环 1024 次，初始化 1024 个页表项。
 	loop 11b
-	/* End condition: we must map up to and including INIT_MAP_BEYOND_END */
+	/* End condition: we must map up to and including INIT_MAP_BEYOND_END (128*1024) 128个页表，每个页表1024项，每项4字节 */
 	/* bytes beyond the end of our own page tables; the +0x007 is the attribute bits */
 	leal (INIT_MAP_BEYOND_END+0x007)(%edi),%ebp
 	cmpl %ebp,%eax
 	jb 10b
-	movl %edi,(init_pg_tables_end - __PAGE_OFFSET)
+	// 到这里的时候，%edi 的值是我们映射的最后一个页表项的地址，这里我们把它存到变量
+    // init_pg_tables_end 里。init_pg_tables_end 在 setup.c 里定义
+	movl %edi,(init_pg_tables_end - __PAGE_OFFSET)      // init_pg_tables_end中保存的地址为 _end+0x2000
 
 #ifdef CONFIG_SMP
 	xorl %ebx,%ebx				/* This is the boot CPU (BSP) */
@@ -182,21 +221,20 @@ ENTRY(startup_32_smp)
 #endif /* CONFIG_SMP */
 
 /*
- * Enable paging
+ * 启用分页
  */
-	movl $swapper_pg_dir-__PAGE_OFFSET,%eax
-	movl %eax,%cr3		/* set the page table pointer.. */
+	movl $swapper_pg_dir-__PAGE_OFFSET,%eax     // 获取swapper_pg_dir的物理地址，存入eax中
+	movl %eax,%cr3		/* 设置页表指针.. */
 	movl %cr0,%eax
 	orl $0x80000000,%eax
-	movl %eax,%cr0		/* ..and set paging (PG) bit */
-	ljmp $__BOOT_CS,$1f	/* Clear prefetch and normalize %eip */
+	movl %eax,%cr0		/* ..并设置分页（PG）位 */
+	ljmp $__BOOT_CS,$1f	/* 清除预取并规范化 %eip，ljmp实际上会做两件事情，__BOOT_CS放到%cs寄存器的同时，1f处地址放到%eip里面*/
 1:
 	/* Set up the stack pointer */
 	lss stack_start,%esp
 
 /*
- * Initialize eflags.  Some BIOS's leave bits like NT set.  This would
- * confuse the debugger if this code is traced.
+ * 初始化 eflags。一些 BIOS 的保留位如 NT 设置。如果跟踪此代码，这会使调试器感到困惑。
  * XXX - best to initialize before switching to protected mode.
  */
 	pushl $0
@@ -210,20 +248,19 @@ ENTRY(startup_32_smp)
 #endif /* CONFIG_SMP */
 
 /*
- * start system 32-bit setup. We need to re-do some of the things done
- * in 16-bit mode for the "real" operations.
+ * 启动系统32位设置。我们需要重新做一些在16位模式下完成的“真实”操作。
  */
 	call setup_idt
 
 /*
- * Copy bootup parameters out of the way.
- * Note: %esi still has the pointer to the real-mode data.
+ * 复制启动参数。
+ * 注意： %esi 仍然具有指向实模式数据的指针。
  */
 	movl $boot_params,%edi
 	movl $(PARAM_SIZE/4),%ecx
 	cld
 	rep
-	movsl
+	movsl   // 数据传送指令,16位模式下： 源地址是DS:SI,目的地址是ES:DI
 	movl boot_params+NEW_CL_POINTER,%esi
 	andl %esi,%esi
 	jnz 2f			# New command line protocol
@@ -413,9 +450,9 @@ ENTRY(_stext)
  * BSS section
  */
 .section ".bss.page_aligned","w"
-ENTRY(swapper_pg_dir)
+ENTRY(swapper_pg_dir)       // 生成1024个4字节的空间，每个空间用0填充
 	.fill 1024,4,0
-ENTRY(empty_zero_page)
+ENTRY(empty_zero_page)      // 零页存放的是系统启动参数和命令行参数
 	.fill 4096,1,0
 
 /*

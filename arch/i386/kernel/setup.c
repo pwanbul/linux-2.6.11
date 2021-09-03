@@ -52,10 +52,10 @@
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
-/* This value is set up by the early boot code to point to the value
-   immediately after the boot time page tables.  It contains a *physical*
-   address, and must not be in the .bss segment! */
-unsigned long init_pg_tables_end __initdata = ~0UL;
+/* 该值由早期引导代码设置为指向引导时间页表之后的值。
+ * 它包含一个物理地址，并且不能在 .bss 段中！
+ * */
+unsigned long init_pg_tables_end __initdata = ~0UL;     // 注意取反
 
 int disable_pse __initdata = 0;
 
@@ -115,7 +115,7 @@ struct sys_desc_table_struct {
 };
 struct edid_info edid_info;
 struct ist_info ist_info;
-struct e820map e820;
+struct e820map e820;        // e820map实例
 
 unsigned char aux_device_present;
 
@@ -130,9 +130,9 @@ unsigned long saved_videomode;
 #define RAMDISK_PROMPT_FLAG		0x8000
 #define RAMDISK_LOAD_FLAG		0x4000	
 
-static char command_line[COMMAND_LINE_SIZE];
+static char command_line[COMMAND_LINE_SIZE];        //
 
-unsigned char __initdata boot_params[PARAM_SIZE];
+unsigned char __initdata boot_params[PARAM_SIZE];       // 2048字节的启动参数
 
 static struct resource data_resource = {
 	.name	= "Kernel data",
@@ -368,6 +368,9 @@ static void __init limit_regions(unsigned long long size)
 	}
 }
 
+/* 把存储区域放到e820map 实例中，
+ * 在此之前的操作都是在zero page上进行的
+ * */
 static void __init add_memory_region(unsigned long long start,
                                   unsigned long long size, int type)
 {
@@ -428,8 +431,8 @@ struct change_member {
 };
 struct change_member change_point_list[2*E820MAX] __initdata;
 struct change_member *change_point[2*E820MAX] __initdata;
-struct e820entry *overlap_list[E820MAX] __initdata;
-struct e820entry new_bios[E820MAX] __initdata;
+struct e820entry *overlap_list[E820MAX] __initdata; // 覆盖change_point
+struct e820entry new_bios[E820MAX] __initdata;      // 新的e820map
 
 static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 {
@@ -478,7 +481,7 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 		   ______________________4_
 	*/
 
-	/* 如果只有一个内存区域，请不要打扰，    至少2个，0-640K和1M以上 */
+	/* 如果只有一个内存区域，请不要打扰，至少2个，0-640K和1M以上 */
 	if (*pnr_map < 2)
 		return -1;
 
@@ -535,12 +538,12 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 	for (chgidx=0; chgidx < chg_nr; chgidx++)
 	{
 		/* 跟踪所有重叠的bios记录 */
-		if (change_point[chgidx]->addr == change_point[chgidx]->pbios->addr)
+		if (change_point[chgidx]->addr == change_point[chgidx]->pbios->addr)    // change_point为起始地址
 		{
-			/* 将map记录添加到重叠列表（> 1 个条目意味着重叠） */
+			/* 将map记录添加到重叠列表（>1个条目意味着重叠） */
 			overlap_list[overlap_entries++]=change_point[chgidx]->pbios;
 		}
-		else
+		else        // change_point为结束地址
 		{
 			/* 从列表中删除记录（顺序无关，因此与最后一个交换） */
 			for (i=0; i<overlap_entries; i++)
@@ -567,8 +570,8 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 						break; 	/* 没有更多空间可用于新的 bios 记录 */
 			}
 			if (current_type != 0)	{
-				new_bios[new_bios_entry].addr = change_point[chgidx]->addr;
-				new_bios[new_bios_entry].type = current_type;
+				new_bios[new_bios_entry].addr = change_point[chgidx]->addr; // 保存起始地址
+				new_bios[new_bios_entry].type = current_type;   // 保存类型
 				last_addr=change_point[chgidx]->addr;
 			}
 			last_type = current_type;
@@ -622,6 +625,10 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 		 * 这个区域就是所有的IBM兼容PC上从640KB～1MB之间著名的空洞：物理地址存在但被保留，对应的页框不能由操作系统使用。
 		 */
 		if (type == E820_RAM) {
+		    /* 处理跨在洞上或者含在洞里的区域
+		     * 1. 含在洞里的不能用
+		     * 2. 跨在洞上的，把在洞内的部分去掉即可
+		     * */
 			if (start < 0x100000ULL/*1MB*/ && end > 0xA0000ULL/*640KB*/) {
 				if (start < 0xA0000ULL)
 					add_memory_region(start, 0xA0000ULL-start, type);       // 将E820图填充到struct e820map结构中
@@ -631,7 +638,7 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 				size = end - start;
 			}
 		}
-		add_memory_region(start, size, type);
+		add_memory_region(start, size, type);       // 将E820图填充到struct e820map结构中
 	} while (biosmap++,--nr_map);
 	return 0;
 }
@@ -671,18 +678,16 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 	int len = 0;
 	int userdef = 0;
 
-	/* Save unparsed command line copy for /proc/cmdline */
-	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
+	/* 为 proc/cmdline 保存未解析的命令行副本 */
+	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';     // 256个参数
 
 	for (;;) {
-		if (c != ' ')
+		if (c != ' ')       // 命令行参数有空格分隔
 			goto next_char;
 		/*
-		 * "mem=nopentium" disables the 4MB page tables.
-		 * "mem=XXX[kKmM]" defines a memory region from HIGH_MEM
-		 * to <mem>, overriding the bios size.
-		 * "memmap=XXX[KkmM]@XXX[KkmM]" defines a memory region from
-		 * <start> to <start>+<mem>, overriding the bios size.
+		 * "mem=nopentium" 禁用 4MB 页表。
+		 * "mem=XXX[kKmM]" 定义从 HIGH_MEM 到 <mem> 的内存区域，覆盖 bios 大小。
+		 * "memmap=XXX[KkmM]@XXX[KkmM]" 定义从 <start> 到 <start>+<mem> 的内存区域，覆盖 bios 大小。
 		 *
 		 * HPA tells me bootloaders need to parse mem=, so no new
 		 * option should be mem=  [also see Documentation/i386/boot.txt]
@@ -817,28 +822,24 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 #endif /* CONFIG_ACPI_BOOT */
 
 		/*
-		 * highmem=size forces highmem to be exactly 'size' bytes.
-		 * This works even on boxes that have no highmem otherwise.
-		 * This also works to reduce highmem size on bigger boxes.
+		 * highmem=size 强制 highmem 为“大小”字节。这甚至适用于没有 highmem 的盒子。这也适用于减少较大盒子上的 highmem 大小。
 		 */
 		else if (!memcmp(from, "highmem=", 8))
-			highmem_pages = memparse(from+8, &from) >> PAGE_SHIFT;
+			highmem_pages = memparse(from+8, &from) >> PAGE_SHIFT;      // 高端内存的页框数，默认-1
 	
 		/*
-		 * vmalloc=size forces the vmalloc area to be exactly 'size'
-		 * bytes. This can be used to increase (or decrease) the
-		 * vmalloc area - the default is 128m.
+		 * vmalloc=size 强制 vmalloc 区域正好是“大小”字节。这可用于增加（或减少）vmalloc 区域 - 默认为128MB。
 		 */
 		else if (!memcmp(from, "vmalloc=", 8))
 			__VMALLOC_RESERVE = memparse(from+8, &from);
 
 	next_char:
-		c = *(from++);
-		if (!c)
+		c = *(from++);      // 指向下一个字符
+		if (!c)     // 到头了
 			break;
-		if (COMMAND_LINE_SIZE <= ++len)
+		if (COMMAND_LINE_SIZE <= ++len)     // 超过限制了
 			break;
-		*(to++) = c;
+		*(to++) = c;        //
 	}
 	*to = '\0';
 	*cmdline_p = command_line;
@@ -866,7 +867,7 @@ efi_find_max_pfn(unsigned long start, unsigned long end, void *arg)
 
 
 /*
- * Find the highest page frame number we have available
+ * 找到我们可用的最高页框编号
  */
 void __init find_max_pfn(void)
 {
@@ -878,47 +879,48 @@ void __init find_max_pfn(void)
 		return;
 	}
 
+	// 遍历e820 map中的记录
 	for (i = 0; i < e820.nr_map; i++) {
 		unsigned long start, end;
 		/* RAM? */
 		if (e820.map[i].type != E820_RAM)
-			continue;
+			continue;       // 只考虑RAM区域
 		start = PFN_UP(e820.map[i].addr);
 		end = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
 		if (start >= end)
 			continue;
 		if (end > max_pfn)
-			max_pfn = end;
+			max_pfn = end;      // 最大可映射页框号，物理内存为4GB时max_pfn为1M
 	}
 }
 
 /*
- * Determine low and high memory ranges:
+ * 确定低和高内存范围:
  */
 unsigned long __init find_max_low_pfn(void)
 {
-	unsigned long max_low_pfn;
+	unsigned long max_low_pfn;      // 低端内存的页框号
 
-	max_low_pfn = max_pfn;
-	if (max_low_pfn > MAXMEM_PFN) {
-		if (highmem_pages == -1)
+	max_low_pfn = max_pfn;      // max_pfn为最后一个可用的页框号，物理内存为4GB时为1M
+	if (max_low_pfn > MAXMEM_PFN) {         // MAXMEM_PFN：0x38000，即896MB
+		if (highmem_pages == -1)        // highmem_pages表示高端内存的页面数，用户可以指定，但实际为没有指定
 			highmem_pages = max_pfn - MAXMEM_PFN;
 		if (highmem_pages + MAXMEM_PFN < max_pfn)
 			max_pfn = MAXMEM_PFN + highmem_pages;
-		if (highmem_pages + MAXMEM_PFN > max_pfn) {
+		if (highmem_pages + MAXMEM_PFN > max_pfn) {		//如果指定的超出，则使用的计算出的
 			printk("only %luMB highmem pages available, ignoring highmem size of %uMB.\n", pages_to_mb(max_pfn - MAXMEM_PFN), pages_to_mb(highmem_pages));
 			highmem_pages = 0;
 		}
 		max_low_pfn = MAXMEM_PFN;
 #ifndef CONFIG_HIGHMEM
-		/* Maximum memory usable is what is directly addressable */
-		printk(KERN_WARNING "Warning only %ldMB will be used.\n",
-					MAXMEM>>20);
-		if (max_pfn > MAX_NONPAE_PFN)
+		/* 最大可用内存是可直接寻址的 */
+		// 没有配置CONFIG_HIGHMEM时，最多可用896MB内存
+		printk(KERN_WARNING "Warning only %ldMB will be used.\n", MAXMEM>>20);
+		if (max_pfn > MAX_NONPAE_PFN)				// MAX_NONPAE_PFN为1M
 			printk(KERN_WARNING "Use a PAE enabled kernel.\n");
 		else
 			printk(KERN_WARNING "Use a HIGHMEM enabled kernel.\n");
-		max_pfn = MAXMEM_PFN;
+		max_pfn = MAXMEM_PFN;			// 如果没配置highmem，则只能访问896MB物理内存
 #else /* !CONFIG_HIGHMEM */
 #ifndef CONFIG_X86_PAE
 		if (max_pfn > MAX_NONPAE_PFN) {
@@ -972,7 +974,9 @@ free_available_memory(unsigned long start, unsigned long end, void *arg)
 	return 0;
 }
 /*
- * Register fully available low RAM pages with the bootmem allocator.
+ * 使用 bootmem 分配器注册完全可用的低 RAM 页面。
+ * 此函数的主要的功能是把内核可以使用的页框号（最大为max_low_pfn)在位图中对应的
+ * 此函数把从1MB开始（HIGH_MEMORY定义为1024*1024)到位图结束所占用的页框号在位图中对应的位置1。
  */
 static void __init register_bootmem_low_pages(unsigned long max_low_pfn)
 {
@@ -985,18 +989,18 @@ static void __init register_bootmem_low_pages(unsigned long max_low_pfn)
 	for (i = 0; i < e820.nr_map; i++) {
 		unsigned long curr_pfn, last_pfn, size;
 		/*
-		 * Reserve usable low memory
+		 * 保留可用的低内存
 		 */
 		if (e820.map[i].type != E820_RAM)
 			continue;
 		/*
-		 * We are rounding up the start address of usable memory:
+		 * 我们对可用内存的起始地址进行四舍五入：
 		 */
 		curr_pfn = PFN_UP(e820.map[i].addr);
 		if (curr_pfn >= max_low_pfn)
 			continue;
 		/*
-		 * ... and at the end of the usable range downwards:
+		 * ...在可用范围的末尾向下：
 		 */
 		last_pfn = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
 
@@ -1004,8 +1008,7 @@ static void __init register_bootmem_low_pages(unsigned long max_low_pfn)
 			last_pfn = max_low_pfn;
 
 		/*
-		 * .. finally, did all the rounding and playing
-		 * around just make the area go away?
+		 * ..最后，是否所有的四舍五入和玩耍只是让该区域消失？
 		 */
 		if (last_pfn <= curr_pfn)
 			continue;
@@ -1026,22 +1029,23 @@ static void __init reserve_ebda_region(void)
 		reserve_bootmem(addr, PAGE_SIZE);	
 }
 
+/* 配置连续内存时的定义
+ * */
 static unsigned long __init setup_memory(void)
 {
 	unsigned long bootmap_size, start_pfn, max_low_pfn;
 
 	/*
-	 * partially used pages are not usable - thus
-	 * we are rounding upwards:
+	 * 部分使用的页面不可用 - 因此我们向上舍入：
 	 */
-	start_pfn = PFN_UP(init_pg_tables_end);
+	start_pfn = PFN_UP(init_pg_tables_end);     // init_pg_tables_end为_end+0x2000，即pg1后面
 
-	find_max_pfn();
+	find_max_pfn();     // 设置max_pfn，应当为0xfffff000~0xffffffff的页框号，即1M
 
-	max_low_pfn = find_max_low_pfn();       //
+	max_low_pfn = find_max_low_pfn();       // 设置max_low_pfn正常为896MB的页框号，修正max_pfn
 
 #ifdef CONFIG_HIGHMEM
-	highstart_pfn = highend_pfn = max_pfn;
+	highstart_pfn = highend_pfn = max_pfn;		// 1M页框号
 	if (max_pfn > max_low_pfn) {
 		highstart_pfn = max_low_pfn;
 	}
@@ -1051,28 +1055,40 @@ static unsigned long __init setup_memory(void)
 	printk(KERN_NOTICE "%ldMB LOWMEM available.\n",
 			pages_to_mb(max_low_pfn));
 	/*
-	 * Initialize the boot-time allocator (with low memory only):
+	 * 初始化启动时间分配器（仅限低内存）:
+	 * 页框号从0到0x38000的区域(896MB)的由bootmem管理,位图放在start_pfn的地址上
+	 * bootmap_size表示位图的大小，单位字节
 	 */
 	bootmap_size = init_bootmem(start_pfn, max_low_pfn);
 
+	/* register_bootmem_low_pages通过将位图中对应的比特位清零，
+	 * 释放所有潜在可用的内存页。在IA-32系统上BIOS对该任务提供了支持，
+	 * BIOS向内核提供了可用内存区的列表，即初始化过程中更早一点提供的e820映射.
+	 * */
 	register_bootmem_low_pages(max_low_pfn);
 
 	/*
-	 * Reserve the bootmem bitmap itself as well. We do this in two
-	 * steps (first step was init_bootmem()) because this catches
-	 * the (very unlikely) case of us accidentally initializing the
-	 * bootmem allocator with an invalid RAM area.
+	 * 也保留bootmem位图本身。我们分两步执行此操作
+	 * （第一步是 init_bootmem()），因为这会捕获（非常不可能的）
+	 * 我们意外使用无效 RAM 区域初始化 bootmem 分配器的情况。
+	 *
+	 * 由于bootmem分配器需要一些内存页管理分配位图，必须首先调用reserve_bootmem分配这些内存页。
+	 *
+	 * 但还有一些其他的内存区已经在使用中，必须相应地标记出来。因此，还需要用reserve_bootmem注册相应的页。
+	 *
+	 * 需要注册的内存区的确切数目，高度依赖于内核配置。例如，需要保留0页，
+	 * 因为在许多计算机上该页是一个特殊的BIOS页，有些特定于计算机的功能需要该页才能运作正常。
+	 * 其他的reserve_bootmem调用则分配与内核配置相关的内存区，例如，用于ACPI数据或SMP启动时的配置。
 	 */
 	reserve_bootmem(HIGH_MEMORY, (PFN_PHYS(start_pfn) +
 			 bootmap_size + PAGE_SIZE-1) - (HIGH_MEMORY));
 
 	/*
-	 * reserve physical page 0 - it's a special BIOS page on many boxes,
-	 * enabling clean reboots, SMP operation, laptop functions.
+	 * 保留物理页面0 - 它是许多机器上的特殊BIOS页面，可实现干净重启、SMP 操作、笔记本电脑功能。
 	 */
 	reserve_bootmem(0, PAGE_SIZE);
 
-	/* reserve EBDA region, it's a 4K region */
+	/* 保留 EBDA 区域，这是一个 4K 区域*/
 	reserve_ebda_region();
 
     /* could be an AMD 768MPX chipset. Reserve a page  before VGA to prevent
@@ -1345,11 +1361,10 @@ static void set_mca_bus(int x) { }
 #endif
 
 /*
- * Determine if we were loaded by an EFI loader.  If so, then we have also been
- * passed the efi memmap, systab, etc., so we should use these data structures
- * for initialization.  Note, the efi init code path is determined by the
- * global efi_enabled. This allows the same kernel image to be used on existing
- * systems (with a traditional BIOS) as well as on EFI systems.
+ * 确定我们是否由EFI加载程序加载。如果是这样，那么我们也已经
+ * 传递了efi memmap，systab等，因此我们应该使用这些数据结构
+ * 进行初始化。注意，efi初始化代码路径由全局efi_enabled确定。
+ * 这允许在现有系统（使用传统BIOS）以及EFI系统上使用相同的内核映像。
  */
 void __init setup_arch(char **cmdline_p)
 {
@@ -1397,7 +1412,10 @@ void __init setup_arch(char **cmdline_p)
 		efi_init();
 	else {
 		printk(KERN_INFO "BIOS-provided physical RAM map:\n");
-		print_memory_map(machine_specific_memory_setup());          // 特定与机器的内存设置。创建一个列表，包括系统占据的内存区和空闲内存区
+		/* machine_specific_memory_setup处理特定与机器的内存设置。
+		 * 创建一个列表，包括系统占据的内存区和空闲内存区
+		 */
+		print_memory_map(machine_specific_memory_setup());      // 正常打印"BIOS-e820"
 	}
 
 	copy_edd();
@@ -1419,7 +1437,7 @@ void __init setup_arch(char **cmdline_p)
 	parse_cmdline_early(cmdline_p);
 
 	/* 计算物理内存数量小于896 MiB的系统上内存页的数目.
-	 * 该函数有两个版本。一个用于连续内存系统（在arch/x86/kernel/setup_32.c），另一个用于不连续内存系统（在arch/x86/mm/discontig_32.c）。
+	 * 该函数有两个版本。一个用于连续内存系统（在arch/x86/kernel/setup.c），另一个用于不连续内存系统（在arch/x86/mm/discontig.c）。
 	 * 尽管实现不同，但二者的效果相同。
 	 * 1. 确定（每个结点）可用的物理内存页的数目。
 	 * 2. 初始化bootmem分配器。
@@ -1440,7 +1458,7 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_SMP
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
-	paging_init();          // paging_init初始化内核页表并启用内存分页，因为IA-32计算机上默认情况下分页是禁用的。
+	paging_init();          // 初始化内核页表并启用内存分页，因为IA-32计算机上默认情况下分页是禁用的。
 
 	/*
 	 * NOTE: at this point the bootmem allocator is fully available.

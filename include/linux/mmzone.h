@@ -13,7 +13,7 @@
 #include <linux/numa.h>
 #include <asm/atomic.h>
 
-/* Free memory management - zoned buddy allocator.  */
+/* 空闲内存管理 - 分区伙伴分配器. */
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
 #define MAX_ORDER 11
 #else
@@ -43,13 +43,13 @@ struct zone_padding {
 #endif
 
 struct per_cpu_pages {
-	int count;		/* number of pages in the list */
-	int low;		/* low watermark, refill needed */
-	int high;		/* high watermark, emptying needed */
-	int batch;		/* chunk size for buddy add/remove */
-	struct list_head list;	/* the list of pages */
+	int count;		/* 列表中的页数 */
+	int low;		/* 低水印，需要补充 */
+	int high;		/* 高水印，需要清空 */
+	int batch;		/* 好友 add/remove 的块大小 */
+	struct list_head list;	/* 页面列表 */
 };
-
+// per cpu 页面高速缓存
 struct per_cpu_pageset {
 	struct per_cpu_pages pcp[2];	/* 0: hot.  1: cold */
 #ifdef CONFIG_NUMA
@@ -62,12 +62,13 @@ struct per_cpu_pageset {
 #endif
 } ____cacheline_aligned_in_smp;
 
+// 区域索引，在zone_table
 #define ZONE_DMA		0
 #define ZONE_NORMAL		1
 #define ZONE_HIGHMEM		2
 
-#define MAX_NR_ZONES		3	/* Sync this with ZONES_SHIFT */
-#define ZONES_SHIFT		2	/* ceil(log2(MAX_NR_ZONES)) */
+#define MAX_NR_ZONES		3	/* 将此与 ZONES_SHIFT 同步 */
+#define ZONES_SHIFT		2	/* ceil(log2(MAX_NR_ZONES)) 向上取整*/
 
 
 /*
@@ -85,15 +86,11 @@ struct per_cpu_pageset {
  */
 #define GFP_ZONEMASK	0x03
 /*
- * As an optimisation any zone modifier bits which are only valid when
- * no other zone modifier bits are set (loners) should be placed in
- * the highest order bits of this field.  This allows us to reduce the
- * extent of the zonelists thus saving space.  For example in the case
- * of three zone modifier bits, we could require up to eight zonelists.
- * If the left most zone modifier is a "loner" then the highest valid
- * zonelist would be four allowing us to allocate only five zonelists.
- * Use the first form when the left most bit is not a "loner", otherwise
- * use the second.
+ * 作为优化，任何仅在没有设置其他区域修饰符位（单独）时才有效的区域修饰符位
+ * 应放置在该字段的最高位。 这使我们能够减少区域列表的范围，从而节省空间。
+ * 例如，在三个区域修饰符位的情况下，我们可能需要多达八个区域列表。
+ * 如果最左边的区域修饰符是“孤独者”，那么最高的有效区域列表将是四个，允许我们只分配五个区域列表。
+ * 当最左边的位不是“孤独者”时使用第一种形式，否则使用第二种形式。
  */
 /* #define GFP_ZONETYPES	(GFP_ZONEMASK + 1) */		/* Non-loner */
 #define GFP_ZONETYPES	((GFP_ZONEMASK + 1) / 2 + 1)		/* Loner */
@@ -105,66 +102,68 @@ struct per_cpu_pageset {
  * ZONE_DMA	  < 16 MB	ISA DMA capable memory
  * ZONE_NORMAL	16-896 MB	direct mapped by the kernel
  * ZONE_HIGHMEM	 > 896 MB	only page cache and user processes
+ * 由于硬件的限制，不能对所有的页框一视同仁，需要把有相同特性的页框分区
+ * 各个分区没有物理上区别，只是逻辑上的用途不同
+ * 分配页框时不能跨越分区
  */
 
-struct zone {
-	/* Fields commonly accessed by the page allocator */
-	unsigned long		free_pages;
+struct zone {       // 内存区
+	/* 页面分配器通常访问的字段 */
+	unsigned long		free_pages;			// 空闲页框的数量
+	/* pages_min 保留的页框池
+	 * pages_low 回收页框使用的下界
+	 * pages_high 回收页框使用的上界
+	 * */
 	unsigned long		pages_min, pages_low, pages_high;
 	/*
-	 * We don't know if the memory that we're going to allocate will be freeable
-	 * or/and it will be released eventually, so to avoid totally wasting several
-	 * GB of ram we must reserve some of the lower zone memory (otherwise we risk
-	 * to run OOM on the lower zones despite there's tons of freeable ram
-	 * on the higher zones). This array is recalculated at runtime if the
-	 * sysctl_lowmem_reserve_ratio sysctl changes.
+	 * 我们不知道我们将要分配的内存是可释放的还是最终会被释放，
+	 * 因此为了避免完全浪费几 GB 的内存，我们必须保留一些较低的区域内存
+	 * （否则我们有运行 OOM 的风险尽管在较高区域有大量可用的公羊，但在较低区域）。
+	 * 如果 sysctl_lowmem_reserve_ratio sysctl 更改，则在运行时重新计算此数组。
 	 */
 	unsigned long		lowmem_reserve[MAX_NR_ZONES];
 
-	struct per_cpu_pageset	pageset[NR_CPUS];
+	struct per_cpu_pageset	pageset[NR_CPUS];       // per cpu 页面高速页框，处理热页和冷页
 
 	/*
 	 * free areas of different sizes
 	 */
 	spinlock_t		lock;
-	struct free_area	free_area[MAX_ORDER];
+	struct free_area	free_area[MAX_ORDER];       // 空闲页框块，11
 
 
 	ZONE_PADDING(_pad1_)
 
-	/* Fields commonly accessed by the page reclaim scanner */
-	spinlock_t		lru_lock;	
-	struct list_head	active_list;
-	struct list_head	inactive_list;
+	/* 页面回收扫描器通常访问的字段 */
+	spinlock_t		lru_lock;	// 活动页链表、非活动页链表使用的自旋锁
+	struct list_head	active_list;        // 活动页链表
+	struct list_head	inactive_list;      // 非活动页链表
 	unsigned long		nr_scan_active;
 	unsigned long		nr_scan_inactive;
 	unsigned long		nr_active;
 	unsigned long		nr_inactive;
-	unsigned long		pages_scanned;	   /* since last reclaim */
+	unsigned long		pages_scanned;		/* 自上次回收以来的扫描计数器，回收页框时置0 */
 	int			all_unreclaimable; /* All pages pinned */
 
 	/*
-	 * prev_priority holds the scanning priority for this zone.  It is
-	 * defined as the scanning priority at which we achieved our reclaim
-	 * target at the previous try_to_free_pages() or balance_pgdat()
-	 * invokation.
+	 * prev_priority 持有该区域的扫描优先级。
+	 * 它被定义为我们在之前的 try_to_free_pages() 或 balance_pgdat()
+	 * 调用中实现回收目标的扫描优先级。
 	 *
-	 * We use prev_priority as a measure of how much stress page reclaim is
-	 * under - it drives the swappiness decision: whether to unmap mapped
-	 * pages.
+	 * 我们使用 prev_priority 作为衡量页面回收压力程度的衡量标准
+	 * - 它推动了 swappiness 决定：是否取消映射映射的页面。
 	 *
-	 * temp_priority is used to remember the scanning priority at which
-	 * this zone was successfully refilled to free_pages == pages_high.
+	 * temp_priority 用于记住此区域成功重新填充为
+	 * free_pages == pages_high 时的扫描优先级。
 	 *
-	 * Access to both these fields is quite racy even on uniprocessor.  But
-	 * it is expected to average out OK.
+	 * 即使在单处理器上访问这两个字段也非常活跃。但预计平均还可以。
 	 */
 	int temp_priority;
 	int prev_priority;
 
 
 	ZONE_PADDING(_pad2_)
-	/* Rarely used or read-mostly fields */
+	/* 很少使用或主要阅读的字段 */
 
 	/*
 	 * wait_table		-- the array holding the hash table
@@ -197,18 +196,18 @@ struct zone {
 	/*
 	 * Discontig memory support fields.
 	 */
-	struct pglist_data	*zone_pgdat;
-	struct page		*zone_mem_map;
+	struct pglist_data	*zone_pgdat;		// 反向指针
+	struct page		*zone_mem_map;		// 当前zone第一个页框的地址
 	/* zone_start_pfn == zone_start_paddr >> PAGE_SHIFT */
-	unsigned long		zone_start_pfn;
+	unsigned long		zone_start_pfn;		// 当前zone起始页框号
 
-	unsigned long		spanned_pages;	/* total size, including holes */
-	unsigned long		present_pages;	/* amount of memory (excluding holes) */
+	unsigned long		spanned_pages;	/* 总页框数，包括hole */
+	unsigned long		present_pages;	/* present页框数，不含hole */
 
 	/*
-	 * rarely used fields:
+	 * 很少使用的领域：
 	 */
-	char			*name;
+	char			*name;		// "DMA, NORMAL, HIGHMEM"
 } ____cacheline_maxaligned_in_smp;
 
 
@@ -220,18 +219,15 @@ struct zone {
 #define DEF_PRIORITY 12
 
 /*
- * One allocation request operates on a zonelist. A zonelist
- * is a list of zones, the first one is the 'goal' of the
- * allocation, the other zones are fallback zones, in decreasing
- * priority.
+ * 一个分配请求对区域列表进行操作。 zonelist 是一个区域列表，
+ * 第一个是分配的“目标”，其他区域是后备区域，优先级递减。
  *
- * Right now a zonelist takes up less than a cacheline. We never
- * modify it apart from boot-up, and only a few indices are used,
- * so despite the zonelist table being relatively big, the cache
- * footprint of this construct is very small.
+ * 现在一个 zonelist 占用的内存比 cacheline 还少。
+ * 除了启动之外我们从不修改它，并且只使用了几个索引，
+ * 因此尽管 zonelist 表相对较大，但该构造的缓存占用空间非常小。
  */
-struct zonelist {
-	struct zone *zones[MAX_NUMNODES * MAX_NR_ZONES + 1]; // NULL delimited
+struct zonelist {       // 备用列表
+	struct zone *zones[MAX_NUMNODES * MAX_NR_ZONES + 1]; // NULL分隔
 };
 
 
@@ -247,21 +243,33 @@ struct zonelist {
  * per-zone basis.
  */
 struct bootmem_data;
-typedef struct pglist_data {
-	struct zone node_zones[MAX_NR_ZONES];
+// 内存结点(物理内存)通过该结构定义
+typedef struct pglist_data {		// 页框列表数据，是不是这样命名的？？
+	/*
+	 * 0: ZONE_DMA
+	 * 1: ZONE_NORMAL
+	 * 2: ZONE_HIGHMEM
+	 * */
+	struct zone node_zones[MAX_NR_ZONES];      // 3种内存区域,最多3个，不足用0填充
+	/* 后备区域列表 3，注意设置区域修改器时的查找顺序，见alloc_pages
+
+	 * */
 	struct zonelist node_zonelists[GFP_ZONETYPES];
-	int nr_zones;
-	struct page *node_mem_map;
-	struct bootmem_data *bdata;
-	unsigned long node_start_pfn;
-	unsigned long node_present_pages; /* total number of physical pages */
-	unsigned long node_spanned_pages; /* total size of physical page
-					     range, including holes */
-	int node_id;
-	struct pglist_data *pgdat_next;
-	wait_queue_head_t kswapd_wait;
-	struct task_struct *kswapd;
-	int kswapd_max_order;
+	int nr_zones;       // 结点中不同内存域的数目
+	struct page *node_mem_map;      // 指向page实例数组的指针，数组元素的指向页框的指针，用于描述结点的所有物理内存页，它包含了结点中所有内存域的页
+	struct bootmem_data *bdata; // 指向自举内存分配器数据结构的实例
+	unsigned long node_start_pfn;   // 该NUMA结点第一个页帧的逻辑编号
+
+	/* node_present_pages指定了结点中页帧的数目，而node_spanned_pages则给出了该结点以页帧为单位计算的长度。
+	 * 二者的值不一定相同，因为结点中可能有一些空洞，并不对应真正的页帧
+	 * */
+	unsigned long node_present_pages; /* 物理内存页的总数，单位为页框，不含洞 1M */
+	unsigned long node_spanned_pages; /* 物理内存页的总数，单位为页框，包含洞在内 1M */
+	int node_id;        // 是全局结点ID,系统中的NUMA结点都从0开始编号。
+	struct pglist_data *pgdat_next; // 单向链表，连接到下一个内存结点，系统中所有结点都通过单链表连接起来，其末尾通过空指针标记
+	wait_queue_head_t kswapd_wait;    // 页换出进程使用的等待队列
+	struct task_struct *kswapd;     // 指向页换出进程的进程描述符
+	int kswapd_max_order;       // kswapd将要创建的空闲块的大小取对数的值
 } pg_data_t;
 
 #define node_present_pages(nid)	(NODE_DATA(nid)->node_present_pages)
@@ -375,7 +383,7 @@ int lowmem_reserve_ratio_sysctl_handler(struct ctl_table *, int, struct file *,
 #ifndef CONFIG_DISCONTIGMEM
 
 extern struct pglist_data contig_page_data;
-#define NODE_DATA(nid)		(&contig_page_data)
+#define NODE_DATA(nid)		(&contig_page_data)     // UMA中只有一个结点，即contig_page_data
 #define NODE_MEM_MAP(nid)	mem_map
 #define MAX_NODES_SHIFT		1
 #define pfn_to_nid(pfn)		(0)

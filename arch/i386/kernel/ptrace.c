@@ -384,7 +384,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	if (pid == 1)		/* you may not mess with init */
 		goto out_tsk;
 
-	if (request == PTRACE_ATTACH) {
+	if (request == PTRACE_ATTACH) {		// 当前进程跟踪pid指定的进程
 		ret = ptrace_attach(child);
 		goto out_tsk;
 	}

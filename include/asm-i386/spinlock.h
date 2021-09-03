@@ -11,16 +11,31 @@ asmlinkage int printk(const char * fmt, ...)
 	__attribute__ ((format (printf, 1, 2)));
 
 /*
- * Your basic SMP spinlocks, allowing only a single CPU anywhere
- */
-
+ * 您的基本 SMP 自旋锁，在任何地方只允许一个 CPU
+ *
+ * 自旋锁
+ * 临界区C只能有一个内核控制路径P，使用于SMP环境
+ * 如果内核控制路径发现自旋锁是开着的，就获得锁并继续自己的执行。
+ * 如果发现锁由运行在另一个CPU上的内核控制路径锁着，就反复执行一条紧凑的循环指令，直到锁被释放。
+ * 循环等待即是忙等，即使等待的内核控制路径无事可做，它也在CPU上保持运行。
+ * 要求持有锁的时间非常短，加锁和解锁的时间也非常短，不能在持有锁时睡眠。
+ * 一般来说，由自旋锁保护的临界区时禁止抢占的，因此，在UP中，这种锁仅仅起到禁止/启用内核抢占。
+ * 注意，在自旋锁忙等期间，内核抢占还是有效的，等待自旋锁释放的进程仍有可能被更高优先级的进程代替。
+ * spin_lock_init()
+ * spin_lock()	1.关闭抢占；2.slock减1看不能获得自旋锁，不能就自旋，直到slcok变为1
+ * spin_trylock()	1.关闭抢占；2.非阻塞获得自旋锁xchg，如果未获取，则关闭抢占
+ * spin_unlock()	释放锁
+ * spin_unlock_wait()	等待锁的释放，并获取锁
+ * spin_is_locked()		检查锁是否释放
+ * https://www.cnblogs.com/aaronlinux/p/5904479.html?utm_source=itdadao&utm_medium=referral
+ * */
 typedef struct {
-	volatile unsigned int slock;
+	volatile unsigned int slock;		// 状态，slock等于1时表示未加锁，slock<=0表示已加锁
 #ifdef CONFIG_DEBUG_SPINLOCK
 	unsigned magic;
 #endif
-#ifdef CONFIG_PREEMPT
-	unsigned int break_lock;
+#ifdef CONFIG_PREEMPT		// 支持SMP(CONFIG_SMP)和内核抢占(CONFIG_PREEMPT)的情况下使用
+	unsigned int break_lock;		// 记录正在等待该锁的进程，初始值为0，有等待的为1
 #endif
 } spinlock_t;
 
@@ -34,6 +49,7 @@ typedef struct {
 
 #define SPIN_LOCK_UNLOCKED (spinlock_t) { 1 SPINLOCK_MAGIC_INIT }
 
+// 初始化锁，即把slock置1
 #define spin_lock_init(x)	do { *(x) = SPIN_LOCK_UNLOCKED; } while(0)
 
 /*
@@ -46,15 +62,16 @@ typedef struct {
 #define spin_is_locked(x)	(*(volatile signed char *)(&(x)->slock) <= 0)
 #define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
 
+// 加锁过程
 #define spin_lock_string \
 	"\n1:\t" \
-	"lock ; decb %0\n\t" \
-	"jns 3f\n" \
+	"lock ; decb %0\n\t" \		// 使用lock前缀，dec对slock减1
+	"jns 3f\n" \		// 减1后，如果为0，则加锁成功
 	"2:\t" \
-	"rep;nop\n\t" \
+	"rep;nop\n\t" \		// 循环nop
 	"cmpb $0,%0\n\t" \
-	"jle 2b\n\t" \
-	"jmp 1b\n" \
+	"jle 2b\n\t" \		// 如果slock小于等于0，则继续循环
+	"jmp 1b\n" \	// 走到这里说明，slock变为1了，无条件跳回到1，加锁
 	"3:\n\t"
 
 #define spin_lock_string_flags \
@@ -79,6 +96,7 @@ typedef struct {
  * (PPro errata 66, 92)
  */
 
+// 注意这个条件编译
 #if !defined(CONFIG_X86_OOSTORE) && !defined(CONFIG_X86_PPRO_FENCE)
 
 #define spin_unlock_string \
@@ -118,16 +136,18 @@ static inline void _raw_spin_unlock(spinlock_t *lock)
 
 #endif
 
+// 非阻塞获取自旋锁锁
 static inline int _raw_spin_trylock(spinlock_t *lock)
 {
 	char oldval;
 	__asm__ __volatile__(
-		"xchgb %b0,%1"
+		"xchgb %b0,%1"		// 默认带上lock前缀
 		:"=q" (oldval), "=m" (lock->slock)
-		:"0" (0) : "memory");
-	return oldval > 0;
+		:"0" (0) : "memory");		// oldval被初始化为0
+	return oldval > 0;		// 为true则，获取到了自旋锁
 }
 
+// 检查能否获得锁，不能就自旋，直到获取到时
 static inline void _raw_spin_lock(spinlock_t *lock)
 {
 #ifdef CONFIG_DEBUG_SPINLOCK
@@ -155,14 +175,14 @@ static inline void _raw_spin_lock_flags (spinlock_t *lock, unsigned long flags)
 }
 
 /*
- * Read-write spinlocks, allowing multiple readers
- * but only one writer.
+ * 读写自旋锁，允许多个读者但只有一个作者。
  *
- * NOTE! it is quite common to have readers in interrupts
- * but no interrupt writers. For those circumstances we
- * can "mix" irq-safe locks - any writer needs to get a
- * irq-safe write-lock, but readers can get non-irqsafe
- * read-locks.
+ * 笔记！在中断中有读取器但没有中断写入器是很常见的。
+ * 对于这些情况，我们可以“混合” irq 安全锁
+ * ——任何作者都需要获得 irq 安全的写锁，
+ * 但读者可以获得非 irq 安全的读锁。
+ *
+ * 读写自旋锁
  */
 typedef struct {
 	volatile unsigned int lock;
@@ -184,6 +204,7 @@ typedef struct {
 
 #define RW_LOCK_UNLOCKED (rwlock_t) { RW_LOCK_BIAS RWLOCK_MAGIC_INIT }
 
+// 初始化读写自旋锁，初始值为0x01000000
 #define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
 /**

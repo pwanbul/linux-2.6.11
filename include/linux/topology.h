@@ -48,7 +48,7 @@
 		if (nr_cpus_node(node))
 
 #ifndef node_distance
-/* Conform to ACPI 2.0 SLIT distance definitions */
+/* 符合 ACPI 2.0 SLIT 距离定义 */
 #define LOCAL_DISTANCE		10
 #define REMOTE_DISTANCE		20
 #define node_distance(from,to)	((from) == (to) ? LOCAL_DISTANCE : REMOTE_DISTANCE)

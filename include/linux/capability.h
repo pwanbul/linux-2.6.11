@@ -50,6 +50,7 @@ extern spinlock_t task_capability_lock;
 
 #ifdef STRICT_CAP_T_TYPECHECKS
 
+// 进程权能
 typedef struct kernel_cap_struct {
 	__u32 cap;
 } kernel_cap_t;

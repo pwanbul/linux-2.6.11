@@ -4,8 +4,10 @@
 #ifdef	__KERNEL__
 #include <linux/config.h>
 
+// bits向32做向上对齐
 #define BITS_TO_LONGS(bits) \
-	(((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
+	(((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)    // BITS_PER_LONG为32
+// 分配一个名为name的位图数组
 #define DECLARE_BITMAP(name,bits) \
 	unsigned long name[BITS_TO_LONGS(bits)]
 #endif
@@ -17,7 +19,7 @@
 
 typedef __u32 __kernel_dev_t;
 
-typedef __kernel_fd_set		fd_set;
+typedef __kernel_fd_set		fd_set;			// 32个元素，每个元素4字节大小
 typedef __kernel_dev_t		dev_t;
 typedef __kernel_ino_t		ino_t;
 typedef __kernel_mode_t		mode_t;

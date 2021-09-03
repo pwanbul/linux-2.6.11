@@ -60,9 +60,10 @@ int core_uses_pid;
 char core_pattern[65] = "core";
 /* The maximal length of core_pattern is also specified in sysctl.c */
 
-static struct linux_binfmt *formats;
-static DEFINE_RWLOCK(binfmt_lock);
+static struct linux_binfmt *formats;        // 头结点
+static DEFINE_RWLOCK(binfmt_lock);          // 读写锁
 
+// 注册 二进制格式对象
 int register_binfmt(struct linux_binfmt * fmt)
 {
 	struct linux_binfmt ** tmp = &formats;
@@ -72,14 +73,14 @@ int register_binfmt(struct linux_binfmt * fmt)
 	if (fmt->next)
 		return -EBUSY;
 	write_lock(&binfmt_lock);
-	while (*tmp) {
+	while (*tmp) {          // 循环的目的是为了检查重复注册
 		if (fmt == *tmp) {
 			write_unlock(&binfmt_lock);
 			return -EBUSY;
 		}
 		tmp = &(*tmp)->next;
 	}
-	fmt->next = formats;
+	fmt->next = formats;        // 头插
 	formats = fmt;
 	write_unlock(&binfmt_lock);
 	return 0;	
@@ -87,6 +88,7 @@ int register_binfmt(struct linux_binfmt * fmt)
 
 EXPORT_SYMBOL(register_binfmt);
 
+// 注销 二进制格式对象
 int unregister_binfmt(struct linux_binfmt * fmt)
 {
 	struct linux_binfmt ** tmp = &formats;
@@ -94,7 +96,7 @@ int unregister_binfmt(struct linux_binfmt * fmt)
 	write_lock(&binfmt_lock);
 	while (*tmp) {
 		if (fmt == *tmp) {
-			*tmp = fmt->next;
+			*tmp = fmt->next;       // 从链表中移除
 			write_unlock(&binfmt_lock);
 			return 0;
 		}
@@ -193,9 +195,8 @@ static int count(char __user * __user * argv, int max)
 }
 
 /*
- * 'copy_strings()' copies argument/environment strings from user
- * memory to free pages in kernel mem. These are in a format ready
- * to be put directly into the top of new user memory.
+ * 'copy_strings()' 将参数环境字符串从用户内存复制到内核内存中的空闲页面。
+ * 这些格式准备好直接放入新用户内存的顶部。
  */
 int copy_strings(int argc,char __user * __user * argv, struct linux_binprm *bprm)
 {
@@ -292,8 +293,8 @@ EXPORT_SYMBOL(copy_strings_kernel);
 
 #ifdef CONFIG_MMU
 /*
- * This routine is used to map in a page into an address space: needed by
- * execve() for the initial stack and environment pages.
+ * 此例程用于将页面映射到地址空间：
+ * execve() 需要用于初始堆栈和环境页面。
  *
  * vma->vm_mm->mmap_sem is held for writing.
  */
@@ -328,8 +329,7 @@ void install_arg_page(struct vm_area_struct *vma,
 	}
 	mm->rss++;
 	lru_cache_add_active(page);
-	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(
-					page, vma->vm_page_prot))));
+	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, vma->vm_page_prot))));
 	page_add_anon_rmap(page, vma, address);
 	pte_unmap(pte);
 	spin_unlock(&mm->page_table_lock);
@@ -345,6 +345,7 @@ out_sig:
 
 #define EXTRA_STACK_VM_PAGES	20	/* random */
 
+// 设置用户栈
 int setup_arg_pages(struct linux_binprm *bprm,
 		    unsigned long stack_top,
 		    int executable_stack)
@@ -399,19 +400,24 @@ int setup_arg_pages(struct linux_binprm *bprm,
 	/* zero pages that were copied above */
 	while (i < MAX_ARG_PAGES)
 		bprm->page[i++] = NULL;
-#else
-	stack_base = stack_top - MAX_ARG_PAGES * PAGE_SIZE;
-	bprm->p += stack_base;
-	mm->arg_start = bprm->p;
-	arg_size = stack_top - (PAGE_MASK & (unsigned long) mm->arg_start);
+#else       // 向下增长的栈
+	stack_base = stack_top - MAX_ARG_PAGES * PAGE_SIZE;			// 栈数据的起始地址
+	bprm->p += stack_base;		// bprm->p表示当前内存顶部
+	mm->arg_start = bprm->p;			// 命令行参数的开始地址
+	arg_size = stack_top - (PAGE_MASK & (unsigned long) mm->arg_start);			// 命令行参数空间大小
 #endif
-
-	arg_size += EXTRA_STACK_VM_PAGES * PAGE_SIZE;
+	/* 内核在为一个进程分配堆栈的时候，将会在实际使用的
+	 * 堆栈基础之上在额外增加20个页面的虚拟地址空间。
+	 * 由于实际上一个进程真正使用的参数空间一般小于一个页面(4KB)，
+	 * 所以通常一个进程最开始堆栈分配的空间为21个页面。
+	 * */
+	arg_size += EXTRA_STACK_VM_PAGES * PAGE_SIZE;		// EXTRA_STACK_VM_PAGES为20
 
 	if (bprm->loader)
 		bprm->loader += stack_base;
 	bprm->exec += stack_base;
 
+	// 分配一个vma。这个vma只含有命令行参数和环境变量，再加20个空的页面
 	mpnt = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 	if (!mpnt)
 		return -ENOMEM;
@@ -430,12 +436,13 @@ int setup_arg_pages(struct linux_binprm *bprm,
 		mpnt->vm_start = stack_base;
 		mpnt->vm_end = stack_base + arg_size;
 #else
-		mpnt->vm_end = stack_top;
-		mpnt->vm_start = mpnt->vm_end - arg_size;
+		mpnt->vm_end = stack_top;			// vma结束地址
+		mpnt->vm_start = mpnt->vm_end - arg_size;		// vma起始地址
 #endif
-		/* Adjust stack execute permissions; explicitly enable
-		 * for EXSTACK_ENABLE_X, disable for EXSTACK_DISABLE_X
-		 * and leave alone (arch default) otherwise. */
+		/* 调整栈执行权限；
+		 * 为 EXSTACK_ENABLE_X 显式启用，
+		 * 为 EXSTACK_DISABLE_X 禁用，
+		 * 否则不理会（arch 默认）。 */
 		if (unlikely(executable_stack == EXSTACK_ENABLE_X))
 			mpnt->vm_flags = VM_STACK_FLAGS |  VM_EXEC;
 		else if (executable_stack == EXSTACK_DISABLE_X)
@@ -444,19 +451,20 @@ int setup_arg_pages(struct linux_binprm *bprm,
 			mpnt->vm_flags = VM_STACK_FLAGS;
 		mpnt->vm_flags |= mm->def_flags;
 		mpnt->vm_page_prot = protection_map[mpnt->vm_flags & 0x7];
+		// 插入vma
 		if ((ret = insert_vm_struct(mm, mpnt))) {
 			up_write(&mm->mmap_sem);
 			kmem_cache_free(vm_area_cachep, mpnt);
 			return ret;
 		}
-		mm->stack_vm = mm->total_vm = vma_pages(mpnt);
+		mm->stack_vm = mm->total_vm = vma_pages(mpnt);		// 计算页面数
 	}
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			install_arg_page(mpnt, page, stack_base);
+			install_arg_page(mpnt, page, stack_base);		// 命令行参数在之前就已经放到页面上，这里只是把页面插入vma中
 		}
 		stack_base += PAGE_SIZE;
 	}
@@ -920,13 +928,13 @@ int prepare_binprm(struct linux_binprm *bprm)
 	 * Check execute perms again - if the caller has CAP_DAC_OVERRIDE,
 	 * generic_permission lets a non-executable through
 	 */
-	if (!(mode & 0111))	/* with at least _one_ execute bit set */
+	if (!(mode & 0111))	/* with at least _one_ execute bit set rwx3中权限至少要设置一种*/
 		return -EACCES;
 	if (bprm->file->f_op == NULL)
 		return -EACCES;
 
-	bprm->e_uid = current->euid;
-	bprm->e_gid = current->egid;
+	bprm->e_uid = current->euid;        // 有效用户ID
+	bprm->e_gid = current->egid;        // 有效组ID
 
 	if(!(bprm->file->f_vfsmnt->mnt_flags & MNT_NOSUID)) {
 		/* Set-uid? */
@@ -952,8 +960,8 @@ int prepare_binprm(struct linux_binprm *bprm)
 	if (retval)
 		return retval;
 
-	memset(bprm->buf,0,BINPRM_BUF_SIZE);
-	return kernel_read(bprm->file,0,bprm->buf,BINPRM_BUF_SIZE);
+	memset(bprm->buf,0,BINPRM_BUF_SIZE);        // 清空buf空间
+	return kernel_read(bprm->file,0,bprm->buf,BINPRM_BUF_SIZE);     // 读可执行文件中头128字节内容到buf中
 }
 
 EXPORT_SYMBOL(prepare_binprm);
@@ -1019,7 +1027,7 @@ inside:
 EXPORT_SYMBOL(remove_arg_zero);
 
 /*
- * cycle the list of binary formats handler, until one recognizes the image
+ * 循环二进制格式处理程序列表，直到识别出image
  */
 int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 {
@@ -1077,7 +1085,7 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 			if (!try_module_get(fmt->module))
 				continue;
 			read_unlock(&binfmt_lock);
-			retval = fn(bprm, regs);
+			retval = fn(bprm, regs);			// 回调
 			if (retval >= 0) {
 				put_binfmt(fmt);
 				allow_write_access(bprm->file);
@@ -1117,74 +1125,76 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 EXPORT_SYMBOL(search_binary_handler);
 
 /*
- * sys_execve() executes a new program.
+ * sys_execve() 执行一个新程序。
  */
-int do_execve(char * filename,
-	char __user *__user *argv,
-	char __user *__user *envp,
-	struct pt_regs * regs)
+int do_execve(char * filename,      // 文件名绝对路径，放在一个page中
+	char __user *__user *argv,      // 命令行参数
+	char __user *__user *envp,      // 环境变量
+	struct pt_regs * regs)          // 寄存器上下文
 {
-	struct linux_binprm *bprm;
+	struct linux_binprm *bprm;	// 存储可执行文件信息
 	struct file *file;
 	int retval;
 	int i;
 
 	retval = -ENOMEM;
-	bprm = kmalloc(sizeof(*bprm), GFP_KERNEL);
+	bprm = kmalloc(sizeof(*bprm), GFP_KERNEL);		// slab分配空间，内核不能调用malloc
 	if (!bprm)
 		goto out_ret;
 	memset(bprm, 0, sizeof(*bprm));
 
-	file = open_exec(filename);
+	file = open_exec(filename);		// 打开文件,filename为绝对路径
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto out_kfree;
 
-	sched_exec();
+	sched_exec();       // 在MP中，找一个最小负载的CPU执行新的进程
 
 	bprm->p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 
 	bprm->file = file;
-	bprm->filename = filename;
-	bprm->interp = filename;
-	bprm->mm = mm_alloc();
+	bprm->filename = filename;      // 二进制文件名
+	bprm->interp = filename;        // 解释器文件名
+	bprm->mm = mm_alloc();		// 分配mm_struct空间
 	retval = -ENOMEM;
 	if (!bprm->mm)
 		goto out_file;
 
-	retval = init_new_context(current, bprm->mm);
+	retval = init_new_context(current, bprm->mm);		// 使用当前进程是否有LDT，有就为新进程准备一个
 	if (retval < 0)
 		goto out_mm;
 
-	bprm->argc = count(argv, bprm->p / sizeof(void *));
+	bprm->argc = count(argv, bprm->p / sizeof(void *));     // 参数的个数
 	if ((retval = bprm->argc) < 0)
 		goto out_mm;
 
-	bprm->envc = count(envp, bprm->p / sizeof(void *));
+	bprm->envc = count(envp, bprm->p / sizeof(void *));     // 环境变量的个数
 	if ((retval = bprm->envc) < 0)
 		goto out_mm;
 
-	retval = security_bprm_alloc(bprm);
+	retval = security_bprm_alloc(bprm);     // LSM
 	if (retval)
 		goto out;
 
 	retval = prepare_binprm(bprm);
 	if (retval < 0)
 		goto out;
-
+	
+	// 复制各种字符串
 	retval = copy_strings_kernel(1, &bprm->filename, bprm);
 	if (retval < 0)
 		goto out;
 
 	bprm->exec = bprm->p;
-	retval = copy_strings(bprm->envc, envp, bprm);
+	retval = copy_strings(bprm->envc, envp, bprm);			// 复制环境变量
 	if (retval < 0)
 		goto out;
 
-	retval = copy_strings(bprm->argc, argv, bprm);
+	retval = copy_strings(bprm->argc, argv, bprm);			// 复制命令行参数
 	if (retval < 0)
 		goto out;
-
+	
+	// 遍历linux_binftm 链表，找到加载elf文件的处理函数
 	retval = search_binary_handler(bprm,regs);
 	if (retval >= 0) {
 		free_arg_pages(bprm);
@@ -1219,7 +1229,7 @@ out_file:
 	}
 
 out_kfree:
-	kfree(bprm);
+	kfree(bprm);		// lmalloc对应kfree
 
 out_ret:
 	return retval;

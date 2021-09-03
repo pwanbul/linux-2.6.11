@@ -291,6 +291,7 @@ static int afs_fill_super(struct super_block *sb, void *data, int silent)
 
 /*****************************************************************************/
 /*
+ * 安德鲁文件系统
  * get an AFS superblock
  * - TODO: don't use get_sb_nodev(), but rather call sget() directly
  */

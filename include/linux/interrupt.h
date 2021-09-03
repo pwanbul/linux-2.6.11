@@ -94,10 +94,11 @@ static inline void __deprecated save_and_cli(unsigned long *x)
 
 extern void local_bh_enable(void);
 
-/* PLEASE, avoid to allocate new softirqs, if you need not _really_ high
-   frequency threaded job scheduling. For almost all the purposes
-   tasklets are more than enough. F.e. all serial device BHs et
-   al. should be converted to tasklets, not to softirqs.
+/* 请避免分配新的软中断，如果你真的不需要高频线程作业调度。
+ * 对于几乎所有的目的，tasklet 已经绰绰有余。
+ * F.e.所有串行设备 BHs 等。应该转换为小任务，而不是软中断。
+ *
+ * 软中断号，同时也是优先，数值越大优先级越低
  */
 
 enum
@@ -112,12 +113,13 @@ enum
 
 /* softirq mask and active fields moved to irq_cpustat_t in
  * asm/hardirq.h to get better cache usage.  KAO
+ * 软中断数组元素
  */
 
 struct softirq_action
 {
-	void	(*action)(struct softirq_action *);
-	void	*data;
+	void	(*action)(struct softirq_action *);		// 回调函数
+	void	*data;		// 数据
 };
 
 asmlinkage void do_softirq(void);

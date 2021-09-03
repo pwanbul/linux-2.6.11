@@ -3,6 +3,7 @@
 
 #include <linux/file.h>
 
+// init的files_struct初始化
 #define INIT_FILES \
 { 							\
 	.count		= ATOMIC_INIT(1), 		\
@@ -31,6 +32,7 @@
 	.max_reqs	= ~0U,				\
 }
 
+// init的mm_struct初始化
 #define INIT_MM(name) \
 {			 					\
 	.mm_rb		= RB_ROOT,				\
@@ -44,6 +46,7 @@
 	.default_kioctx = INIT_KIOCTX(name.default_kioctx, name),	\
 }
 
+// init的signal_struct初始化
 #define INIT_SIGNALS(sig) {	\
 	.count		= ATOMIC_INIT(1), 		\
 	.wait_chldexit	= __WAIT_QUEUE_HEAD_INITIALIZER(sig.wait_chldexit),\
@@ -54,6 +57,7 @@
 	.rlim		= INIT_RLIMITS,					\
 }
 
+// init的sighand_struct初始化
 #define INIT_SIGHAND(sighand) {						\
 	.count		= ATOMIC_INIT(1), 				\
 	.action		= { { { .sa_handler = NULL, } }, },		\
@@ -66,13 +70,14 @@ extern struct group_info init_groups;
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x1fffff (=2MB)
  */
+// init的task_struct
 #define INIT_TASK(tsk)	\
 {									\
 	.state		= 0,						\
-	.thread_info	= &init_thread_info,				\
+	.thread_info	= &init_thread_info,				\			// 关键：线程描述符
 	.usage		= ATOMIC_INIT(2),				\
 	.flags		= 0,						\
-	.lock_depth	= -1,						\
+	.lock_depth	= -1,						\				// 大内核锁支持
 	.prio		= MAX_PRIO-20,					\
 	.static_prio	= MAX_PRIO-20,					\
 	.policy		= SCHED_NORMAL,					\

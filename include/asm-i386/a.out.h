@@ -19,7 +19,7 @@ struct exec
 
 #ifdef __KERNEL__
 
-#define STACK_TOP	TASK_SIZE
+#define STACK_TOP	TASK_SIZE			// 用户栈的起始地址
 
 #endif
 

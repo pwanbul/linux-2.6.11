@@ -26,11 +26,10 @@
 #define DST_GC_INC	(HZ/2)
 #define DST_GC_MAX	(120*HZ)
 
-/* Each dst_entry has reference count and sits in some parent list(s).
- * When it is removed from parent list, it is "freed" (dst_free).
- * After this it enters dead state (dst->obsolete > 0) and if its refcnt
- * is zero, it can be destroyed immediately, otherwise it is added
- * to gc list and garbage collector periodically checks the refcnt.
+/* 每个 dst_entry 都有引用计数并位于一些父列表中。
+ * 当它从父列表中删除时，它被“释放”（dst_free）。
+ * 在此之后它进入死状态（dst->obsolete > 0），如果它的 refcnt 为零，
+ * 它可以立即销毁，否则它被添加到 gc 列表中，垃圾收集器定期检查 refcnt。
  */
 
 struct sk_buff;
@@ -233,7 +232,7 @@ static inline int dst_output(struct sk_buff *skb)
 	}
 }
 
-/* Input packet from network to transport.  */
+/* 从网络输入数据包进行传输层。  */
 static inline int dst_input(struct sk_buff *skb)
 {
 	int err;

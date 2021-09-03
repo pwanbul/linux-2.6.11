@@ -11,13 +11,11 @@
  */
 
 /*
- * This string-include defines all string functions as inline
- * functions. Use gcc. It also assumes ds=es=data space, this should be
- * normal. Most of the string-functions are rather heavily hand-optimized,
- * see especially strsep,strstr,str[c]spn. They should work, but are not
- * very easy to understand. Everything is done entirely within the register
- * set, making the functions fast and clean. String instructions have been
- * used through-out, making for "slightly" unclear code :-)
+ * 此字符串包含将所有字符串函数定义为内联函数。使用 gcc。
+ * 它还假设 ds=es=data 空间，这应该是正常的。
+ * 大多数字符串函数都经过大量手工优化，尤其是 strsep,strstr,str[c]spn。
+ * 它们应该可以工作，但不是很容易理解。一切都完全在寄存器组内完成，
+ * 使功能快速而干净。 字符串指令一直被使用，导致“稍微”不清楚的代码 :-)
  *
  *		NO Copyright (C) 1991, 1992 Linus Torvalds,
  *		consider these trivial functions to be PD.
@@ -25,6 +23,29 @@
 
 /* AK: in fact I bet it would be better to move this stuff all out of line.
  */
+/* 内核中各处都会处理字符串，因而对字符串处理的时间要求很严格。
+ * 由于很多体系结构都提供了专门的汇编指令来执行所需的任务，
+ * 或者由于手工优化的汇编代码可能比编译器生成的代码更为快速，
+ * 因此所有体系结构在<asm-arch/string.h>中都定义了自身的各种字符串操作。
+ *
+ * 所有这些操作，都是用来替换用户空间中所用的C标准库的同名函数，
+ * 以便在内核中执行同样的任务。对于每个由体系结构自身以优化
+ * 形式定义的字符串操作来说，都必须定义相应的__HAVE_ARCH_OPERATION宏。
+ * 例如，对memcpy必须设置__HAVE_ARCH_MEMCPY。体系结构相关代码
+ * 未能实现的所有函数，都替换为lib/string.c中实现的体系结构无关的标准操作。
+ * */
+
+/*
+ * (1) lodsb、lodsw、lodsl：把DS:SI指向的存储单元中的数据装入AL或AX或EAX，然后根据DF标志增减SI
+ * (2) stosb、stosw、stosl：把AL或AX或EAX中的数据装入ES:DI指向的存储单元，然后根据DF标志增减DI
+ * (3) movsb、movsw、movsl：把DS:SI指向的存储单元中的数据装入ES:DI指向的存储单元中，然后根据DF标志分别增减SI和DI
+ * (4) scasb、scasw、scasl：把AL或AX或EAX中的数据与ES:DI指向的存储单元中的数据相减，影响标志位，然后根据DF标志分别增减SI和DI
+ * (5) cmpsb、cmpsw、cmpsl：把DS:SI指向的存储单元中的数据与ES:DI指向的存储单元中的数据相减，影响标志位，然后根据DF标志分别增减SI和DI
+ * (6) rep：重复其后的串操作指令。重复前先判断CX是否为0，为0就结束重复，否则CX减1，重复其后的串操作指令。主要用在MOVS和STOS前。一般不用在LODS前。
+ *
+ * 上述指令涉及的寄存器：段寄存器DS和ES、变址寄存器SI和DI、累加器AX、计数器CX涉及
+ * 的标志位：DF、AF、CF、OF、PF、SF、ZF
+ * */
 
 #define __HAVE_ARCH_STRCPY
 static inline char * strcpy(char * dest,const char *src)
@@ -33,7 +54,7 @@ int d0, d1, d2;
 __asm__ __volatile__(
 	"1:\tlodsb\n\t"
 	"stosb\n\t"
-	"testb %%al,%%al\n\t"
+	"testb %%al,%%al\n\t"		// 检查是否遇到'\0'
 	"jne 1b"
 	: "=&S" (d0), "=&D" (d1), "=&a" (d2)
 	:"0" (src),"1" (dest) : "memory");
@@ -193,27 +214,57 @@ __asm__ __volatile__(
 return __res;
 }
 
+/*
+ * 32位模式下：
+ * 源地址是DS:ESI,目的地址是ES:EDI			应当把源数据和目标地址放在这两个寄存器中
+ *
+ * 注意：在传送完成之后，ESI和EDI会增加或者减小。
+ * CLD 当DF=0 时，表示正向传送，传送之后ESI和EDI的值会增加；
+ * STD 当DF=1 时，表示反向传送，传送之后ESI和EDI的值会减小；
+ *
+ * 他们的区别是：ESI和EDI的加减想象成有一个指针
+ * MOVSB:传送一个字节，之后ESI和EDI加/减1，
+ * MOVSW:传送一个字，之后ESI和EDI加/减2
+ * MOVSL(INTEL使用MOVSD):传送一个双字，之后ESI和EDI加/减4
+ *
+ * 单纯的movsb/ movsw/ movsl只能执行一次，
+ * 如果希望处理器自动地反复执行，可以加上指令前缀"rep;"
+ * 在寄存器ECX中设置传送的次数。
+ * 当ECX不等于0时，则执行movsb/ movsw/ movsl,
+ * 执行后，ECX的值减一，直到减为0为止。
+ *
+ * 例如，ESI正向移动(加)时，"hello world"，执行 movsb/ movsw/ movsl
+ * 输出："h","hel","hello w"
+ *
+ * 反向移动时，ESI要指向"hello world"的尾端，EDI要指向存储空间的尾端
+ * 执行 movsb/ movsw/ movsl
+ * 输出："\n","d\n","rld\n"
+ *
+ * 注意上面两种方式区别，默认正向
+ * */
+
 static inline void * __memcpy(void * to, const void * from, size_t n)
 {
 int d0, d1, d2;
 __asm__ __volatile__(
 	"rep ; movsl\n\t"
-	"testb $2,%b4\n\t"
-	"je 1f\n\t"
+	"testb $2,%b4\n\t"		// %b4，4是第4个参数n，b是指取该寄存器的1字节大小
+	"je 1f\n\t"		// 如果n的第1字节的第2为等于1，那至少还有2字节
 	"movsw\n"
-	"1:\ttestb $1,%b4\n\t"
+	"1:\ttestb $1,%b4\n\t"		// 还剩1字节
 	"je 2f\n\t"
 	"movsb\n"
 	"2:"
+	// "c"即ECX，rep的计数器，"D"即EDI，目标变址寄存器，"S"即ESI，源变址寄存器
 	: "=&c" (d0), "=&D" (d1), "=&S" (d2)
+	//q 表示为eax ebx ecx edx；"0"指代"=&c"， "1"指代"=&D"， "2"指代"=&S"
 	:"0" (n/4), "q" (n),"1" ((long) to),"2" ((long) from)
 	: "memory");
 return (to);
 }
 
 /*
- * This looks horribly ugly, but the compiler can optimize it totally,
- * as the count is constant.
+ * 这看起来非常难看，但编译器可以完全优化它，因为计数是恒定的。
  */
 static inline void * __constant_memcpy(void * to, const void * from, size_t n)
 {
@@ -229,7 +280,7 @@ __asm__ __volatile__( \
 	: "memory");
 {
 	int d0, d1, d2;
-	switch (n % 4) {
+	switch (n % 4) {		// 取余
 		case 0: COMMON(""); return to;
 		case 1: COMMON("\n\tmovsb"); return to;
 		case 2: COMMON("\n\tmovsw"); return to;
@@ -242,12 +293,12 @@ __asm__ __volatile__( \
 
 #define __HAVE_ARCH_MEMCPY
 
-#ifdef CONFIG_X86_USE_3DNOW
+#ifdef CONFIG_X86_USE_3DNOW		// 架构特定实现
 
 #include <asm/mmx.h>
 
 /*
- *	This CPU favours 3DNow strongly (eg AMD Athlon)
+ *	该 CPU 强烈支持 3DNow（例如 AMD Athlon）
  */
 
 static inline void * __constant_memcpy3d(void * to, const void * from, size_t len)
@@ -276,7 +327,7 @@ static __inline__ void *__memcpy3d(void *to, const void *from, size_t len)
  */
  
 #define memcpy(t, f, n) \
-(__builtin_constant_p(n) ? \
+(__builtin_constant_p(n) ? \		// n是否为编译期常量，是常量的话，函数返回1，否则函数返回0
  __constant_memcpy((t),(f),(n)) : \
  __memcpy((t),(f),(n)))
 

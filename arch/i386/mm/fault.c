@@ -202,9 +202,7 @@ static inline int is_prefetch(struct pt_regs *regs, unsigned long addr,
 fastcall void do_invalid_op(struct pt_regs *, unsigned long);
 
 /*
- * This routine handles page faults.  It determines the address,
- * and the problem, and then passes it off to one of the appropriate
- * routines.
+ * 该例程处理页面错误。它确定地址和问题，然后将其传递给适当的例程之一。
  *
  * error_code:
  *	bit 0 == 0 means no page found, 1 means protection fault
@@ -221,9 +219,10 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	int write;
 	siginfo_t info;
 
-	/* get the address */
+	/* get the address 从CR2获取故障地址 */
 	__asm__("movl %%cr2,%0":"=r" (address));
 
+	// debug用的
 	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
 					SIGSEGV) == NOTIFY_STOP)
 		return;
@@ -236,24 +235,19 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	info.si_code = SEGV_MAPERR;
 
 	/*
-	 * We fault-in kernel-space virtual memory on-demand. The
-	 * 'reference' page table is init_mm.pgd.
+	 * 我们按需对内核空间虚拟内存进行故障处理。 “引用”页表是 init_mm.pgd。
 	 *
-	 * NOTE! We MUST NOT take any locks for this case. We may
-	 * be in an interrupt or a critical region, and should
-	 * only copy the information from the master page table,
-	 * nothing more.
+	 * 笔记！对于这种情况，我们不得采取任何锁定措施。
+	 * 我们可能处于中断或临界区，应该只从主页表复制信息，仅此而已。
 	 *
-	 * This verifies that the fault happens in kernel space
-	 * (error_code & 4) == 0, and that the fault was not a
-	 * protection error (error_code & 1) == 0.
+	 * 这验证了错误发生在内核空间 (error_code & 4) == 0，
+	 * 并且该错误不是保护错误 (error_code & 1) == 0。
 	 */
-	if (unlikely(address >= TASK_SIZE)) { 
+	if (unlikely(address >= TASK_SIZE)) {       // in kernel
 		if (!(error_code & 5))
-			goto vmalloc_fault;
+			goto vmalloc_fault;     // in kernel, no page found
 		/* 
-		 * Don't take the mm semaphore here. If we fixup a prefetch
-		 * fault we could otherwise deadlock.
+		 * 不要在这里使用 mm 信号量。如果我们修复预取错误，我们可能会死锁。
 		 */
 		goto bad_area_nosemaphore;
 	} 
@@ -261,26 +255,21 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	mm = tsk->mm;
 
 	/*
-	 * If we're in an interrupt, have no user context or are running in an
-	 * atomic region then we must not take the fault..
+	 * 如果我们处于中断状态，没有用户上下文或正在原子区域中运行，那么我们不能承担错误。
 	 */
 	if (in_atomic() || !mm)
 		goto bad_area_nosemaphore;
 
-	/* When running in the kernel we expect faults to occur only to
-	 * addresses in user space.  All other faults represent errors in the
-	 * kernel and should generate an OOPS.  Unfortunatly, in the case of an
-	 * erroneous fault occuring in a code path which already holds mmap_sem
-	 * we will deadlock attempting to validate the fault against the
-	 * address space.  Luckily the kernel only validly references user
-	 * space from well defined areas of code, which are listed in the
-	 * exceptions table.
+	/* 在内核中运行时，我们预计错误只会发生在用户空间中的地址上。
+	 * 所有其他故障都代表内核中的错误，应生成OOPS。
+	 * 不幸的是，如果在已经拥有 mmap_sem 的代码路径中发生错误故障，
+	 * 我们将死锁尝试针对地址空间验证故障。
+	 * 幸运的是，内核仅从定义明确的代码区域中有效地引用用户空间，
+	 * 这些区域列在异常表中。
 	 *
-	 * As the vast majority of faults will be valid we will only perform
-	 * the source reference check when there is a possibilty of a deadlock.
-	 * Attempt to lock the address space, if we cannot we then validate the
-	 * source.  If this is invalid we can skip the address space check,
-	 * thus avoiding the deadlock.
+	 * 由于绝大多数错误都是有效的，我们只会在可能出现死锁时执行源引用检查。
+	 * 尝试锁定地址空间，如果不能，则验证源。
+	 * 如果这是无效的，我们可以跳过地址空间检查，从而避免死锁。
 	 */
 	if (!down_read_trylock(&mm->mmap_sem)) {
 		if ((error_code & 4) == 0 &&
@@ -298,10 +287,8 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		goto bad_area;
 	if (error_code & 4) {
 		/*
-		 * accessing the stack below %esp is always a bug.
-		 * The "+ 32" is there due to some instructions (like
-		 * pusha) doing post-decrement on the stack and that
-		 * doesn't show up until later..
+		 * 访问%esp下面的堆栈总是一个错误。
+		 * “+32”是由于某些指令（如 pusha）在堆栈上进行后递减而存在的，并且直到稍后才会出现。
 		 */
 		if (address + 32 < regs->esp)
 			goto bad_area;
@@ -309,8 +296,7 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (expand_stack(vma, address))
 		goto bad_area;
 /*
- * Ok, we have a good vm_area for this memory access, so
- * we can handle it..
+    好的，我们有一个很好的 vm_area 用于这个内存访问，所以我们可以处理它..
  */
 good_area:
 	info.si_code = SEGV_ACCERR;
@@ -336,9 +322,7 @@ good_area:
 
  survive:
 	/*
-	 * If for any reason at all we couldn't handle the fault,
-	 * make sure we exit gracefully rather than endlessly redo
-	 * the fault.
+	 * 如果由于任何原因我们无法处理故障，请确保我们优雅地退出而不是无休止地重做故障。
 	 */
 	switch (handle_mm_fault(mm, vma, address, write)) {
 		case VM_FAULT_MINOR:
@@ -367,10 +351,9 @@ good_area:
 	return;
 
 /*
- * Something tried to access memory that isn't in our memory map..
- * Fix it, but check if it's kernel or user first..
+ * 有些东西试图访问不在我们内存映射中的内存..修复它，但首先检查它是内核还是用户..
  */
-bad_area:
+bad_area:       // 访问无效的地址
 	up_read(&mm->mmap_sem);
 
 bad_area_nosemaphore:

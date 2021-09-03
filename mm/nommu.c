@@ -33,7 +33,7 @@
 #include <asm/tlbflush.h>
 
 void *high_memory;
-struct page *mem_map;
+struct page *mem_map;       // 保存页框描述符指针的数组
 unsigned long max_mapnr;
 unsigned long num_physpages;
 unsigned long askedalloc, realalloc;
@@ -915,7 +915,10 @@ unsigned long do_mremap(unsigned long addr,
 
 /*
  * Look up the first VMA which satisfies  addr < vm_end,  NULL if none
- */
+ *	有2种情况会返回vma：
+ *	1. vm_start <= addr < vm_end
+ *	2. addr < vm_start
+ * /
 struct vm_area_struct *find_vma(struct mm_struct *mm, unsigned long addr)
 {
 	struct vm_list_struct *vml;

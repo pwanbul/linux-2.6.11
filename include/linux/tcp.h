@@ -19,12 +19,12 @@
 
 #include <linux/types.h>
 #include <asm/byteorder.h>
-
+// tcp首部
 struct tcphdr {
-	__u16	source;
-	__u16	dest;
-	__u32	seq;
-	__u32	ack_seq;
+	__u16	source;			// 源端口
+	__u16	dest;			// 目的端口
+	__u32	seq;			// 序号
+	__u32	ack_seq;		// 确认号
 #if defined(__LITTLE_ENDIAN_BITFIELD)
 	__u16	res1:4,
 		doff:4,
@@ -37,9 +37,9 @@ struct tcphdr {
 		ece:1,
 		cwr:1;
 #elif defined(__BIG_ENDIAN_BITFIELD)
-	__u16	doff:4,
-		res1:4,
-		cwr:1,
+	__u16	doff:4,			// 首部大小
+		res1:4,			// 保留
+		cwr:1,		// 控制码
 		ece:1,
 		urg:1,
 		ack:1,
@@ -50,9 +50,9 @@ struct tcphdr {
 #else
 #error	"Adjust your <asm/byteorder.h> defines"
 #endif	
-	__u16	window;
-	__u16	check;
-	__u16	urg_ptr;
+	__u16	window;			// 接受窗口大小
+	__u16	check;			// 校验和，覆盖伪首部+首部+数据
+	__u16	urg_ptr;		// 紧急指针
 };
 
 

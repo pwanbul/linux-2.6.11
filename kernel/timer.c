@@ -1045,28 +1045,23 @@ static void process_timeout(unsigned long __data)
 }
 
 /**
- * schedule_timeout - sleep until timeout
+ * schedule_timeout - 休眠直到超时
  * @timeout: timeout value in jiffies
  *
- * Make the current task sleep until @timeout jiffies have
- * elapsed. The routine will return immediately unless
- * the current task state has been set (see set_current_state()).
+ * 使当前任务休眠，直到@timeout jiffies 过去。除非设置了当前任务状态
+ * （请参阅 set_current_state()），否则例程将立即返回。
  *
- * You can set the task state as follows -
+ * 您可以按如下方式设置任务状态 -
  *
- * %TASK_UNINTERRUPTIBLE - at least @timeout jiffies are guaranteed to
- * pass before the routine returns. The routine will return 0
+ * %TASK_UNINTERRUPTIBLE - 至少@timeout jiffies 保证在例程返回之前通过。例程将返回0
  *
  * %TASK_INTERRUPTIBLE - the routine may return early if a signal is
  * delivered to the current task. In this case the remaining time
  * in jiffies will be returned, or 0 if the timer expired in time
  *
- * The current task state is guaranteed to be TASK_RUNNING when this
- * routine returns.
+ * 当此例程返回时，当前任务状态保证为 TASK_RUNNING。
  *
- * Specifying a @timeout value of %MAX_SCHEDULE_TIMEOUT will schedule
- * the CPU away without a bound on the timeout. In this case the return
- * value will be %MAX_SCHEDULE_TIMEOUT.
+ * 指定 %MAX_SCHEDULE_TIMEOUT 的@timeout 值将在没有超时限制的情况下调度 CPU。在这种情况下，返回值将是 %MAX_SCHEDULE_TIMEOUT。
  *
  * In all cases the return value is guaranteed to be non-negative.
  */
@@ -1079,11 +1074,8 @@ fastcall signed long __sched schedule_timeout(signed long timeout)
 	{
 	case MAX_SCHEDULE_TIMEOUT:
 		/*
-		 * These two special cases are useful to be comfortable
-		 * in the caller. Nothing more. We could take
-		 * MAX_SCHEDULE_TIMEOUT from one of the negative value
-		 * but I' d like to return a valid offset (>=0) to allow
-		 * the caller to do everything it want with the retval.
+		 * 这两个特殊情况对于让调用者感到舒适很有用。而已。我们可以从负值之一中获取 MAX_SCHEDULE_TIMEOUT，
+		 * 但我想返回一个有效的偏移量 (>=0) 以允许调用者使用 retval 做它想做的一切。
 		 */
 		schedule();
 		goto out;

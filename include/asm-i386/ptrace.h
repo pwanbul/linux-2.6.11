@@ -20,20 +20,19 @@
 #define SS   16
 #define FRAME_SIZE 17
 
-/* this struct defines the way the registers are stored on the 
-   stack during a system call. */
+/* 这个结构体定义了系统调用期间寄存器在堆栈上的存储方式。 */
 
 struct pt_regs {
-	long ebx;
-	long ecx;
-	long edx;
-	long esi;
-	long edi;
-	long ebp;
-	long eax;
-	int  xds;
-	int  xes;
-	long orig_eax;
+	long ebx;       // 0
+	long ecx;       // 1
+	long edx;       // 2
+	long esi;       // 3
+	long edi;       // 4
+	long ebp;       // 5
+	long eax;       // 6
+	int  xds;       // 7
+	int  xes;       // 8
+	long orig_eax;       // 0
 	long eip;
 	int  xcs;
 	long eflags;

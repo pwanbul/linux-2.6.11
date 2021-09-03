@@ -10,9 +10,12 @@
 
 #include <linux/wait.h>
 
+/* 完成体
+ * 由于completion的实现方式，即使complete_xxx在wait_for_xxx之前调用，也可以正常工作
+ * */
 struct completion {
-	unsigned int done;
-	wait_queue_head_t wait;
+	unsigned int done;      // 确保事件在进程休眠之前完成
+	wait_queue_head_t wait;         // 等待队列头
 };
 
 #define COMPLETION_INITIALIZER(work) \
@@ -21,6 +24,7 @@ struct completion {
 #define DECLARE_COMPLETION(work) \
 	struct completion work = COMPLETION_INITIALIZER(work)
 
+// 初始化动态分配的完成体
 static inline void init_completion(struct completion *x)
 {
 	x->done = 0;
