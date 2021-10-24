@@ -167,7 +167,7 @@ enum
 	VM_BLOCK_DUMP=24,	/* block dump mode */
 	VM_HUGETLB_GROUP=25,	/* permitted hugetlb group */
 	VM_VFS_CACHE_PRESSURE=26, /* dcache/icache reclaim pressure */
-	VM_LEGACY_VA_LAYOUT=27, /* legacy/compatibility virtual address space layout */
+	VM_LEGACY_VA_LAYOUT=27, /* 遗留/兼容性虚拟地址空间布局 */
 	VM_SWAP_TOKEN_TIMEOUT=28, /* default time for token time out */
 };
 
@@ -820,10 +820,8 @@ extern ctl_handler sysctl_ms_jiffies;
 
 
 /*
- * Register a set of sysctl names by calling register_sysctl_table
- * with an initialised array of ctl_table's.  An entry with zero
- * ctl_name terminates the table.  table->de will be set up by the
- * registration and need not be initialised in advance.
+ * 通过使用初始化的 ctl_table 数组调用 register_sysctl_table 来注册一组 sysctl 名称。
+ * ctl_name 为零的条目将终止该表。 table->de 将由注册设置，不需要提前初始化。
  *
  * sysctl names can be mirrored automatically under /proc/sys.  The
  * procname supplied controls /proc naming.
@@ -856,12 +854,12 @@ extern ctl_handler sysctl_ms_jiffies;
  * cover common cases.
  */
 
-/* A sysctl table is an array of struct ctl_table: */
+/* 一个 sysctl 表是一个结构体 ctl_table 的数组： */
 struct ctl_table 
 {
-	int ctl_name;			/* Binary ID */
+	int ctl_name;			/* Binary ID 是一个enum值 */
 	const char *procname;		/* Text ID for /proc/sys, or zero */
-	void *data;
+	void *data;		// 用到这个参数时的取值
 	int maxlen;
 	mode_t mode;
 	ctl_table *child;

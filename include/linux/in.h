@@ -21,7 +21,7 @@
 #include <linux/types.h>
 #include <linux/socket.h>
 
-/* Standard well-defined IP protocols.  */
+/* 传送层协议号 */
 enum {
   IPPROTO_IP = 0,		/* Dummy protocol for TCP		*/
   IPPROTO_ICMP = 1,		/* Internet Control Message Protocol	*/
@@ -49,7 +49,9 @@ enum {
 };
 
 
-/* Internet address. */
+/* Internet address.
+ * 历史原因导致多套了一层
+ * */
 struct in_addr {
 	__u32	s_addr;
 };
@@ -171,14 +173,16 @@ struct in_pktinfo
 	struct in_addr	ipi_addr;
 };
 
-/* Structure describing an Internet (IP) socket address. */
+/* 描述 Internet (IP) 套接字地址的结构.
+ * IPv4
+ * */
 #define __SOCK_SIZE__	16		/* sizeof(struct sockaddr)	*/
 struct sockaddr_in {
-  sa_family_t		sin_family;	/* Address family		*/
-  unsigned short int	sin_port;	/* Port number			*/
-  struct in_addr	sin_addr;	/* Internet address		*/
+  sa_family_t		sin_family;	/* 地址族 */
+  unsigned short int	sin_port;	/* 端口号 */
+  struct in_addr	sin_addr;	/* IPv4地址 */
 
-  /* Pad to size of `struct sockaddr'. */
+  /* 填充数据使其达到`struct sockaddr'的大小. */
   unsigned char		__pad[__SOCK_SIZE__ - sizeof(short int) -
 			sizeof(unsigned short int) - sizeof(struct in_addr)];
 };
@@ -186,27 +190,30 @@ struct sockaddr_in {
 
 
 /*
- * Definitions of the bits in an Internet address integer.
- * On subnets, host and network parts are found according
- * to the subnet mask, not these masks.
+ * Internet 地址整数中位的定义。
+ * 在子网上，根据子网掩码而不是这些掩码找到主机和网络部分。
  */
+// A类地址，0开头
 #define	IN_CLASSA(a)		((((long int) (a)) & 0x80000000) == 0)
 #define	IN_CLASSA_NET		0xff000000
 #define	IN_CLASSA_NSHIFT	24
 #define	IN_CLASSA_HOST		(0xffffffff & ~IN_CLASSA_NET)
 #define	IN_CLASSA_MAX		128
 
+// B类地址，10开头
 #define	IN_CLASSB(a)		((((long int) (a)) & 0xc0000000) == 0x80000000)
 #define	IN_CLASSB_NET		0xffff0000
 #define	IN_CLASSB_NSHIFT	16
 #define	IN_CLASSB_HOST		(0xffffffff & ~IN_CLASSB_NET)
 #define	IN_CLASSB_MAX		65536
 
+// C类地址，110开头
 #define	IN_CLASSC(a)		((((long int) (a)) & 0xe0000000) == 0xc0000000)
 #define	IN_CLASSC_NET		0xffffff00
 #define	IN_CLASSC_NSHIFT	8
 #define	IN_CLASSC_HOST		(0xffffffff & ~IN_CLASSC_NET)
 
+// D类地址，1110开头
 #define	IN_CLASSD(a)		((((long int) (a)) & 0xf0000000) == 0xe0000000)
 #define	IN_MULTICAST(a)		IN_CLASSD(a)
 #define IN_MULTICAST_NET	0xF0000000
@@ -214,23 +221,23 @@ struct sockaddr_in {
 #define	IN_EXPERIMENTAL(a)	((((long int) (a)) & 0xf0000000) == 0xf0000000)
 #define	IN_BADCLASS(a)		IN_EXPERIMENTAL((a))
 
-/* Address to accept any incoming messages. */
+/* 接受任何传入消息的地址. */
 #define	INADDR_ANY		((unsigned long int) 0x00000000)
 
-/* Address to send to all hosts. */
+/* 发送给所有主机的地址. */
 #define	INADDR_BROADCAST	((unsigned long int) 0xffffffff)
 
-/* Address indicating an error return. */
+/* 指示错误返回的地址. */
 #define	INADDR_NONE		((unsigned long int) 0xffffffff)
 
-/* Network number for local host loopback. */
+/* 本地主机环回的网络号. */
 #define	IN_LOOPBACKNET		127
 
-/* Address to loopback in software to local host.  */
+/* 在软件中环回到本地主机的地址.  */
 #define	INADDR_LOOPBACK		0x7f000001	/* 127.0.0.1   */
 #define	IN_LOOPBACK(a)		((((long int) (a)) & 0xff000000) == 0x7f000000)
 
-/* Defines for Multicast INADDR */
+/* 定义组播 INADDR */
 #define INADDR_UNSPEC_GROUP   	0xe0000000U	/* 224.0.0.0   */
 #define INADDR_ALLHOSTS_GROUP 	0xe0000001U	/* 224.0.0.1   */
 #define INADDR_ALLRTRS_GROUP    0xe0000002U	/* 224.0.0.2 */

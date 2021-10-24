@@ -5,13 +5,13 @@
  * Resource limits
  */
 
-/* Allow arch to control resource order */
+/* 允许 arch 控制资源顺序 */
 #ifndef __ARCH_RLIMIT_ORDER
 #define RLIMIT_CPU		0	/* CPU time in ms */
 #define RLIMIT_FSIZE		1	/* Maximum filesize */
-#define RLIMIT_DATA		2	/* max data size */
-#define RLIMIT_STACK		3	/* max stack size */
-#define RLIMIT_CORE		4	/* max core file size */
+#define RLIMIT_DATA		2	/* 最大数据大小，即.data的大小 */
+#define RLIMIT_STACK		3	/* 最大栈大小 */
+#define RLIMIT_CORE		4	/* 最大core文件大小 */
 #define RLIMIT_RSS		5	/* max resident set size */
 #define RLIMIT_NPROC		6	/* max number of processes */
 #define RLIMIT_NOFILE		7	/* max number of open files */
@@ -29,15 +29,16 @@
  * Which makes a ton more sense anyway.
  */
 #ifndef RLIM_INFINITY
-#define RLIM_INFINITY	(~0UL)
+#define RLIM_INFINITY	(~0UL)		// 无限大
 #endif
 
-#ifndef _STK_LIM_MAX
+#ifndef _STK_LIM_MAX		// 栈的大小限制
 #define _STK_LIM_MAX	RLIM_INFINITY
 #endif
 
 #ifdef __KERNEL__
 
+// init task的rlimits初始化
 #define INIT_RLIMITS							\
 {									\
 	[RLIMIT_CPU]		= { RLIM_INFINITY, RLIM_INFINITY },	\

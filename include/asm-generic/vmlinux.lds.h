@@ -32,35 +32,35 @@
 		VMLINUX_SYMBOL(__end_pci_fixups_enable) = .;		\
 	}								\
 									\
-	/* Kernel symbol table: Normal symbols */			\
+	/* Kernel symbol table: Normal symbols 普通符号的符号表*/			\
 	__ksymtab         : AT(ADDR(__ksymtab) - LOAD_OFFSET) {		\
 		VMLINUX_SYMBOL(__start___ksymtab) = .;			\
 		*(__ksymtab)						\
 		VMLINUX_SYMBOL(__stop___ksymtab) = .;			\
 	}								\
 									\
-	/* Kernel symbol table: GPL-only symbols */			\
+	/* Kernel symbol table: GPL-only symbols GPL-only符号的符号表 */			\
 	__ksymtab_gpl     : AT(ADDR(__ksymtab_gpl) - LOAD_OFFSET) {	\
 		VMLINUX_SYMBOL(__start___ksymtab_gpl) = .;		\
 		*(__ksymtab_gpl)					\
 		VMLINUX_SYMBOL(__stop___ksymtab_gpl) = .;		\
 	}								\
 									\
-	/* Kernel symbol table: Normal symbols */			\
+	/* Kernel symbol table: Normal symbols 普通符号的crc表 */			\
 	__kcrctab         : AT(ADDR(__kcrctab) - LOAD_OFFSET) {		\
 		VMLINUX_SYMBOL(__start___kcrctab) = .;			\
 		*(__kcrctab)						\
 		VMLINUX_SYMBOL(__stop___kcrctab) = .;			\
 	}								\
 									\
-	/* Kernel symbol table: GPL-only symbols */			\
+	/* Kernel symbol table: GPL-only symbols GPL-only符号的crc表 */			\
 	__kcrctab_gpl     : AT(ADDR(__kcrctab_gpl) - LOAD_OFFSET) {	\
 		VMLINUX_SYMBOL(__start___kcrctab_gpl) = .;		\
 		*(__kcrctab_gpl)					\
 		VMLINUX_SYMBOL(__stop___kcrctab_gpl) = .;		\
 	}								\
 									\
-	/* Kernel symbol table: strings */				\
+	/* Kernel symbol table: strings 函数名字符串表 */				\
         __ksymtab_strings : AT(ADDR(__ksymtab_strings) - LOAD_OFFSET) {	\
 		*(__ksymtab_strings)					\
 	}								\

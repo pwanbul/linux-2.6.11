@@ -304,7 +304,9 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 /*
  * pgd_offset() returns a (pgd_t *)
- * pgd_index() is used get the offset into the pgd page's array of pgd_t's;
+ * pgd_index() 用于获取 pgd 页的 pgd_t 数组的偏移量；
+ *
+ * 通过address计算pgd中索引
  */
 #define pgd_offset(mm, address) ((mm)->pgd+pgd_index(address))
 
@@ -319,8 +321,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  *
  * 此宏返回 pmd 页面中条目的索引，该条目将控制给定的虚拟地址
  */
-#define pmd_index(address) \
-		(((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
+#define pmd_index(address) (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
 
 /*
  * pte 页面可以被认为是一个这样的数组： pte_t[PTRS_PER_PTE]

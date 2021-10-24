@@ -263,6 +263,7 @@ typedef struct {
 				_raw_spin_trylock(lock) ? \
 				1 : ({preempt_enable(); local_bh_enable(); 0;});})
 
+// UP中，退化为关闭抢占
 #define _spin_lock(lock)	\
 do { \
 	preempt_disable(); \

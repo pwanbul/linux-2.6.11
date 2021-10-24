@@ -85,8 +85,7 @@ static inline void pud_clear (pud_t * pud) { }
 
 
 /* 在二级页表中找到一个条目.. */
-#define pmd_offset(pud, address) ((pmd_t *) pud_page(*(pud)) + \
-			pmd_index(address))
+#define pmd_offset(pud, address) ((pmd_t *) pud_page(*(pud)) + pmd_index(address))
 
 static inline pte_t ptep_get_and_clear(pte_t *ptep)
 {

@@ -34,12 +34,11 @@ static inline void mapping_set_gfp_mask(struct address_space *m, int mask)
 }
 
 /*
- * The page cache can done in larger chunks than
- * one page, because it allows for more efficient
- * throughput (it can then be mapped into user
- * space in smaller chunks for same flexibility).
+ * 页面缓存可以在比一页更大的块中完成，
+ * 因为它允许更有效的吞吐量（然后可以将它以较小的
+ * 块映射到用户空间以获得相同的灵活性）。
  *
- * Or rather, it _will_ be done in larger chunks.
+ * 或者更确切地说，它_将_以更大的块完成。
  */
 #define PAGE_CACHE_SHIFT	PAGE_SHIFT
 #define PAGE_CACHE_SIZE		PAGE_SIZE

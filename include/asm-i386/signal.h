@@ -13,7 +13,7 @@ struct siginfo;
 /* Most things should be clean enough to redefine this at will, if care
    is taken to make libc match.  */
 
-#define _NSIG		64
+#define _NSIG		64		// 64个信号
 #define _NSIG_BPW	32
 #define _NSIG_WORDS	(_NSIG / _NSIG_BPW)
 
@@ -147,18 +147,20 @@ struct old_sigaction {
 	__sigrestore_t sa_restorer;
 };
 
+//
 struct sigaction {
-	__sighandler_t sa_handler;
+	__sighandler_t sa_handler;		// 信号处理函数，或者SIG_DEL/SIG_IGN
 	unsigned long sa_flags;
 	__sigrestore_t sa_restorer;
-	sigset_t sa_mask;		/* mask last for extensibility */
+	sigset_t sa_mask;		/* 运行处理函数的时，要屏蔽的信号 */
 };
 
+// 对用户进程可见的信号特性
 struct k_sigaction {
 	struct sigaction sa;
 };
 #else
-/* Here we must cater to libcs that poke about in kernel headers.  */
+/* 在这里，我们必须迎合内核头文件中的 libcs​​。  */
 
 struct sigaction {
 	union {

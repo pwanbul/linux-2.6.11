@@ -17,7 +17,7 @@ asmlinkage int printk(const char * fmt, ...)
  * 临界区C只能有一个内核控制路径P，使用于SMP环境
  * 如果内核控制路径发现自旋锁是开着的，就获得锁并继续自己的执行。
  * 如果发现锁由运行在另一个CPU上的内核控制路径锁着，就反复执行一条紧凑的循环指令，直到锁被释放。
- * 循环等待即是忙等，即使等待的内核控制路径无事可做，它也在CPU上保持运行。
+ * 循环等待即忙等，即使等待的内核控制路径无事可做，它也在CPU上保持运行。
  * 要求持有锁的时间非常短，加锁和解锁的时间也非常短，不能在持有锁时睡眠。
  * 一般来说，由自旋锁保护的临界区时禁止抢占的，因此，在UP中，这种锁仅仅起到禁止/启用内核抢占。
  * 注意，在自旋锁忙等期间，内核抢占还是有效的，等待自旋锁释放的进程仍有可能被更高优先级的进程代替。
@@ -28,6 +28,11 @@ asmlinkage int printk(const char * fmt, ...)
  * spin_unlock_wait()	等待锁的释放，并获取锁
  * spin_is_locked()		检查锁是否释放
  * https://www.cnblogs.com/aaronlinux/p/5904479.html?utm_source=itdadao&utm_medium=referral
+ *
+ * 由于请求锁而得不到时，会导致进程忙等，所以
+ * 1. 持有锁的时间要短，加锁、解锁时间要短
+ * 2. 持有锁的期间内不能休眠，要关闭抢占
+ * 注意：忙等的进程仍然有可能被抢占
  * */
 typedef struct {
 	volatile unsigned int slock;		// 状态，slock等于1时表示未加锁，slock<=0表示已加锁
@@ -53,10 +58,9 @@ typedef struct {
 #define spin_lock_init(x)	do { *(x) = SPIN_LOCK_UNLOCKED; } while(0)
 
 /*
- * Simple spin lock operations.  There are two variants, one clears IRQ's
- * on the local processor, one does not.
+ * 简单的自旋锁操作。有两种变体，一种清除本地处理器上的 IRQ，一种不清除。
  *
- * We make no fairness assumptions. They have a cost.
+ * 我们不做任何公平假设。他们有成本。
  */
 
 #define spin_is_locked(x)	(*(volatile signed char *)(&(x)->slock) <= 0)
@@ -175,11 +179,11 @@ static inline void _raw_spin_lock_flags (spinlock_t *lock, unsigned long flags)
 }
 
 /*
- * 读写自旋锁，允许多个读者但只有一个作者。
+ * 读写自旋锁，允许多个读者但只有一个写者。
  *
  * 笔记！在中断中有读取器但没有中断写入器是很常见的。
  * 对于这些情况，我们可以“混合” irq 安全锁
- * ——任何作者都需要获得 irq 安全的写锁，
+ * ——任何写者都需要获得 irq 安全的写锁，
  * 但读者可以获得非 irq 安全的读锁。
  *
  * 读写自旋锁
@@ -207,13 +211,13 @@ typedef struct {
 // 初始化读写自旋锁，初始值为0x01000000
 #define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
-/**
+/*
  * read_can_lock - would read_trylock() succeed?
  * @lock: the rwlock in question.
  */
 #define read_can_lock(x) ((int)(x)->lock > 0)
 
-/**
+/*
  * write_can_lock - would write_trylock() succeed?
  * @lock: the rwlock in question.
  */

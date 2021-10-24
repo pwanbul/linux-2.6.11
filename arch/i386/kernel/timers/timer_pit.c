@@ -57,7 +57,7 @@ static void delay_pit(unsigned long loops)
 }
 
 
-/* This function must be called with xtime_lock held.
+/* 必须在持有 xtime_lock 的情况下调用此函数。
  * It was inspired by Steve McCanne's microtime-i386 for BSD.  -- jrs
  * 
  * However, the pc-audio speaker driver changes the divisor so that
@@ -87,6 +87,8 @@ static void delay_pit(unsigned long loops)
  * 
  * If you are really that interested, you should be reading
  * comp.protocols.time.ntp!
+ *
+ * 从上一个tick开始到现在的时间
  */
 
 static unsigned long get_offset_pit(void)
@@ -150,7 +152,7 @@ static unsigned long get_offset_pit(void)
 }
 
 
-/* tsc timer_opts struct */
+/* pit(可编程间隔定时器)对象 */
 struct timer_opts timer_pit = {
 	.name = "pit",
 	.mark_offset = mark_offset_pit, 

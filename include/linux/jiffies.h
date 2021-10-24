@@ -70,20 +70,21 @@
 /* a value TUSEC for TICK_USEC (can be set bij adjtimex)		*/
 #define TICK_USEC_TO_NSEC(TUSEC) (SH_DIV (TUSEC * USER_HZ * 1000, ACTHZ, 8))
 
-/* some arch's have a small-data section that can be accessed register-relative
- * but that can only take up to, say, 4-byte variables. jiffies being part of
- * an 8-byte variable may not be correctly accessed unless we force the issue
+/* 一些 arch 有一个小数据部分，可以相对于寄存器访问，但只能占用 4 字节的变量。
+ * 除非我们强制执行此问题，否则可能无法正确访问作为 8 字节变量一部分的 jiffies
  */
 #define __jiffy_data  __attribute__((section(".data")))
 
 /*
- * The 64-bit value is not volatile - you MUST NOT read it
- * without sampling the sequence number in xtime_lock.
- * get_jiffies_64() will do this for you as appropriate.
+ * 64 位值不是易失性的 - 您不得在不对 xtime_lock 中的序列号进行采样的情况下读取它。
+ * get_jiffies_64() 将根据需要为您执行此操作。
  */
 extern u64 __jiffy_data jiffies_64;
 extern unsigned long volatile __jiffy_data jiffies;
 
+/* 32为上long为32位，64位上long为64位
+ * 因此，在32位上对64的数据读取时不能保证原子性
+ * */
 #if (BITS_PER_LONG < 64)
 u64 get_jiffies_64(void);
 #else
@@ -119,10 +120,9 @@ static inline u64 get_jiffies_64(void)
 #define time_before_eq(a,b)	time_after_eq(b,a)
 
 /*
- * Have the 32 bit jiffies value wrap 5 minutes after boot
- * so jiffies wrap bugs show up earlier.
+ * 让 32 位 jiffies 值在启动后 5 分钟包装，以便 jiffies 包装错误更早出现。
  */
-#define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))
+#define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))		// 300 000毫秒,即5分钟
 
 /*
  * Change timeval to jiffies, trying to avoid the

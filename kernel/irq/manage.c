@@ -148,9 +148,11 @@ int can_request_irq(unsigned int irq, unsigned long irqflags)
 
 /*
  * 注册 irq action 的内部函数 - 通常用于分配作为架构一部分的特殊中断。
- */
+ * irq: irq线
+ **/
 int setup_irq(unsigned int irq, struct irqaction * new)
 {
+	// irq_desc为irq描述符数组
 	struct irq_desc *desc = irq_desc + irq;
 	struct irqaction *old, **p;
 	unsigned long flags;
@@ -279,7 +281,7 @@ void free_irq(unsigned int irq, void *dev_id)
 
 EXPORT_SYMBOL(free_irq);
 
-/**
+/*
  *  由驱动程序调用，注册一个中断处理函数
  *
  *	request_irq - allocate an interrupt line
@@ -293,16 +295,16 @@ EXPORT_SYMBOL(free_irq);
  *	您的处理程序函数可能会被调用。由于您的处理程序函数必须清除电路板
  *	引发的任何中断，您必须注意初始化您的硬件并以正确的顺序设置中断处理程序。
  *
- *	Dev_id 必须是全局唯一的。通常，设备数据结构的地址用作 cookie。
+ *	dev_id 必须是全局唯一的。通常，设备数据结构的地址用作 cookie。
  *	由于处理程序接收此值，因此使用它是有意义的。
  *
  *	如果您的中断是共享的，您必须传递一个非空的 dev_id，因为这是释放中断时所必需的。
  *
- *	Flags:
+ *	irqflags:
  *
- *	SA_SHIRQ		Interrupt is shared
- *	SA_INTERRUPT		Disable local interrupts while processing
- *	SA_SAMPLE_RANDOM	The interrupt can be used for entropy
+ *	SA_SHIRQ		中断共享，在同一个IRQ线上注册多个中断处理程序
+ *	SA_INTERRUPT		处理时禁用本地中断
+ *	SA_SAMPLE_RANDOM	中断可用于熵池
  *
  */
 int request_irq(unsigned int irq,
@@ -313,18 +315,17 @@ int request_irq(unsigned int irq,
 	int retval;
 
 	/*
-	 * Sanity-check: shared interrupts must pass in a real dev-ID,
-	 * otherwise we'll have trouble later trying to figure out
-	 * which interrupt is which (messes up the interrupt freeing
-	 * logic etc).
+	 * 完整性检查：共享中断必须传入真实的开发 ID，
+	 * 否则我们稍后会在试图找出哪个中断是哪个（弄乱中断释放逻辑等）时遇到麻烦。
 	 */
-	if ((irqflags & SA_SHIRQ) && !dev_id)
+	if ((irqflags & SA_SHIRQ) && !dev_id)	// 如果设置了SA_SHIRQ就必须指定dev_id
 		return -EINVAL;
-	if (irq >= NR_IRQS)
+	if (irq >= NR_IRQS)		// 超限
 		return -EINVAL;
 	if (!handler)
 		return -EINVAL;
 
+	// 分配内存，非阻塞
 	action = kmalloc(sizeof(struct irqaction), GFP_ATOMIC);
 	if (!action)
 		return -ENOMEM;

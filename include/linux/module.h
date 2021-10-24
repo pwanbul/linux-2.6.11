@@ -34,8 +34,8 @@
 
 struct kernel_symbol
 {
-	unsigned long value;
-	const char *name;
+	unsigned long value;		// 保存函数地址
+	const char *name;		// 指向函数名字符串的指针
 };
 
 struct modversion_info
@@ -176,8 +176,7 @@ void *__symbol_get_gpl(const char *symbol);
 
 #ifndef __GENKSYMS__
 #ifdef CONFIG_MODVERSIONS
-/* Mark the CRC weak since genksyms apparently decides not to
- * generate a checksums for some symbols */
+/* 将 CRC 标记为弱，因为 genksyms 显然决定不为某些符号生成校验和  */
 #define __CRC_SYMBOL(sym, sec)					\
 	extern void *__crc_##sym __attribute__((weak));		\
 	static const unsigned long __kcrctab_##sym		\
@@ -188,21 +187,29 @@ void *__symbol_get_gpl(const char *symbol);
 #define __CRC_SYMBOL(sym, sec)
 #endif
 
-/* For every exported symbol, place a struct in the __ksymtab section */
+/* 对于每个导出的符号，在 __ksymtab 部分放置一个结构体
+ *
+ * */
 #define __EXPORT_SYMBOL(sym, sec)				\
+	/* 生成校验和 */\
 	__CRC_SYMBOL(sym, sec)					\
+	/* 定义一个指向函数名字符串的指针，放入__ksymtab_strings中 */\
 	static const char __kstrtab_##sym[]			\
 	__attribute__((section("__ksymtab_strings")))		\
 	= MODULE_SYMBOL_PREFIX #sym;                    	\
+	/* 定义一个结构体实例，里面保存 指向函数名字符串的指针和函数地址，放入__ksymtab(符号表)中 */\
 	static const struct kernel_symbol __ksymtab_##sym	\
 	__attribute_used__					\
 	__attribute__((section("__ksymtab" sec), unused))	\
 	= { (unsigned long)&sym, __kstrtab_##sym }
 
-/*https://www.jianshu.com/p/289f10ccef2d*/
+/* https://www.jianshu.com/p/289f10ccef2d
+ * 普通导出符号
+ * */
 #define EXPORT_SYMBOL(sym)					\
 	__EXPORT_SYMBOL(sym, "")
-
+/* 需要满足GPL的导出符号
+ * */
 #define EXPORT_SYMBOL_GPL(sym)					\
 	__EXPORT_SYMBOL(sym, "_gpl")
 

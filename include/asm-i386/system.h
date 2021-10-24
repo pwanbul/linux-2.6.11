@@ -443,6 +443,7 @@ Intel和AMD都没有在IA32 CPU中实现乱续写(Out-Of-Order Store)，所以wm
 #endif
 
 #ifdef CONFIG_SMP
+// 内存屏障
 #define smp_mb()	mb()
 #define smp_rmb()	rmb()
 #define smp_wmb()	wmb()

@@ -4,7 +4,7 @@
 #include <linux/time.h>
 
 /*
- * Resource control/accounting header file for linux
+ * linux的资源控制/会计头文件
  */
 
 /*
@@ -37,9 +37,10 @@ struct	rusage {
 	long	ru_nivcsw;		/* involuntary " */
 };
 
+// resource limit
 struct rlimit {
-	unsigned long	rlim_cur;
-	unsigned long	rlim_max;
+	unsigned long	rlim_cur;		// 软限制，当前值
+	unsigned long	rlim_max;		// 硬限制，最大值
 };
 
 #define	PRIO_MIN	(-20)

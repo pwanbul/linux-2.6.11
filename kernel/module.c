@@ -117,7 +117,7 @@ static unsigned int find_sec(Elf_Ehdr *hdr,
 	return 0;
 }
 
-/* Provided by the linker */
+/* 由链接器提供 */
 extern const struct kernel_symbol __start___ksymtab[];
 extern const struct kernel_symbol __stop___ksymtab[];
 extern const struct kernel_symbol __start___ksymtab_gpl[];
@@ -131,7 +131,7 @@ extern const unsigned long __start___kcrctab_gpl[];
 #define symversion(base, idx) ((base) ? ((base) + (idx)) : NULL)
 #endif
 
-/* Find a symbol, return value, crc and module which owns it */
+/* 查找符号、返回值、crc 和拥有它的模块 */
 static unsigned long __find_symbol(const char *name,
 				   struct module **owner,
 				   const unsigned long **crc,
@@ -140,7 +140,7 @@ static unsigned long __find_symbol(const char *name,
 	struct module *mod;
 	unsigned int i;
 
-	/* Core kernel first. */ 
+	/* 先设置核心内核 */
 	*owner = NULL;
 	for (i = 0; __start___ksymtab+i < __stop___ksymtab; i++) {
 		if (strcmp(__start___ksymtab[i].name, name) == 0) {

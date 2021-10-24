@@ -39,8 +39,7 @@
 #include <asm/unistd.h>
 
 /* 
- * The timezone where the local system is located.  Used as a default by some
- * programs who obtain this value by using gettimeofday.
+ * 本地系统所在的时区。某些通过使用 gettimeofday 获取此值的程序将其用作默认值。
  */
 struct timezone sys_tz;
 
@@ -96,6 +95,10 @@ asmlinkage long sys_stime(time_t __user *tptr)
 
 #endif /* __ARCH_WANT_SYS_TIME */
 
+/* gettimeofday实现
+ * struct timeval: 分钟+微秒
+ * struct timezone: 和greenwich 时间差了多少分钟+时区
+ * */
 asmlinkage long sys_gettimeofday(struct timeval __user *tv, struct timezone __user *tz)
 {
 	if (likely(tv != NULL)) {
@@ -569,6 +572,8 @@ void getnstimeofday(struct timespec *tv)
 }
 #endif
 
+/* 在32位上，读取jiffies_64需要使用该函数以保证原子性
+ * */
 #if (BITS_PER_LONG < 64)
 u64 get_jiffies_64(void)
 {
@@ -576,9 +581,9 @@ u64 get_jiffies_64(void)
 	u64 ret;
 
 	do {
-		seq = read_seqbegin(&xtime_lock);
+		seq = read_seqbegin(&xtime_lock);		// 获取当前顺序计数器
 		ret = jiffies_64;
-	} while (read_seqretry(&xtime_lock, seq));
+	} while (read_seqretry(&xtime_lock, seq));		// 检查是否需要重新读取
 	return ret;
 }
 

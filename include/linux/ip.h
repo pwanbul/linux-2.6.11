@@ -18,6 +18,7 @@
 #define _LINUX_IP_H
 #include <asm/byteorder.h>
 
+// TOS	type of service
 #define IPTOS_TOS_MASK		0x1E
 #define IPTOS_TOS(tos)		((tos)&IPTOS_TOS_MASK)
 #define	IPTOS_LOWDELAY		0x10
@@ -37,7 +38,7 @@
 #define IPTOS_PREC_ROUTINE              0x00
 
 
-/* IP options */
+/* IP 选项 */
 #define IPOPT_COPY		0x80
 #define IPOPT_CLASS_MASK	0x60
 #define IPOPT_NUMBER_MASK	0x1f
@@ -179,21 +180,21 @@ struct iphdr {
 	__u8	ihl:4,
 		version:4;
 #elif defined (__BIG_ENDIAN_BITFIELD)
-	__u8	version:4,		// 版本
+	__u8	version:4,		// 版本号
   		ihl:4;			// 首部长度，4字节对齐
 #else
 #error	"Please fix <asm/byteorder.h>"
 #endif
-	__u8	tos;		// 服务类型
+	__u8	tos;		// 服务类型，type of service实际分为DS和ECN
 	__u16	tot_len;	// 总长度，首部+数据
 	__u16	id;			// 标识符
-	__u16	frag_off;	// 片偏移
+	__u16	frag_off;	// 片偏移，实际由 0+MF+DF+offset组成
 	__u8	ttl;		// time to live
 	__u8	protocol;	// 传输层协议号
 	__u16	check;		// 首部校验和
 	__u32	saddr;		// 源IP地址
 	__u32	daddr;		// 目的IP地址
-	/*The options start here. */
+	/*选项从这里开始. */
 };
 
 struct ip_auth_hdr {

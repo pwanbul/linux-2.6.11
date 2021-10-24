@@ -2,6 +2,10 @@
 # Building
 # ==========================================================================
 
+# 被顶层Makefile所调用，与各级子目录的Makefile合起来构成一个完整的Makefile文件，
+# 定义built-in.o、.lib以及目标文件.o的生成规则。
+# 这个Makefile文件生成了子目录的.lib、built-in.o以及目标文件.o
+
 src := $(obj)
 
 .PHONY: __build

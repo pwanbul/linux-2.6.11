@@ -292,7 +292,7 @@ __asm__(".section .text\n"
 	".previous");
 
 /*
- * Create a kernel thread
+ * 创建内核线程
  */
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {

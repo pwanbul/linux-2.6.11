@@ -1,51 +1,52 @@
 #ifndef __LINUX_SEQLOCK_H
 #define __LINUX_SEQLOCK_H
 /*
- * Reader/writer consistent mechanism without starving writers. This type of
- * lock for data where the reader wants a consitent set of information
- * and is willing to retry if the information changes.  Readers never
- * block but they may have to retry if a writer is in
- * progress. Writers do not wait for readers. 
+ * 读者一致的机制，而不会让写者挨饿。
+ * 这种类型的数据锁，读者需要一组一致的信息，并愿意在信息发生变化时重试。
+ * 读者永远不会阻塞，但如果写者正在进行中，他们可能不得不重试。写者不会等待读者。
  *
- * This is not as cache friendly as brlock. Also, this will not work
- * for data that contains pointers, because any writer could
- * invalidate a pointer that a reader was following.
+ * 这不像 brlock 那样缓存友好。此外，这不适用于包含指针的数据，
+ * 因为任何写入器都可能使读取器跟随的指针无效。
  *
- * Expected reader usage:
+ * 预期的读者使用:
  * 	do {
  *	    seq = read_seqbegin(&foo);
  * 	...
  *      } while (read_seqretry(&foo, seq));
  *
  *
- * On non-SMP the spin locks disappear but the writer still needs
- * to increment the sequence variables because an interrupt routine could
- * change the state of the data.
+ * 在非SMP上，自旋锁消失了，但写者仍然需要增加序列变量，
+ * 因为中断例程可能会改变数据的状态。
  *
  * Based on x86_64 vsyscall gettimeofday 
  * by Keith Owens and Andrea Arcangeli
+ *
+ * https://blog.csdn.net/weixin_38233274/article/details/79276359
  */
 
 #include <linux/config.h>
 #include <linux/spinlock.h>
 #include <linux/preempt.h>
 
+/* 顺序锁定义
+ * 读者不能持有被保护数据的指针，如果写者释放了读者
+ * 引用的内存，读者retry的时候，就会有bug
+ * */
 typedef struct {
-	unsigned sequence;
-	spinlock_t lock;
+	unsigned sequence;		// 顺序计数器，初始值为0，写者增加该值
+	spinlock_t lock;		// 写写时互斥
 } seqlock_t;
 
 /*
- * These macros triggered gcc-3.x compile-time problems.  We think these are
- * OK now.  Be cautious.
+ * 这些宏触发了 gcc-3.x 编译时问题。我们认为这些现在都可以。要小心。
  */
 #define SEQLOCK_UNLOCKED { 0, SPIN_LOCK_UNLOCKED }
 #define seqlock_init(x)	do { *(x) = (seqlock_t) SEQLOCK_UNLOCKED; } while (0)
 
 
-/* Lock out other writers and update the count.
- * Acts like a normal spin_lock/unlock.
- * Don't need preempt_disable() because that is in the spin_lock already.
+/* 锁定其他写者并更新计数。
+ * 就像普通的 spin_lock/unlock 一样。
+ * 不需要 preempt_disable() 因为它已经在 spin_lock 中了。
  */
 static inline void write_seqlock(seqlock_t *sl)
 {
@@ -72,7 +73,7 @@ static inline int write_tryseqlock(seqlock_t *sl)
 	return ret;
 }
 
-/* Start of read calculation -- fetch last complete writer token */
+/* 开始读取计算——获取最后一个完整的写入者令牌 */
 static inline unsigned read_seqbegin(const seqlock_t *sl)
 {
 	unsigned ret = sl->sequence;
@@ -80,18 +81,19 @@ static inline unsigned read_seqbegin(const seqlock_t *sl)
 	return ret;
 }
 
-/* Test if reader processed invalid data.
- * If initial values is odd, 
- *	then writer had already started when section was entered
- * If sequence value changed
- *	then writer changed data while in section
+/* 测试读者是否处理了无效数据。
+ * 如果初始值为奇数，则在读取节时写入器已经启动
+ * 如果序列值改变了，那么写者在节中改变了数据
  *    
- * Using xor saves one conditional branch.
+ * 使用 xor 可以节省一个条件分支。
+ *
+ * 写者在操作时，顺序计数器为奇数，
+ * 如果读完的时候，还有写者在写，或者写者写完，那么必须重新读取
  */
 static inline int read_seqretry(const seqlock_t *sl, unsigned iv)
 {
 	smp_rmb();
-	return (iv & 1) | (sl->sequence ^ iv);
+	return (iv & 1) | (sl->sequence ^ iv);		// 对于偶数，第0位必定为0，对于奇数第0位必定为1
 }
 
 

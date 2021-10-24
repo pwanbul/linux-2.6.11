@@ -559,12 +559,9 @@ unsigned long tick_usec = TICK_USEC; 		/* USER_HZ period (usec) */
 unsigned long tick_nsec = TICK_NSEC;		/* ACTHZ period (nsec) */
 
 /* 
- * The current time 
- * wall_to_monotonic is what we need to add to xtime (or xtime corrected 
- * for sub jiffie times) to get to monotonic time.  Monotonic is pegged
- * at zero at system boot time, so wall_to_monotonic will be negative,
- * however, we will ALWAYS keep the tv_nsec part positive so we can use
- * the usual normalization.
+ * 当前时间 wall_to_monotonic 是我们需要添加到 xtime（或 xtime 校正子 jiffie 时间）
+ * 以获得单调时间的时间。 Monotonic 在系统启动时固定为零，因此 wall_to_monotonic
+ * 将为负数，但是，我们将始终保持 tv_nsec 部分为正数，以便我们可以使用通常的归一化。
  */
 struct timespec xtime __attribute__ ((aligned (16)));
 struct timespec wall_to_monotonic __attribute__ ((aligned (16)));
@@ -737,7 +734,7 @@ static void second_overflow(void)
 #endif
 }
 
-/* in the NTP reference this is called "hardclock()" */
+/* 在 NTP 参考中，这称为“hardclock()” */
 static void update_wall_time_one_tick(void)
 {
 	long time_adjust_step, delta_nsec;
@@ -787,11 +784,9 @@ static void update_wall_time_one_tick(void)
 }
 
 /*
- * Using a loop looks inefficient, but "ticks" is
- * usually just one (we shouldn't be losing ticks,
- * we're doing this this way mainly for interrupt
- * latency reasons, not because we think we'll
- * have lots of lost timer ticks
+ * 使用循环看起来效率低下，但“滴答”通常只是一个（我们不应该丢失滴答，
+ * 我们这样做主要是出于中断延迟的原因，而不是因为我们认为我们会丢失
+ * 很多计时器滴答
  */
 static void update_wall_time(unsigned long ticks)
 {
@@ -835,23 +830,21 @@ static unsigned long count_active_tasks(void)
 }
 
 /*
- * Hmm.. Changed this, as the GNU make sources (load.c) seems to
- * imply that avenrun[] is the standard name for this kind of thing.
- * Nothing else seems to be standardized: the fractional size etc
- * all seem to differ on different machines.
+ * 嗯.. 改变了这一点，因为 GNU make 源 (load.c) 似乎暗示 avenrun[] 是这种事情的标准名称。
+ * 似乎没有其他东西是标准化的：小数大小等在不同的机器上似乎都不同。
  *
- * Requires xtime_lock to access.
+ * 需要 xtime_lock 才能访问。
  */
-unsigned long avenrun[3];
+unsigned long avenrun[3];		// 负载均衡，高21位保存整数，低11位保存小
 
 /*
- * calc_load - given tick count, update the avenrun load estimates.
- * This is called while holding a write_lock on xtime_lock.
+ * calc_load - 给定滴答计数，更新 avenrun 负载估计。
+ * 这是在 xtime_lock 上持有 write_lock 时调用的。
  */
 static inline void calc_load(unsigned long ticks)
 {
 	unsigned long active_tasks; /* fixed-point */
-	static int count = LOAD_FREQ;
+	static int count = LOAD_FREQ;		// 采样频率，每5秒
 
 	count -= ticks;
 	if (count < 0) {
@@ -863,12 +856,11 @@ static inline void calc_load(unsigned long ticks)
 	}
 }
 
-/* jiffies at the most recent update of wall time */
+/* jiffies 在最近更新的墙上时间，防止irq0中断丢失 */
 unsigned long wall_jiffies = INITIAL_JIFFIES;
 
 /*
- * This read-write spinlock protects us from races in SMP while
- * playing with xtime and avenrun.
+ * 这个读写自旋锁保护我们在玩 xtime 和 avenrun 时免受 SMP 中的竞争。
  */
 #ifndef ARCH_HAVE_XTIME_LOCK
 seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
@@ -896,31 +888,29 @@ void run_local_timers(void)
 }
 
 /*
- * Called by the timer interrupt. xtime_lock must already be taken
- * by the timer IRQ!
+ * 由定时器中断调用。 xtime_lock 必须已经被定时器 IRQ 占用！
  */
 static inline void update_times(void)
 {
 	unsigned long ticks;
 
 	ticks = jiffies - wall_jiffies;
-	if (ticks) {
+	if (ticks) {		// 正常ticks为1，因为irq0是可屏蔽的中断，所以中断可能会丢失
 		wall_jiffies += ticks;
 		update_wall_time(ticks);
 	}
-	calc_load(ticks);
+	calc_load(ticks);		// 计算负载
 }
   
 /*
- * The 64-bit jiffies value is not atomic - you MUST NOT read it
- * without sampling the sequence number in xtime_lock.
- * jiffies is defined in the linker script...
+ * 64 位 jiffies 值不是原子的 - 您不得在不对 xtime_lock 中的序列号进行采样的情况下读取它。
+ * jiffies 在链接描述文件中定义...
  */
 
 void do_timer(struct pt_regs *regs)
 {
-	jiffies_64++;
-	update_times();
+	jiffies_64++;		// 更新
+	update_times();		// 更新系统时间，计算系统负载
 }
 
 #ifdef __ARCH_WANT_SYS_ALARM

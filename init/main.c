@@ -162,8 +162,8 @@ static int __init obsolete_checksetup(char *line)
 	struct obs_kernel_param *p;
 
 	p = __setup_start;
-	do {
-		int n = strlen(p->str);
+	do {		// 变量.init.setup区域
+		int n = strlen(p->str);		// p->str的取值，例如“clock=”
 		if (!strncmp(line, p->str, n)) {
 			if (p->early) {
 				/* Already done in parse_early_param?  (Needs
@@ -361,12 +361,10 @@ static void __init smp_init(void)
 #endif
 
 /*
- * We need to finalize in a non-__init function or else race conditions
- * between the root thread and the init thread may cause start_kernel to
- * be reaped by free_initmem before the root thread has proceeded to
- * cpu_idle.
+ * 我们需要在非 __init 函数中完成，否则根线程和 init 线程之间的
+ * 竞争条件可能会导致 start_kernel 在根线程进入 cpu_idle 之前被 free_initmem 获取。
  *
- * gcc-3.4 accidentally inlines this function, so use noinline.
+ * gcc-3.4 不小心内联了这个函数，所以使用 noinline。
  */
 
 static void noinline rest_init(void)
@@ -411,7 +409,7 @@ void __init parse_early_param(void)
 }
 
 /*
- *	Activate the first processor.
+ *	激活第一个处理器。
  */
 
 asmlinkage void __init start_kernel(void)
@@ -462,7 +460,7 @@ asmlinkage void __init start_kernel(void)
 	pidhash_init();		// pid hash表初始化
 	init_timers();
 	softirq_init();		// tasklet初始化
-	time_init();
+	time_init();		// 时间度量初始化
 
 	/*
 	 * HACK ALERT! This is early. We're enabling the console before
@@ -486,7 +484,7 @@ asmlinkage void __init start_kernel(void)
 	mem_init();     // mem_init是另一个特定于体系结构的函数，用于停用bootmem分配器并迁移到实际的内存管理函数；
 	kmem_cache_init();      // 通用slab初始化
 	numa_policy_init();
-	if (late_time_init)
+	if (late_time_init)		// hpet使用内存映射IO，需要在mem_init后期执行
 		late_time_init();
 	calibrate_delay();
 	pidmap_init();      // 初始化pid bitmap
@@ -514,8 +512,8 @@ asmlinkage void __init start_kernel(void)
 
 	acpi_early_init(); /* before LAPIC and SMP init */
 
-	/* Do the rest non-__init'ed, we're now alive */
-	rest_init();
+	/* 做剩下的非 __init'ed，我们现在还活着 */
+	rest_init();		// 创建第一个内核线程
 }
 
 static int __initdata initcall_debug;
@@ -529,6 +527,7 @@ __setup("initcall_debug", initcall_debug_setup);
 
 struct task_struct *child_reaper = &init_task;
 
+// initcall特殊符号
 extern initcall_t __initcall_start[], __initcall_end[];
 
 static void __init do_initcalls(void)
@@ -567,11 +566,10 @@ static void __init do_initcalls(void)
 }
 
 /*
- * Ok, the machine is now initialized. None of the devices
- * have been touched yet, but the CPU subsystem is up and
- * running, and memory and process management works.
+ * 好的，现在机器已经初始化了。尚未触及任何设备，
+ * 但 CPU 子系统已启动并运行，内存和进程管理工作正常。
  *
- * Now we can finally start doing some real work..
+ * 现在我们终于可以开始做一些真正的工作了..
  */
 static void __init do_basic_setup(void)
 {
@@ -582,7 +580,7 @@ static void __init do_basic_setup(void)
 	driver_init();
 
 #ifdef CONFIG_SYSCTL
-	sysctl_init();
+	sysctl_init();			// 初始化内核参数sysctl
 #endif
 
 	/* Networking initialization needs a process context */ 
@@ -630,12 +628,9 @@ static int init(void * unused)
 {
 	lock_kernel();
 	/*
-	 * Tell the world that we're going to be the grim
-	 * reaper of innocent orphaned children.
+	 * 告诉全世界，我们将成为无辜孤儿的死神。
 	 *
-	 * We don't want people to have to make incorrect
-	 * assumptions about where in the task array this
-	 * can be found.
+	 * 我们不希望人们对任务数组中的位置做出错误的假设.
 	 */
 	child_reaper = current;
 
@@ -649,8 +644,7 @@ static int init(void * unused)
 	sched_init_smp();
 
 	/*
-	 * Do this before initcalls, because some drivers want to access
-	 * firmware files.
+	 * 在 initcalls 之前执行此操作，因为某些驱动程序想要访问固件文件。
 	 */
 	populate_rootfs();
 

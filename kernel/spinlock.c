@@ -148,7 +148,7 @@ void __lockfunc _write_lock_bh(rwlock_t *lock)
 }
 EXPORT_SYMBOL(_write_lock_bh);
 
-// spin_lock实现
+// MP中，spin_lock实现
 void __lockfunc _spin_lock(spinlock_t *lock)
 {
 	preempt_disable();		// 关闭抢占

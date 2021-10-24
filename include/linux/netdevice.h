@@ -253,12 +253,14 @@ struct netdev_boot_setup {
 
 /*
  *	The DEVICE structure.
- *	Actually, this whole structure is a big mistake.  It mixes I/O
- *	data with strictly "high-level" data, and it has to know about
- *	almost every data structure used in the INET module.
+ *	实际上，这整个结构是一个很大的错误。
+ *	它将IO数据与严格的“高级”数据混合在一起，它必须了解INET模块中使用的几乎所有数据结构。
  *
  *	FIXME: cleanup struct net_device such that network protocol info
  *	moves out.
+ *
+ *	网络设备定义
+ *	register_netdev函数将其注册到内核
  */
 
 struct net_device

@@ -37,16 +37,17 @@ struct exec_domain;
 
 /*
  * cloning flags:
+ * 注意，没有CLONE_SIGNAL
  */
 #define CSIGNAL		0x000000ff	/* signal mask to be sent at exit */
-#define CLONE_VM	0x00000100	/* set if VM shared between processes */
-#define CLONE_FS	0x00000200	/* set if fs info shared between processes */
-#define CLONE_FILES	0x00000400	/* set if open files shared between processes */
-#define CLONE_SIGHAND	0x00000800	/* set if signal handlers and blocked signals shared */
+#define CLONE_VM	0x00000100	/* 设置 VM 是否在进程之间共享 */
+#define CLONE_FS	0x00000200	/* 设置是否在进程之间共享 fs 信息 */
+#define CLONE_FILES	0x00000400	/* 设置是否打开进程间共享的文件 */
+#define CLONE_SIGHAND	0x00000800	/* 设置信号处理程序和阻塞信号是否共享 */
 #define CLONE_PTRACE	0x00002000	/* set if we want to let tracing continue on the child too */
-#define CLONE_VFORK	0x00004000	/* set if the parent wants the child to wake it up on mm_release */
+#define CLONE_VFORK	0x00004000	/* 设置是否父母希望孩子在 mm_release 上唤醒它 */
 #define CLONE_PARENT	0x00008000	/* set if we want to have the same parent as the cloner */
-#define CLONE_THREAD	0x00010000	/* Same thread group? */
+#define CLONE_THREAD	0x00010000	/* 同一个线程组？ */
 #define CLONE_NEWNS	0x00020000	/* New namespace group? */
 #define CLONE_SYSVSEM	0x00040000	/* share system V SEM_UNDO semantics */
 #define CLONE_SETTLS	0x00080000	/* create a new TLS for the child */
@@ -64,24 +65,30 @@ struct exec_domain;
 #define CLONE_KERNEL	(CLONE_FS | CLONE_FILES | CLONE_SIGHAND)
 
 /*
- * These are the constant used to fake the fixed-point load-average
- * counting. Some notes:
- *  - 11 bit fractions expand to 22 bits by the multiplies: this gives
- *    a load-average precision of 10 bits integer + 11 bits fractional
- *  - if you want to count load-averages more often, you need more
- *    precision, or rounding will get you. With 2-second counting freq,
- *    the EXP_n values would be 1981, 2034 and 2043 if still using only
- *    11 bit fractions.
+ * 这些是用于伪造定点负载平均计数的常量。一些注意事项：
+ *  - 11 位分数通过乘法扩展为 22 位： this gives
+ *    10 位整数 + 11 位小数的负载平均精度
+ *  - 如果您想更频繁地计算负载平均值，则需要更高的精度，否则四舍五入会让您满意。
+ *  使用 2 秒计数频率，如果仍仅使用 11 位小数，则 EXP_n 值将是 1981、2034 和 2043。
+ *
+ *  https://zhuanlan.zhihu.com/p/69219472
  */
-extern unsigned long avenrun[];		/* Load averages */
+extern unsigned long avenrun[];		/* 平均负载 */
 
-#define FSHIFT		11		/* nr of bits of precision */
+#define FSHIFT		11		/* nr位精度 */
 #define FIXED_1		(1<<FSHIFT)	/* 1.0 as fixed-point */
-#define LOAD_FREQ	(5*HZ)		/* 5 sec intervals */
+#define LOAD_FREQ	(5*HZ)		/* 5 秒间隔，每5秒更新一次 */
 #define EXP_1		1884		/* 1/exp(5sec/1min) as fixed-point */
 #define EXP_5		2014		/* 1/exp(5sec/5min) */
 #define EXP_15		2037		/* 1/exp(5sec/15min) */
 
+/* 展开：load(x+1) = ( (load(x) * exp) + n*(2^11-exp) ) / 2^11
+ * 				  = n * (1-exp/2^11) + load(n) * (exp/2^11)
+ * 当EXP_1时，exp/2^11 => 1884/2048 => 0.919921875 近似 e^(-5/60)
+ * 当EXP_5时，exp/2^11 => 2014/2048 => 0.9833984375 近似 e^(-5/300)
+ * 当EXP_15时，exp/2^11 => 2037/2048 => 0.99462890625 近似 e^(-5/900)
+ * 服从参数为1的指数分布
+ * */
 #define CALC_LOAD(load,exp,n) \
 	load *= exp; \
 	load += n*(FIXED_1-exp); \
@@ -265,32 +272,36 @@ struct mm_struct {
 	unsigned long hiwater_vm;	/* High-water virtual memory usage */
 };
 
+/*
+ * 信号处理函数
+ * */
 struct sighand_struct {
-	atomic_t		count;
-	struct k_sigaction	action[_NSIG];
-	spinlock_t		siglock;
+	atomic_t		count;		// 引用计数器
+	struct k_sigaction	action[_NSIG];		// 最多64个信号
+	spinlock_t		siglock;		// 保护锁
 };
 
 /*
- * NOTE! "signal_struct" does not have it's own
- * locking, because a shared signal_struct always
- * implies a shared sighand_struct, so locking
- * sighand_struct is always a proper superset of
- * the locking of signal_struct.
+ * 注意！ “signal_struct”没有自己的锁，
+ * 因为一个共享的signal_struct 总是隐含着一个共享的sighand_struct，
+ * 所以锁sighand_struct 始终是signal_struct 锁的一个合适的超集。
+ *
+ * signal_struct会被线程组共享，见CLONE_SIGNAL
+ * 除了和信号相关的处理外，还有线程组，会话，resource limit等
  */
 struct signal_struct {
-	atomic_t		count;
-	atomic_t		live;
+	atomic_t		count;		// 引用计数
+	atomic_t		live;		// 活动线程的数量
 
 	wait_queue_head_t	wait_chldexit;	/* for wait4() */
 
-	/* current thread group signal load-balancing target: */
+	/* 当前线程组信号负载平衡目标： */
 	task_t			*curr_target;
 
-	/* shared signal handling: */
+	/* 共享未决信号处理： */
 	struct sigpending	shared_pending;
 
-	/* thread group exit support */
+	/* 线程组退出支持*/
 	int			group_exit_code;
 	/* overloaded:
 	 * - notify group_exit_task when ->count is equal to notify_count
@@ -307,7 +318,7 @@ struct signal_struct {
 	/* POSIX.1b Interval Timers */
 	struct list_head posix_timers;
 
-	/* job control IDs */
+	/* 作业控制 ID */
 	pid_t pgrp;     // 进程组ID
 	pid_t tty_old_pgrp;
 	pid_t session;      // 会话ID
@@ -327,13 +338,11 @@ struct signal_struct {
 	unsigned long min_flt, maj_flt, cmin_flt, cmaj_flt;
 
 	/*
-	 * We don't bother to synchronize most readers of this at all,
-	 * because there is no reader checking a limit that actually needs
-	 * to get both rlim_cur and rlim_max atomically, and either one
-	 * alone is a single word that can safely be read normally.
-	 * getrlimit/setrlimit use task_lock(current->group_leader) to
-	 * protect this instead of the siglock, because they really
-	 * have no need to disable irqs.
+	 * 我们根本不费心去同步大多数读者，
+	 * 因为没有读者检查实际上需要原子地同时获取 rlim_cur 和 rlim_max 的限制，
+	 * 并且其中任何一个都是可以安全正常读取的单个单词。
+	 * getrlimit/setrlimit 使用 task_lock(current->group_leader)
+	 * 来保护它而不是 siglock，因为他们真的不需要禁用 irqs。
 	 */
 	struct rlimit rlim[RLIM_NLIMITS];       // resource limit
 };
@@ -650,11 +659,11 @@ struct task_struct {
 /* namespace 命名空间相关*/
 	struct namespace *namespace;
 /* signal handlers 信号处理相关*/
-	struct signal_struct *signal;
-	struct sighand_struct *sighand;     // 信号行为相关
-
-	sigset_t blocked, real_blocked;     // 阻塞信号集
-	struct sigpending pending;      // 未决信号
+	struct signal_struct *signal;		// 共享的未决信号相关，见CLONE_THREAD
+	struct sighand_struct *sighand;		// 共享的信号处理函数相关，见CLONE_SIGHAND
+/* 最多64个信号，从1开始算起，1-31为非实时信号，32-64位实时信号 */
+	sigset_t blocked, real_blocked;		// 阻塞信号集
+	struct sigpending pending;		// 私有的未决信号
 
 	unsigned long sas_ss_sp;
 	size_t sas_ss_size;

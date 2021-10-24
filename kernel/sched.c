@@ -1197,11 +1197,11 @@ void fastcall sched_fork(task_t *p)
 }
 
 /*
- * wake_up_new_task - wake up a newly created task for the first time.
+ * wake_up_new_task -首次唤醒新创建的任务。
  *
- * This function will do some initial scheduler statistics housekeeping
- * that must be done for every newly created context, then puts the task
- * on the runqueue and wakes it.
+ * 这个函数将做一些初始调度器统计内务处理，
+ * 必须为每个新创建的上下文完成，
+ * 然后将任务放在运行队列上并唤醒它。
  */
 void fastcall wake_up_new_task(task_t * p, unsigned long clone_flags)
 {

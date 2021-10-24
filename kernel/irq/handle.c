@@ -15,18 +15,13 @@
 #include "internals.h"
 
 /*
- * Linux has a controller-independent interrupt architecture.
- * Every controller has a 'controller-template', that is used
- * by the main code to do the right thing. Each driver-visible
- * interrupt source is transparently wired to the apropriate
- * controller. Thus drivers need not be aware of the
- * interrupt-controller.
+ * Linux具有独立于控制器的中断架构。每个控制器都有一个“控制器模板”，
+ * 主代码使用它来做正确的事情。 每个驱动程序可见的中断源都透明地
+ * 连接到适当的控制器。因此驱动程序不需要知道中断控制器。
  *
- * The code is designed to be easily extended with new/different
- * interrupt controllers, without having to do assembly magic or
- * having to touch the generic code.
+ * 该代码旨在使用新的不同中断控制器轻松扩展，而无需进行汇编魔术或接触通用代码。
  *
- * Controller mappings for all interrupt sources:
+ * 所有中断源的控制器映射：
  */
 irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
 	[0 ... NR_IRQS-1] = {

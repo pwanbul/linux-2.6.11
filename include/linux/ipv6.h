@@ -96,12 +96,12 @@ struct ipv6_comp_hdr {
 };
 
 /*
- *	IPv6 fixed header
+ *	IPv6 固定头部
  *
- *	BEWARE, it is incorrect. The first 4 bits of flow_lbl
- *	are glued to priority now, forming "class".
+ *	当心，这是不正确的。 flow_lbl的前4位现在粘在优先级上，形成“类”。
+ *
+ *	ipv6首部
  */
-// ipv6首部
 struct ipv6hdr {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
 	__u8			priority:4,

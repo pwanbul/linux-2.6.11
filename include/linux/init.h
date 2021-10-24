@@ -148,7 +148,7 @@ struct obs_kernel_param {
 void __init parse_early_param(void);
 #endif /* __ASSEMBLY__ */
 
-/**
+/*
  * module_init() - driver initialization entry point
  * @x: function to be run at kernel boot time or module insertion
  * 

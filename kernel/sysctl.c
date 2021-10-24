@@ -168,7 +168,9 @@ static void register_proc_table(ctl_table *, struct proc_dir_entry *);
 static void unregister_proc_table(ctl_table *, struct proc_dir_entry *);
 #endif
 
-/* The default sysctl tables: */
+/* 默认的 sysctl 表：
+ * 内核参数
+ * */
 
 static ctl_table root_table[] = {
 	{

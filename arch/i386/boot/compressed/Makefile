@@ -1,7 +1,7 @@
 #
 # linux/arch/i386/boot/compressed/Makefile
 #
-# create a compressed vmlinux image from the original vmlinux
+# 从原始 vmlinux 创建一个压缩的 vmlinux 映像
 #
 
 targets		:= vmlinux vmlinux.bin vmlinux.bin.gz head.o misc.o piggy.o

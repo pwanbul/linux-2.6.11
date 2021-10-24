@@ -1,5 +1,11 @@
-# 顶层Makefile
+# makefile 教程 http://c.biancheng.net/view/7097.html
 
+# 顶层Makefile
+# 它主要用于指定编译Linux Kernel 目标文件（vmlinux ）和模块（module ）路径。
+# 它根据.config文件决定了内核根目录下那些文件、子目录被编译进内核。
+# 对于内核或驱动开发人员来说，这个文件几乎不用任何修改。
+
+# 版本号
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 11
@@ -7,45 +13,37 @@ EXTRAVERSION =
 NAME=Woozy Numbat
 
 # *DOCUMENTATION*
-# To see a list of typical targets execute "make help"
-# More info can be located in ./README
-# Comments in this file are targeted only to the developer, do not
-# expect to learn how to build the kernel reading this file.
+# 要查看典型目标列表，请执行“make help”
+# 更多信息可以在 .README 中找到
+# 此文件中的注释仅针对开发人员，不要指望通过阅读此文件来学习如何构建内核。
 
-# Do not print "Entering directory ..."
-MAKEFLAGS += --no-print-directory
+# 不打印"Entering directory ..."
+MAKEFLAGS += --no-print-directory		#  追加赋值 ( += ) 原变量用空格隔开的方式追加一个新值
 
-# We are using a recursive build, so we need to do a little thinking
-# to get the ordering right.
+# 我们正在使用递归构建，因此我们需要做一些思考才能正确排序。
 #
-# Most importantly: sub-Makefiles should only ever modify files in
-# their own directory. If in some directory we have a dependency on
-# a file in another dir (which doesn't happen often, but it's of
-# unavoidable when linking the built-in.o targets which finally
-# turn into vmlinux), we will call a sub make in that other dir, and
-# after that we are sure that everything which is in that other dir
-# is now up to date.
+# 最重要的是：子 Makefile 应该只修改它们自己目录中的文件。
+# 如果在某个目录中我们依赖另一个目录中的文件（这种情况不经常发生，
+# 但在链接最终变成 vmlinux 的内置.o 目标时不可避免），
+# 我们将在该目录中调用 sub make其他目录，然后我们确定该
+# 其他目录中的所有内容现在都是最新的。
 #
-# The only cases where we need to modify files which have global
-# effects are thus separated out and done before the recursive
-# descending is started. They are now explicitly listed as the
-# prepare rule.
+# 我们需要修改具有全局影响的文件的唯一情况因此被分离出来并在递归降序开始之前完成。
+# 它们现在被明确列为准备规则。
 
-# To put more focus on warnings, be less verbose as default
-# Use 'make V=1' to see the full commands
-
+# 为了更多地关注警告，默认情况下不那么冗长使用“make V=1”查看完整命令
+# V 的全拼为 verbose，表示详细的，即打印更多的信息，在编译时不指定V时，默认 V=0 ，表示不输出编译。
 ifdef V
-  ifeq ("$(origin V)", "command line")
+  ifeq ("$(origin V)", "command line")		# $(origin )函数的作用是告诉你变量是哪里来的，其出生状况如何，他并不改变变量
     KBUILD_VERBOSE = $(V)
   endif
 endif
 ifndef KBUILD_VERBOSE
-  KBUILD_VERBOSE = 0
+  KBUILD_VERBOSE = 0		# 打印冗余信息级别
 endif
 
-# Call sparse as part of compilation of C files
-# Use 'make C=1' to enable sparse checking
-
+# 调用sparse作为 C 文件编译的一部分
+# 使用 'make C=1' 启用sparse检查
 ifdef C
   ifeq ("$(origin C)", "command line")
     KBUILD_CHECKSRC = $(C)
@@ -55,67 +53,81 @@ ifndef KBUILD_CHECKSRC
   KBUILD_CHECKSRC = 0
 endif
 
-# Use make M=dir to specify directory of external module to build
-# Old syntax make ... SUBDIRS=$PWD is still supported
-# Setting the environment variable KBUILD_EXTMOD take precedence
+# 使用 make M=dir 指定要构建的外部模块的目录
+# 旧语法 make ... SUBDIRS=PWD 仍受支持
+# 设置环境变量 KBUILD_EXTMOD 优先
 ifdef SUBDIRS
-  KBUILD_EXTMOD ?= $(SUBDIRS)
+  KBUILD_EXTMOD ?= $(SUBDIRS)		#  条件赋值 ( ?= ) 如果变量未定义，则使用符号中的值定义变量，如果该变量已经赋值，则该赋值语句无效
 endif
 ifdef M
   ifeq ("$(origin M)", "command line")
-    KBUILD_EXTMOD := $(M)
+    KBUILD_EXTMOD := $(M)		# 简单赋值 ( := ) 编程语言中常规理解的赋值方式，只对当前语句的变量有效
   endif
 endif
 
 
-# kbuild supports saving output files in a separate directory.
-# To locate output files in a separate directory two syntax'es are supported.
-# In both cases the working directory must be the root of the kernel src.
+# kbuild 支持将输出文件保存在单独的目录中。
+# 要在单独的目录中定位输出文件，支持两种语法。
+# 在这两种情况下，工作目录都必须是内核 src 的根目录。
 # 1) O=
 # Use "make O=dir/to/store/output/files/"
 # 
 # 2) Set KBUILD_OUTPUT
-# Set the environment variable KBUILD_OUTPUT to point to the directory
-# where the output files shall be placed.
+# 将环境变量 KBUILD_OUTPUT 设置为指向应放置输出文件的目录。
 # export KBUILD_OUTPUT=dir/to/store/output/files/
 # make
 #
-# The O= assigment takes precedence over the KBUILD_OUTPUT environment variable.
+# O= 赋值优先于 KBUILD_OUTPUT 环境变量。
 
 
-# KBUILD_SRC is set on invocation of make in OBJ directory
-# KBUILD_SRC is not intended to be used by the regular user (for now)
+# KBUILD_SRC 在 OBJ 目录中调用 make 时设置
+# KBUILD_SRC 不适合普通用户使用（目前）
 ifeq ($(KBUILD_SRC),)
 
-# OK, Make called in directory where kernel src resides
-# Do we want to locate output files in a separate directory?
+# OK，在内核 src 所在的目录中调用 Make
+# 我们要在单独的目录中定位输出文件吗？
 ifdef O
   ifeq ("$(origin O)", "command line")
     KBUILD_OUTPUT := $(O)
   endif
 endif
 
-# That's our default target when none is given on the command line
-.PHONY: _all
+# 当命令行上没有给出任何内容时，这是我们的默认目标
+.PHONY: _all		# 将一个目标(_all)声明称伪目标的方法是将它作为特殊的目标.PHONY的依赖
 _all:
 
 ifneq ($(KBUILD_OUTPUT),)
-# Invoke a second make in the output directory, passing relevant variables
-# check that the output directory actually exists
+# 在输出目录中调用第二个 make，传递相关变量
+# 检查输出目录是否确实存在
 saved-output := $(KBUILD_OUTPUT)
 KBUILD_OUTPUT := $(shell cd $(KBUILD_OUTPUT) && /bin/pwd)
+# $(if CONDITION,THEN-PART[,ELSE-PART])
 $(if $(KBUILD_OUTPUT),, \
      $(error output directory "$(saved-output)" does not exist))
 
+# make 在执行时会设置一个特殊变量 "MAKECMDGOALS" ，
+# 该变量记录了命令行参数指定的终极目标列表，
+# 没有通过参数指定终极目标时此变量为空。
+# 该变量仅限于用在特殊场合(比如判断)，
+# 在 Makefile 中最好不要对它进行重新定义。
 .PHONY: $(MAKECMDGOALS)
 
+# $(filter-out PATTERN...,TEXT)
+# 函数名称：反过滤函数—filter-out。
+# 函数功能：和“filter”函数实现的功能相反。过滤掉字串“TEXT”中所有符合模式
+# “PATTERN”的单词，保留所有不符合此模式的单词。可以有多个模式。
+# 存在多个模式时，模式表达式之间使用空格分割。。
+# 返回值：空格分割的“TEXT”字串中所有不符合模式“PATTERN”的字串。
+# 函数说明： “filter-out”函数也可以用来去除一个变量中的某些字符串，
+# （实现和“filter”函数相反）
 $(filter-out _all,$(MAKECMDGOALS)) _all:
+	# @表示规则的目标文件名
 	$(if $(KBUILD_VERBOSE:1=),@)$(MAKE) -C $(KBUILD_OUTPUT)		\
 	KBUILD_SRC=$(CURDIR)	     KBUILD_VERBOSE=$(KBUILD_VERBOSE)	\
 	KBUILD_CHECK=$(KBUILD_CHECK) KBUILD_EXTMOD="$(KBUILD_EXTMOD)"	\
         -f $(CURDIR)/Makefile $@
 
-# Leave processing to above invocation of make
+# 将处理留给上述 make 调用
 skip-makefile := 1
 endif # ifneq ($(KBUILD_OUTPUT),)
 endif # ifeq ($(KBUILD_SRC),)
@@ -457,8 +469,7 @@ config: scripts_basic outputmakefile FORCE
 
 else
 # ===========================================================================
-# Build targets only - this includes vmlinux, arch specific targets, clean
-# targets and others. In general all targets except *config targets.
+# 仅构建目标 - 这包括 vmlinux、arch 特定目标、clean目标等。 一般来说，除了配置目标之外的所有目标。
 
 ifeq ($(KBUILD_EXTMOD),)
 # Additional helpers built in scripts/
@@ -470,7 +481,7 @@ scripts: scripts_basic include/config/MARKER
 
 scripts_basic: include/linux/autoconf.h
 
-# Objects we will link into vmlinux / subdirs we need to visit
+# 我们将链接到我们需要访问的 vmlinux 子目录的对象
 init-y		:= init/
 drivers-y	:= drivers/ sound/
 net-y		:= net/
@@ -721,8 +732,9 @@ $(KALLSYMS): scripts ;
 
 endif # ifdef CONFIG_KALLSYMS
 
-# vmlinux image - including updated kernel symbols
+# vmlinux image - 包括更新的内核符号
 # vmlinux由vmlinux-lds、vmlinux-init和vmlinux-main两个变量中的对象、外加kallsym.o链接而成
+# FORCE就是不管目标是否存在，和依赖是否更新，都重新生成目标，以及依赖中隐含的目标
 vmlinux: $(vmlinux-lds) $(vmlinux-init) $(vmlinux-main) $(kallsyms.o) FORCE
 	$(call if_changed_rule,vmlinux__)
 

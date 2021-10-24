@@ -931,8 +931,7 @@ success:
 }
 
 /*
- * This is the "read()" routine for all filesystems
- * that can use the page cache directly.
+ * 这是所有可以直接使用页面缓存的文件系统的“read()”例程。
  */
 ssize_t
 __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,

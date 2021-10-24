@@ -34,11 +34,16 @@ typedef int irqreturn_t;
 #define IRQ_RETVAL(x)	((x) != 0)
 
 struct irqaction {
+	// 中断处理程序
 	irqreturn_t (*handler)(int, void *, struct pt_regs *);
+	// flags
 	unsigned long flags;
 	cpumask_t mask;
+	// 设备名
 	const char *name;
+	// 设备ID
 	void *dev_id;
+
 	struct irqaction *next;
 	int irq;
 	struct proc_dir_entry *dir;

@@ -185,8 +185,8 @@ void __init anon_vma_init(void)
 }
 
 /*
- * Getting a lock on a stable anon_vma from a page off the LRU is
- * tricky: page_lock_anon_vma rely on RCU to guard against the races.
+ * 从 LRU 上的一个页面获取一个稳定的 anon_vma 的锁是很棘手的：
+ * page_lock_anon_vma 依靠 RCU 来防止竞争。
  */
 static struct anon_vma *page_lock_anon_vma(struct page *page)
 {
@@ -208,15 +208,18 @@ out:
 }
 
 /*
- * At what user virtual address is page expected in vma?
+ * 在vma中预期页面位于哪个用户虚拟地址？
  */
 static inline unsigned long
 vma_address(struct page *page, struct vm_area_struct *vma)
 {
-	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
+	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);		// index是页帧在映射内部的偏移量，12-12
 	unsigned long address;
-
+	/* 对于匿名映射，vma->vm_pgoff等于0或者vma->vm_start/PAGE_SIZE
+	 * 相应的，page->index为区域内的页索引或者页线性地址除以PAGE_SIZE
+	 * */
 	address = vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
+	// address不在vma范围内
 	if (unlikely(address < vma->vm_start || address >= vma->vm_end)) {
 		/* page should be within any vma from prio_tree_next */
 		BUG_ON(!PageAnon(page));
@@ -260,17 +263,17 @@ static int page_referenced_one(struct page *page,
 
 	if (!mm->rss)
 		goto out;
-	address = vma_address(page, vma);
+	address = vma_address(page, vma);		// 找到page在vma中的线性地址
 	if (address == -EFAULT)
 		goto out;
 
 	spin_lock(&mm->page_table_lock);
 
-	pgd = pgd_offset(mm, address);
+	pgd = pgd_offset(mm, address);		// 通过address计算pgd中索引
 	if (!pgd_present(*pgd))
 		goto out_unlock;
 
-	pud = pud_offset(pgd, address);
+	pud = pud_offset(pgd, address);		// 通过address计算pud中索引
 	if (!pud_present(*pud))
 		goto out_unlock;
 
@@ -278,7 +281,7 @@ static int page_referenced_one(struct page *page,
 	if (!pmd_present(*pmd))
 		goto out_unlock;
 
-	pte = pte_offset_map(pmd, address);
+	pte = pte_offset_map(pmd, address);			// 找到页表项
 	if (!pte_present(*pte))
 		goto out_unmap;
 
@@ -496,12 +499,13 @@ void page_remove_rmap(struct page *page)
 }
 
 /*
- * Subfunctions of try_to_unmap: try_to_unmap_one called
- * repeatedly from either try_to_unmap_anon or try_to_unmap_file.
+ * try_to_unmap的子函数：
+ * try_to_unmap_one从try_to_unmap_anon或
+ * try_to_unmap_file重复调用。
  */
 static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 {
-	struct mm_struct *mm = vma->vm_mm;
+	struct mm_struct *mm = vma->vm_mm;		// 通过vma找到所在的mm_struct
 	unsigned long address;
 	pgd_t *pgd;
 	pud_t *pud;
@@ -512,7 +516,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 
 	if (!mm->rss)
 		goto out;
-	address = vma_address(page, vma);
+	address = vma_address(page, vma);		// 找到page在vma中的线性地址
 	if (address == -EFAULT)
 		goto out;
 
@@ -542,9 +546,8 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 		goto out_unmap;
 
 	/*
-	 * If the page is mlock()d, we cannot swap it out.
-	 * If it's recently referenced (perhaps page_referenced
-	 * skipped over this mm) then we should reactivate it.
+	 * 如果页面是 mlock()d，我们不能把它换掉。
+	 * 如果它最近被引用（也许 page_referenced 跳过了这个 mm），那么我们应该重新激活它。
 	 */
 	if ((vma->vm_flags & (VM_LOCKED|VM_RESERVED)) ||
 			ptep_clear_flush_young(vma, address, pte)) {
@@ -716,6 +719,7 @@ out_unlock:
 	spin_unlock(&mm->page_table_lock);
 }
 
+/* 尝试释放与page关联的所有匿名vma */
 static int try_to_unmap_anon(struct page *page)
 {
 	struct anon_vma *anon_vma;
@@ -726,8 +730,10 @@ static int try_to_unmap_anon(struct page *page)
 	if (!anon_vma)
 		return ret;
 
+	// 遍历anon_vma链表中的各个vma
 	list_for_each_entry(vma, &anon_vma->head, anon_vma_node) {
 		ret = try_to_unmap_one(page, vma);
+		// 释放失败或者page的页表项引用计数为0
 		if (ret == SWAP_FAIL || !page_mapped(page))
 			break;
 	}
@@ -836,16 +842,16 @@ out:
 }
 
 /**
- * try_to_unmap - try to remove all page table mappings to a page
+ * try_to_unmap - 尝试删除所有映射到一个页框的页表
  * @page: the page to get unmapped
  *
- * Tries to remove all the page table entries which are mapping this
- * page, used in the pageout path.  Caller must hold the page lock.
+ * 尝试删除所有映射此页框的页表条目，用于分页路径。
+ * 调用者必须保持页面锁定。
  * Return values are:
  *
- * SWAP_SUCCESS	- we succeeded in removing all mappings
- * SWAP_AGAIN	- we missed a mapping, try again later
- * SWAP_FAIL	- the page is unswappable
+ * SWAP_SUCCESS	- 成功删除了所有映射
+ * SWAP_AGAIN	- 某些映射不能删除，请稍后再试
+ * SWAP_FAIL	- 出错，该页框不可交换
  */
 int try_to_unmap(struct page *page)
 {
@@ -854,12 +860,12 @@ int try_to_unmap(struct page *page)
 	BUG_ON(PageReserved(page));
 	BUG_ON(!PageLocked(page));
 
-	if (PageAnon(page))
+	if (PageAnon(page))			// 匿名映射还是文件映射
 		ret = try_to_unmap_anon(page);
 	else
 		ret = try_to_unmap_file(page);
 
-	if (!page_mapped(page))
+	if (!page_mapped(page))			// 检查 page->_mapcount
 		ret = SWAP_SUCCESS;
 	return ret;
 }

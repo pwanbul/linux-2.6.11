@@ -73,12 +73,11 @@ void __init trap_init_hook(void)
 
 static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer", NULL, NULL};
 
-/**
- * time_init_hook - do any specific initialisations for the system timer.
+/*
+ * time_init_hook - 为系统定时器做任何特定的初始化。
  *
  * Description:
- *	Must plug the system timer interrupt source at HZ into the IRQ listed
- *	in irq_vectors.h:TIMER_IRQ
+ *	必须将 HZ 处的系统定时器中断源插入 irq_vectors.h:TIMER_IRQ 中列出的 IRQ
  **/
 void __init time_init_hook(void)
 {

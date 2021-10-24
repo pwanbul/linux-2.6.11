@@ -52,11 +52,10 @@ struct hw_interrupt_type {
 typedef struct hw_interrupt_type  hw_irq_controller;
 
 /*
- * This is the "IRQ descriptor", which contains various information
- * about the irq, including what kind of hardware handling it has,
- * whether it is disabled etc etc.
+ * 这是“IRQ 描述符”，它包含有关irq的各种信息，
+ * 包括它具有什么样的硬件处理，它是否被禁用等。
  *
- * Pad this out to 32 bytes for cache and indexing reasons.
+ * 出于缓存和索引的原因，将其填充为32字节。
  */
 typedef struct irq_desc {
 	hw_irq_controller *handler;

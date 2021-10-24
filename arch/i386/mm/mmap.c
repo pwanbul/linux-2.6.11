@@ -77,12 +77,12 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
 	if (sysctl_legacy_va_layout ||		// 内核参数/proc/sys/vm/legacy_va_layout，经典布局
 			(current->personality & ADDR_COMPAT_LAYOUT) ||
 			current->signal->rlim[RLIMIT_STACK].rlim_cur == RLIM_INFINITY) {// resource limit机制，不限制栈的大小
-		// mmap vam 向上增长
+		// mmap vam 向上增长,经典布局
 		mm->mmap_base = TASK_UNMAPPED_BASE;
 		mm->get_unmapped_area = arch_get_unmapped_area;		// 获取mmap空间
 		mm->unmap_area = arch_unmap_area;				// 释放mmap空间
 	} else {
-		// mmap vam 向下增长
+		// mmap vam 向下增长,灵活布局
 		mm->mmap_base = mmap_base(mm);		// 决定起始地址
 		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
 		mm->unmap_area = arch_unmap_area_topdown;

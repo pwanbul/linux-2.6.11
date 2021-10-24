@@ -31,8 +31,8 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/hash.h>
-
-#define pid_hashfn(nr) hash_long((unsigned long)nr, pidhash_shift)      // 散列函数，pidhash_shift用来控制hash表的长度
+// 散列函数，pidhash_shift用来控制hash表的长度
+#define pid_hashfn(nr) hash_long((unsigned long)nr, pidhash_shift)
 // 4种进程标识符的hash表
 static struct hlist_head *pid_hash[PIDTYPE_MAX];        // 静态的,大小为PIDTYPE_MAX
 static int pidhash_shift;       // 用来控制hash表的长度
@@ -165,13 +165,13 @@ int alloc_pidmap(void)
 	return -1;
 }
 
-struct pid * fastcall find_pid(enum pid_type type, int nr)      // 查询是否有相同nr的struct pid，返回struct pid指针
+// 查询是否有相同nr的struct pid，返回struct pid指针
+struct pid * fastcall find_pid(enum pid_type type, int nr)
 {
 	struct hlist_node *elem;
 	struct pid *pid;
 
-	hlist_for_each_entry(pid, elem,
-			&pid_hash[type][pid_hashfn(nr)], pid_chain) {
+	hlist_for_each_entry(pid, elem, &pid_hash[type][pid_hashfn(nr)], pid_chain) {
 		if (pid->nr == nr)
 			return pid;
 	}
@@ -241,7 +241,8 @@ void fastcall detach_pid(task_t *task, enum pid_type type)
 	free_pidmap(nr);        // 释放位图
 }
 
-task_t *find_task_by_pid_type(int type, int nr)     // 返回task_struct指针
+// 返回task_struct指针
+task_t *find_task_by_pid_type(int type, int nr)
 {
 	struct pid *pid;
 

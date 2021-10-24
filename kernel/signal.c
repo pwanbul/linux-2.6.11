@@ -625,7 +625,7 @@ static int rm_from_queue(unsigned long mask, struct sigpending *s)
 }
 
 /*
- * Bad permissions for sending the signal
+ * 发送信号的权限错误
  */
 static int check_kill_permission(int sig, struct siginfo *info,
 				 struct task_struct *t)
@@ -1109,7 +1109,7 @@ void zap_other_threads(struct task_struct *p)
 }
 
 /*
- * Must be called with the tasklist_lock held for reading!
+ * 必须在持有 tasklist_lock 的情况下调用以进行读取！
  */
 int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
@@ -1160,9 +1160,8 @@ kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 
 	return retval;
 }
-
-int
-kill_proc_info(int sig, struct siginfo *info, pid_t pid)
+/* 杀指定进程 */
+int kill_proc_info(int sig, struct siginfo *info, pid_t pid)
 {
 	int error;
 	struct task_struct *p;
@@ -1178,10 +1177,14 @@ kill_proc_info(int sig, struct siginfo *info, pid_t pid)
 
 
 /*
- * kill_something_info() interprets pid in interesting ways just like kill(2).
+ * kill_something_info() 以有趣的方式解释 pid，就像 kill(2) 一样。
  *
- * POSIX specifies that kill(-1,sig) is unspecified, but what we have
- * is probably wrong.  Should make it like BSD or SYSV.
+ * POSIX 指定 kill(-1,sig) 未指定，但我们所拥有的可能是错误的。应该使它像 BSD 或 SYSV。
+ *
+ * pid == 0:杀当前进程组
+ * pid > 0:杀指定进程
+ * pid == -1: pid大于0的进程的非当前进程组进程
+ * pid < 0:杀进程组ID等于|pid|的
  */
 
 static int kill_something_info(int sig, struct siginfo *info, int pid)
@@ -2225,8 +2228,8 @@ sys_rt_sigtimedwait(const sigset_t __user *uthese,
 	return ret;
 }
 
-asmlinkage long
-sys_kill(int pid, int sig)
+/* 杀死进程/进程组*/
+asmlinkage long sys_kill(int pid, int sig)
 {
 	struct siginfo info;
 

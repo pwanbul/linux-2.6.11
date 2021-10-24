@@ -242,11 +242,11 @@ sysenter_past_esp:
 ENTRY(system_call)
 	pushl %eax			// save orig_eax
 	SAVE_ALL
-	GET_THREAD_INFO(%ebp)		# thread_info的地址放在ebp中
-					# system call tracing in operation
+	GET_THREAD_INFO(%ebp)		// thread_info的地址放在ebp中
+	// system call tracing in operation
 	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)		// 被跟踪或者被审计
 	jnz syscall_trace_entry			// 第一次处理跟踪或者审计
-	cmpl $(nr_syscalls), %eax		# 检查调用号是否越界
+	cmpl $(nr_syscalls), %eax		// 检查调用号是否越界
 	jae syscall_badsys
 syscall_call:
 	call *sys_call_table(,%eax,4)		# 调用服务器例程

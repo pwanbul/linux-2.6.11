@@ -10,8 +10,8 @@
 #ifndef _STRUCT_TIMESPEC
 #define _STRUCT_TIMESPEC
 struct timespec {
-	time_t	tv_sec;		/* seconds */
-	long	tv_nsec;	/* nanoseconds */
+	time_t	tv_sec;		/* UTC纪元到当前的偏移时间，秒 */
+	long	tv_nsec;	/* 上一秒到当前的偏移时间，纳秒 */
 };
 #endif /* _STRUCT_TIMESPEC */
 
@@ -33,7 +33,7 @@ struct timezone {
 #endif
 
 #ifndef NSEC_PER_SEC
-#define NSEC_PER_SEC (1000000000L)
+#define NSEC_PER_SEC (1000000000L)		// 每秒的纳秒数
 #endif
 
 #ifndef NSEC_PER_USEC

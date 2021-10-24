@@ -11,7 +11,7 @@
  * timer_pit when HPET is active. So, we default to timer_tsc.
  */
 #endif
-/* list of timers, ordered by preference, NULL terminated */
+/* 计时器列表，按偏好排序，NULL 终止 */
 static struct init_timer_opts* __initdata timers[] = {
 #ifdef CONFIG_X86_CYCLONE_TIMER
 	&timer_cyclone_init,
@@ -23,7 +23,7 @@ static struct init_timer_opts* __initdata timers[] = {
 	&timer_pmtmr_init,
 #endif
 	&timer_tsc_init,
-	&timer_pit_init,
+	&timer_pit_init,		// 这个必定有
 	NULL,
 };
 
@@ -35,7 +35,7 @@ static int __init clock_setup(char* str)
 		strlcpy(clock_override, str, sizeof(clock_override));
 	return 1;
 }
-__setup("clock=", clock_setup);
+__setup("clock=", clock_setup);		// 设置内核参数
 
 
 /* The chosen timesource has been found to be bad.
@@ -46,14 +46,13 @@ void clock_fallback(void)
 	cur_timer = &timer_pit;
 }
 
-/* iterates through the list of timers, returning the first 
- * one that initializes successfully.
+/* 遍历计时器列表，返回第一个初始化成功的计时器。
  */
 struct timer_opts* __init select_timer(void)
 {
 	int i = 0;
 	
-	/* find most preferred working timer */
+	/* 找到最喜欢的工作计时器 */
 	while (timers[i]) {
 		if (timers[i]->init)
 			if (timers[i]->init(clock_override) == 0)

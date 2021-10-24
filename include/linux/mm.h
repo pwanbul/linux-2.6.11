@@ -90,20 +90,18 @@ struct vm_area_struct {
 	} shared;
 
 	/*
-	 * A file's MAP_PRIVATE vma can be in both i_mmap tree and anon_vma
-	 * list, after a COW of one of the file pages.  A MAP_SHARED vma
-	 * can only be in the i_mmap tree.  An anonymous MAP_PRIVATE, stack
-	 * or brk vma (with NULL file) can only be in an anon_vma list.
+	 * 在文件页面之一的COW之后，文件的MAP_PRIVATE vma可以在i_mmap树和anon_vma列表中。
+	 * MAP_SHARED vma只能在i_mmap树中。匿名MAP_PRIVATE、堆栈或 brk vma（带有 NULL 文件）
+	 * 只能在 anon_vma 列表中。
 	 */
-	struct list_head anon_vma_node;	/* Serialized by anon_vma->lock */
-	struct anon_vma *anon_vma;	/* Serialized by page_table_lock */
+	struct list_head anon_vma_node;	/* 由 anon_vma->lock 序列化 链入anon_vma中的链表 */
+	struct anon_vma *anon_vma;	/* 由 page_table_lock 序列化 指向anon_vma */
 
 	/* Function pointers to deal with this struct. */
 	struct vm_operations_struct * vm_ops;	// 处理此结构的函数指针
 
-	/* Information about our backing store: */
-	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
-					   units, *not* PAGE_CACHE_SIZE */
+	/* 关于我们后备存储的信息： */
+	unsigned long vm_pgoff;		/* 以 PAGE_SIZE 为单位的偏移量（在 vm_file 内），而不是 PAGE_CACHE_SIZE */
 	struct file * vm_file;		/* File we map to (can be NULL). */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
 	unsigned long vm_truncate_count;/* truncate_count or restart_addr */
@@ -226,7 +224,9 @@ typedef unsigned long page_flags_t;
 struct page {
 	page_flags_t flags;		/* Atomic flags, some possibly updated asynchronously  标志*/
 	atomic_t _count;		/* 引用计数器，若为-1则表示页框空闲；当有一个进程或内核数据结构占用时为0，...*/
-	atomic_t _mapcount;		/* Count of ptes mapped in mms, 页表项数量，没有则为-1
+	atomic_t _mapcount;		/*
+ 					 * 页表项的引用计数，没有引用则为-1，0表示非共享，大于0表共享
+					 * Count of ptes mapped in mms,
 					 * to show when page is mapped
 					 * & limit reverse map searches.
 					 */
@@ -236,14 +236,18 @@ struct page {
 					 * swp_entry_t if PageSwapCache
 					 * 当页面空闲时，这表示伙伴系统中的order。
 					 */
-	struct address_space *mapping;	/* If low bit clear, points to      页缓存使用
-					 * inode address_space, or NULL.
-					 * If page mapped as anonymous
-					 * memory, low bit is set, and
-					 * it points to anon_vma object:
+	struct address_space *mapping;	/*
+ 					 * 为NULL，表示属于交换高速缓存
+ 					 * 非NULL，若最低位为0，表示文件映射，
+ 					 * 指向文件的struct address_space
+ 					 * (struct address_space是4字节对齐的)；
+ 					 * 若最低位1，表示匿名映射，指向anon_vma
+ 					 *
+ 					 * 如果低位清零，则指向 inode address_space，或 NULL。
+					 * 如果页面映射为匿名内存，则设置低位，并指向 anon_vma 对象：
 					 * see PAGE_MAPPING_ANON below.
 					 */
-	pgoff_t index;			/* Our offset within mapping. */
+	pgoff_t index;			/* 我们在映射中的偏移量。 */
 	struct list_head lru;		/* 页框高速缓存 分页列表，例如。受 zone->lru_lock 保护的 active_list!*/
 	/*
 	 * On machines where all RAM is mapped into kernel address space,
@@ -349,41 +353,34 @@ static inline void put_page(struct page *page)
  * only one copy in memory, at most, normally.
  *
  * 对于非保留页面，page_count(page) 表示引用计数。
- *   page_count() == 0 means the page is free.
- *   page_count() == 1 means the page is used for exactly one purpose
- *   (e.g. a private data page of one process).
+ *   page_count() == 0 意味着该页面是空闲的
+ *   page_count() == 1 表示该页面仅用于一个目的（例如，一个进程的私有数据页面）。
  *
- * A page may be used for kmalloc() or anyone else who does a
- * __get_free_page(). In this case the page_count() is at least 1, and
- * all other fields are unused but should be 0 or NULL. The
- * management of this page is the responsibility of the one who uses
- * it.
+ * 页面可用于 kmalloc() 或任何其他执行 __get_free_page() 的人。
+ * 在这种情况下，page_count() 至少为 1，所有其他字段均未使用，但应为 0 或 NULL。
+ * 此页面的管理是使用它的人的责任。
  *
- * The other pages (we may call them "process pages") are completely
- * managed by the Linux memory manager: I/O, buffers, swapping etc.
- * The following discussion applies only to them.
+ * 其他页面（我们可以称它们为“进程页面”）完全由 Linux 内存管理器管理：
+ * IO、缓冲区、交换等。以下讨论仅适用于它们。
  *
- * A page may belong to an inode's memory mapping. In this case,
- * page->mapping is the pointer to the inode, and page->index is the
- * file offset of the page, in units of PAGE_CACHE_SIZE.
+ * 一个页面可能属于一个inode的内存映射。在这种情况下，
+ * page->mapping是指向inode的指针，page->index是该页的文件偏移量，
+ * 以PAGE_CACHE_SIZE为单位。
  *
- * A page contains an opaque `private' member, which belongs to the
- * page's address_space.  Usually, this is the address of a circular
- * list of the page's disk buffers.
+ * 一个页面包含一个不透明的“私有”成员，它属于页面的地址空间。
+ * 通常，这是页面磁盘缓冲区循环列表的地址。
  *
- * For pages belonging to inodes, the page_count() is the number of
- * attaches, plus 1 if `private' contains something, plus one for
- * the page cache itself.
+ * 对于属于 inode 的页面，page_count() 是附加的数量，
+ * 如果“private”包含某些内容，则加 1，如果页面缓存本身，则加 1。
  *
- * All pages belonging to an inode are in these doubly linked lists:
+ * 属于一个 inode 的所有页面都在这些双向链表中：
  * mapping->clean_pages, mapping->dirty_pages and mapping->locked_pages;
  * using the page->list list_head. These fields are also used for
  * freelist managemet (when page_count()==0).
  *
- * There is also a per-mapping radix tree mapping index to the page
- * in memory if present. The tree is rooted at mapping->root.  
+ * 如果存在，还有一个每个映射的基数树映射索引到内存中的页面。该树的根为 mapping->root。
  *
- * All process pages can do I/O:
+ * 所有进程页面都可以做IO：
  * - inode pages may need to be read from disk,
  * - inode pages which have been modified and are MAP_SHARED may need
  *   to be written to disk,
@@ -461,13 +458,12 @@ void page_address_init(void);
 #endif
 
 /*
- * On an anonymous page mapped into a user virtual memory area,
- * page->mapping points to its anon_vma, not to a struct address_space;
- * with the PAGE_MAPPING_ANON bit set to distinguish it.
+ * 在映射到用户虚拟内存区域的匿名页面上，
+ * page->mapping 指向它的 anon_vma，而不是指向 struct address_space；
+ * 设置 PAGE_MAPPING_ANON 位以区分它。
  *
- * Please note that, confusingly, "page_mapping" refers to the inode
- * address_space which maps the page from disk; whereas "page_mapped"
- * refers to user virtual address space into which the page is mapped.
+ * 请注意，令人困惑的是，“page_mapping”指的是从磁盘映射
+ * 页面的 inode address_space；而“page_mapped”是指页面被映射到的用户虚拟地址空间。
  */
 #define PAGE_MAPPING_ANON	1
 
@@ -482,7 +478,7 @@ static inline struct address_space *page_mapping(struct page *page)
 		mapping = NULL;
 	return mapping;
 }
-
+/* page是否用作匿名映射 */
 static inline int PageAnon(struct page *page)
 {
 	return ((unsigned long)page->mapping & PAGE_MAPPING_ANON) != 0;
@@ -500,7 +496,7 @@ static inline pgoff_t page_index(struct page *page)
 }
 
 /*
- * Tatomic page->_mapcount 和 _count 一样，
+ * atomic page->_mapcount 和 _count 一样，
  * 从 -1 开始：这样就可以使用 atomic_inc_and_test
  * 和 atomic_add_negative(-1) 跟踪从它到它的转换。
  */
@@ -509,13 +505,15 @@ static inline void reset_page_mapcount(struct page *page)
 	atomic_set(&(page)->_mapcount, -1);
 }
 
+/* 返回页框的引用计数
+ * */
 static inline int page_mapcount(struct page *page)
 {
 	return atomic_read(&(page)->_mapcount) + 1;
 }
 
 /*
- * Return true if this page is mapped into pagetables.
+ * 如果此页面映射到分页表，则返回 true
  */
 static inline int page_mapped(struct page *page)
 {

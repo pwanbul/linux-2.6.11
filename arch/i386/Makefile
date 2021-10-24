@@ -15,6 +15,11 @@
 #           Added '-march' and '-mpreferred-stack-boundary' support
 #
 
+# ARCH Makefile 位于ARCH/$(ARCH)/Makefile ，是系统对应平台的Makefile。
+# Kernel Top Makefile 会包含这个文件来指定平台相关信息。
+# ARCH Makefile同样根据.config文件，决定了ARCH/$(ARCH) 目录下那些文件、
+# 子目录被编译进内核只有平台开发人员会关心这个文件。
+
 LDFLAGS		:= -m elf_i386
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux :=

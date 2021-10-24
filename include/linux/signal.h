@@ -11,12 +11,12 @@
 #define MAX_SIGPENDING	1024
 
 /*
- * Real Time signals may be queued.
+ * 实时信号可以排队。
  */
 
 struct sigqueue {
-	struct list_head list;
-	spinlock_t *lock;
+	struct list_head list;		// 链入struct sigpending中
+	spinlock_t *lock;		// 指向struct sighand_struct的siglock
 	int flags;
 	siginfo_t info;
 	struct user_struct *user;
@@ -25,9 +25,10 @@ struct sigqueue {
 /* flags values. */
 #define SIGQUEUE_PREALLOC	1
 
+// 未决信号
 struct sigpending {
 	struct list_head list;
-	sigset_t signal;
+	sigset_t signal;		// 屏障的信号
 };
 
 /*

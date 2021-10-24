@@ -659,13 +659,12 @@ buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
 }
 
 /*
- * Return 1 if free pages are above 'mark'. This takes into account the order
- * of the allocation.
+ * 如果空闲页面高于“标记”，则返回 1。这考虑了分配的顺序。
  */
 int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
-		      int classzone_idx, int can_try_harder, int gfp_high)
+		int classzone_idx, int can_try_harder, int gfp_high)
 {
-	/* free_pages my go negative - that's OK */
+	/* free_pages 我的结果是负面的 - 没关系 */
 	long min = mark, free_pages = z->free_pages - (1 << order) + 1;
 	int o;
 
@@ -700,10 +699,12 @@ int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
  * - __get_free_pages
  * - __get_free_page
  * - __get_dma_pages
+ *
+ * gfp_mask: 修改器
+ * order: 分配阶
+ * zonelist: 备选列表
  */
-struct page * fastcall
-__alloc_pages(unsigned int gfp_mask, unsigned int order,
-		struct zonelist *zonelist)
+struct page * fastcall __alloc_pages(unsigned int gfp_mask, unsigned int order, struct zonelist *zonelist)
 {
 	const int wait = gfp_mask & __GFP_WAIT;
 	struct zone **zones, *z;
@@ -716,30 +717,27 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	int can_try_harder;
 	int did_some_progress;
 
-	might_sleep_if(wait);
+	might_sleep_if(wait);		// debug
 
 	/*
-	 * The caller may dip into page reserves a bit more if the caller
-	 * cannot run direct reclaim, or is the caller has realtime scheduling
-	 * policy
+	 * 如果调用者不能运行直接回收，或者调用者有实时调度策略，调用者可能会更多地进入页面保留
 	 */
 	can_try_harder = (unlikely(rt_task(p)) && !in_interrupt()) || !wait;
 
-	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
+	zones = zonelist->zones;  /* 适用于 gfp_mask 的区域列表，zones为数组，大小不定，以NULL结尾 */
 
-	if (unlikely(zones[0] == NULL)) {
-		/* Should this ever happen?? */
+	if (unlikely(zones[0] == NULL)) {		// 正常不会成立
+		/* 这是否应该发生?? */
 		return NULL;
 	}
 
-	classzone_idx = zone_idx(zones[0]);
+	classzone_idx = zone_idx(zones[0]);		// 返回在node_zones中的下标
 
  restart:
-	/* Go through the zonelist once, looking for a zone with enough free */
+	/* 遍历 zonelist 一次，寻找一个有足够空闲的 zone */
 	for (i = 0; (z = zones[i]) != NULL; i++) {
 
-		if (!zone_watermark_ok(z, order, z->pages_low,
-				       classzone_idx, 0, 0))
+		if (!zone_watermark_ok(z, order, z->pages_low, classzone_idx, 0, 0))
 			continue;
 
 		page = buffered_rmqueue(z, order, gfp_mask);

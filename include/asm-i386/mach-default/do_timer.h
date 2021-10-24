@@ -2,15 +2,14 @@
 
 #include <asm/apic.h>
 
-/**
+/*
  * do_timer_interrupt_hook - hook into timer tick
- * @regs:	standard registers from interrupt
+ * @regs:	来自中断的标准寄存器
  *
  * Description:
- *	This hook is called immediately after the timer interrupt is ack'd.
- *	It's primary purpose is to allow architectures that don't possess
- *	individual per CPU clocks (like the CPU APICs supply) to broadcast the
- *	timer interrupt as a means of triggering reschedules etc.
+ *	这个钩子在定时器中断被确认后立即调用。
+ *	它的主要目的是允许不具有每个 CPU 时钟（如 CPU APIC 提供）的
+ *	架构广播定时器中断作为触发重新调度等的手段。
  **/
 
 static inline void do_timer_interrupt_hook(struct pt_regs *regs)

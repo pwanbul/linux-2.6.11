@@ -706,6 +706,8 @@ static const struct {
 
 static struct class_simple *mem_class;
 
+/*
+ * */
 static int __init chr_dev_init(void)
 {
 	int i;

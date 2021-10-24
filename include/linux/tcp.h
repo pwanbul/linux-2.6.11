@@ -41,32 +41,32 @@ struct tcphdr {
 		res1:4,			// 保留
 		cwr:1,		// 控制码
 		ece:1,
-		urg:1,
-		ack:1,
-		psh:1,
-		rst:1,
-		syn:1,
-		fin:1;
+		urg:1,		// 紧急指针
+		ack:1,		// 确认号
+		psh:1,		// 推送
+		rst:1,		// 重置
+		syn:1,		// 同步
+		fin:1;		// 结束
 #else
 #error	"Adjust your <asm/byteorder.h> defines"
 #endif	
-	__u16	window;			// 接受窗口大小
+	__u16	window;			// 接收窗口大小rwd
 	__u16	check;			// 校验和，覆盖伪首部+首部+数据
 	__u16	urg_ptr;		// 紧急指针
 };
 
-
+// 状态机定义
 enum {
-  TCP_ESTABLISHED = 1,
-  TCP_SYN_SENT,
-  TCP_SYN_RECV,
-  TCP_FIN_WAIT1,
-  TCP_FIN_WAIT2,
-  TCP_TIME_WAIT,
-  TCP_CLOSE,
-  TCP_CLOSE_WAIT,
-  TCP_LAST_ACK,
-  TCP_LISTEN,
+  TCP_ESTABLISHED = 1,		// 建立链接
+  TCP_SYN_SENT,		// 已发送SYN
+  TCP_SYN_RECV,		// 已发送SYN+ACK
+  TCP_FIN_WAIT1,	// 已发送FIN+ACK
+  TCP_FIN_WAIT2,	// 接收ACK
+  TCP_TIME_WAIT,	// 已接收被动关闭方发送的FIN+ACK
+  TCP_CLOSE,		// 链接关闭
+  TCP_CLOSE_WAIT,	// 已接收主动关闭方发送FIN
+  TCP_LAST_ACK,		// 被动关闭方已发送FIN+ACK
+  TCP_LISTEN,		// 监听
   TCP_CLOSING,	 /* now a valid state */
 
   TCP_MAX_STATES /* Leave at the end! */
@@ -101,6 +101,7 @@ union tcp_word_hdr {
 
 #define tcp_flag_word(tp) ( ((union tcp_word_hdr *)(tp))->words [3]) 
 
+// 控制码定义
 enum { 
 	TCP_FLAG_CWR = __constant_htonl(0x00800000), 
 	TCP_FLAG_ECE = __constant_htonl(0x00400000), 
@@ -114,7 +115,7 @@ enum {
 	TCP_DATA_OFFSET = __constant_htonl(0xF0000000)
 }; 
 
-/* TCP socket options */
+/* TCP 选项 */
 #define TCP_NODELAY		1	/* Turn off Nagle's algorithm. */
 #define TCP_MAXSEG		2	/* Limit MSS */
 #define TCP_CORK		3	/* Never send partially complete segments */

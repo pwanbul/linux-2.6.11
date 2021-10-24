@@ -2686,7 +2686,7 @@ static inline void net_set_todo(struct net_device *dev)
 	spin_unlock(&net_todo_list_lock);
 }
 
-/**
+/*
  *	register_netdevice	- register a network device
  *	@dev: device to register
  *
@@ -2701,6 +2701,14 @@ static inline void net_set_todo(struct net_device *dev)
  *	BUGS:
  *	The locking appears insufficient to guarantee two parallel registers
  *	will not get the same name.
+ *
+ *	注册net_device
+ *
+ *	- 所有的网络设备都保存在一个单链表中，表头为dev_base。
+ *	- 按设备名散列。辅助函数dev_get_by_name(struct net * net, const char * name)根据
+ *		设备名在该散列表上查找网络设备。
+ *	- 按接口索引散列。辅助函数dev_get_by_index(struct net * net, int ifindex)根据
+ *		给定的接口索引查找net_device实例。
  */
 
 int register_netdevice(struct net_device *dev)

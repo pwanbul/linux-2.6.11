@@ -60,7 +60,7 @@ extern void __chk_io_ptr(void __iomem *);
 #define likely(x)	__builtin_expect(!!(x), 1)
 #define unlikely(x)	__builtin_expect(!!(x), 0)
 
-/* Optimization barrier */
+/* 优化屏障 */
 #ifndef barrier
 # define barrier() __memory_barrier()
 #endif

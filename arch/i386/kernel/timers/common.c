@@ -15,11 +15,11 @@
 
 /* ------ Calibrate the TSC -------
  * Return 2^32 * (1 / (TSC clocks per usec)) for do_fast_gettimeoffset().
- * Too much 64-bit arithmetic here to do this cleanly in C, and for
- * accuracy's sake we want to keep the overhead on the CTC speaker (channel 2)
- * output busy loop as low as possible. We avoid reading the CTC registers
- * directly because of the awkward 8-bit access mechanism of the 82C54
- * device.
+ * 这里有太多的 64 位算法无法在 C 中干净利落地执行此操作，并且为了准确起见，
+ * 我们希望将 CTC 扬声器（通道 2）输出忙循环的开销保持在尽可能低的水平。
+ * 由于 82C54 设备笨拙的 8 位访问机制，我们避免直接读取 CTC 寄存器。
+ *
+ * 内核不会写死频率，这样可以在不同频率的硬件上移植，该函数计算RTC的频率
  */
 
 #define CALIBRATE_TIME	(5 * 1000020/HZ)

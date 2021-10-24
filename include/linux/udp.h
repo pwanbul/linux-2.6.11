@@ -27,7 +27,7 @@ struct udphdr {
 	__u16	check;		// 校验和，覆盖伪首部+首部+数据
 };
 
-/* UDP socket options */
+/* UDP 选项 */
 #define UDP_CORK	1	/* Never send partially complete segments */
 #define UDP_ENCAP	100	/* Set the socket to accept encapsulated packets */
 

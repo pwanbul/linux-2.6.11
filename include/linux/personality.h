@@ -13,16 +13,16 @@ extern int		unregister_exec_domain(struct exec_domain *);
 extern int		__set_personality(unsigned long);
 
 /*
- * Flags for bug emulation.
+ * 错误模拟的标志。
  *
- * These occupy the top three bytes.
+ * 这些占据前三个字节。
  */
 enum {
 	FDPIC_FUNCPTRS =	0x0080000,	/* userspace function ptrs point to descriptors
 						 * (signal handling)
 						 */
 	MMAP_PAGE_ZERO =	0x0100000,
-	ADDR_COMPAT_LAYOUT =	0x0200000,
+	ADDR_COMPAT_LAYOUT =	0x0200000,		// 地址兼容的布局
 	READ_IMPLIES_EXEC =	0x0400000,
 	ADDR_LIMIT_32BIT =	0x0800000,
 	SHORT_INODE =		0x1000000,

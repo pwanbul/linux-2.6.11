@@ -34,7 +34,7 @@ struct in6_addr
 		__u8		u6_addr8[16];
 		__u16		u6_addr16[8];
 		__u32		u6_addr32[4];
-	} in6_u;
+	} in6_u;		// 16字节，128位
 #define s6_addr			in6_u.u6_addr8
 #define s6_addr16		in6_u.u6_addr16
 #define s6_addr32		in6_u.u6_addr32
@@ -51,8 +51,9 @@ extern const struct in6_addr in6addr_any;
 extern const struct in6_addr in6addr_loopback;
 #define IN6ADDR_LOOPBACK_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
 
+// IPv6地址族
 struct sockaddr_in6 {
-	unsigned short int	sin6_family;    /* AF_INET6 */
+	unsigned short int	sin6_family;    /* AF_INET6 2字节*/
 	__u16			sin6_port;      /* Transport layer port # */
 	__u32			sin6_flowinfo;  /* IPv6 flow information */
 	struct in6_addr		sin6_addr;      /* IPv6 address */

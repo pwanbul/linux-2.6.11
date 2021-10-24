@@ -29,7 +29,7 @@ static void delay_none(unsigned long loops)
 		:"0" (loops));
 }
 
-/* none timer_opts struct */
+/* 空的定时器对象 */
 struct timer_opts timer_none = {
 	.name = 	"none",
 	.mark_offset =	mark_offset_none, 

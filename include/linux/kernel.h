@@ -50,7 +50,7 @@ struct completion;
 
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
 void __might_sleep(char *file, int line);
-#define might_sleep() __might_sleep(__FILE__, __LINE__)			// debug用，若这原子上下文中调用此接口就会打印堆栈信息
+#define might_sleep() __might_sleep(__FILE__, __LINE__)			// debug用，若在原子上下文中调用此接口就会打印堆栈信息
 #define might_sleep_if(cond) do { if (unlikely(cond)) might_sleep(); } while (0)
 #else
 #define might_sleep() do {} while(0)

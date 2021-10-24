@@ -111,8 +111,8 @@ struct zone {       // 内存区
 	/* 页面分配器通常访问的字段 */
 	unsigned long		free_pages;			// 空闲页框的数量
 	/* pages_min 保留的页框池
-	 * pages_low 回收页框使用的下界
-	 * pages_high 回收页框使用的上界
+	 * pages_low 空闲页框的低水位，设置为pages_min的5/4
+	 * pages_high 空闲页框的高水位，设置为pages_min的3/2
 	 * */
 	unsigned long		pages_min, pages_low, pages_high;
 	/*
@@ -287,7 +287,7 @@ int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
 		int alloc_type, int can_try_harder, int gfp_high);
 
 /*
- * zone_idx() returns 0 for the ZONE_DMA zone, 1 for the ZONE_NORMAL zone, etc.
+ * zone_idx() 为 ZONE_DMA 区域返回 0，为 ZONE_NORMAL 区域返回 1，等等。
  */
 #define zone_idx(zone)		((zone) - (zone)->zone_pgdat->node_zones)
 

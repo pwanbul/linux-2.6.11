@@ -30,6 +30,7 @@ typedef unsigned short	sa_family_t;
 
 /*
  *	1003.1g requires sa_family_t and that sa_data is char.
+ *	通用的数据结构，实际操作是这个结构体，16字节
  */
  
 struct sockaddr {

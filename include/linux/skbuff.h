@@ -118,7 +118,7 @@ struct sk_buff_head {
 	struct sk_buff	*next;
 	struct sk_buff	*prev;
 
-	__u32		qlen;
+	__u32		qlen;		// 链表长度
 	spinlock_t	lock;
 };
 
@@ -138,7 +138,7 @@ struct skb_frag_struct {
 /* 这个数据在克隆之间是不变的，并且存在于头数据的末尾，即在 skb-> end。
  */
 struct skb_shared_info {
-	atomic_t	dataref;
+	atomic_t	dataref;		// 引用计数
 	unsigned int	nr_frags;
 	unsigned short	tso_size;
 	unsigned short	tso_segs;
@@ -199,14 +199,19 @@ struct skb_shared_info {
  * 套接字缓存区定义
  * */
 struct sk_buff {
-	/* 这两个成员必须是第一位的。 */
+	/* 这两个成员必须是第一位的。
+	 * next和prev用于将套接字缓冲区保存到一个双链表中。这里没有使用内核的标准链表实现，
+	 * 而是使用了一个手工实现的版本
+	 *
+	 * struct sk_buff_head 实现头结点
+	 * */
 	struct sk_buff		*next;
 	struct sk_buff		*prev;
 
 	struct sk_buff_head	*list;		// 指向链表头
-	struct sock		*sk;
-	struct timeval		stamp;		//
-	struct net_device	*dev;
+	struct sock		*sk;		// 处理该分组的套接字对应的socket实例
+	struct timeval		stamp;		// 保存了分组到达的时间
+	struct net_device	*dev;		// 处理分组的网络设备
 	struct net_device	*input_dev;
 	struct net_device	*real_dev;
 
@@ -282,8 +287,8 @@ struct sk_buff {
 
 
 	/* 这些元素必须在最后，详见 alloc_skb().  */
-	unsigned int		truesize;
-	atomic_t		users;
+	unsigned int		truesize;		// 真实的大小
+	atomic_t		users;		// 引用计数器
 	unsigned char		*head,
 				*data,
 				*tail,

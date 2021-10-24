@@ -2,19 +2,20 @@
 #define _ASMi386_TIMER_H
 #include <linux/init.h>
 
-/**
- * struct timer_ops - used to define a timer source
+/* 和定时器相关的硬件五花八门，通过下面的结构来抽象，每个
+ * 硬件定时器都会有一个timer_ops对象，在select_timer()
+ * 中选择一个最好的定时器对象，由cur_timer指向，
+ * cur_timer初始化为timer_none，是一个空定时器
  *
- * @name: name of the timer.
- * @init: Probes and initializes the timer. Takes clock= override 
- *        string as an argument. Returns 0 on success, anything else
- *        on failure.
- * @mark_offset: called by the timer interrupt.
- * @get_offset:  called by gettimeofday(). Returns the number of microseconds
- *               since the last timer interupt.
- * @monotonic_clock: returns the number of nanoseconds since the init of the
- *                   timer.
- * @delay: delays this many clock cycles.
+ *
+ * struct timer_ops - 用于定义定时器源，定时器对象
+ *
+ * @name: 定时器的名称。
+ * @init: 探测并初始化定时器。将clock=覆盖字符串作为参数。 成功时返回 0，失败时返回任何其他内容。
+ * @mark_offset: 由定时器中断调用。
+ * @get_offset:  由 gettimeofday() 调用。返回自上次计时器中断以来的微秒数。
+ * @monotonic_clock: 返回自计时器初始化以来的纳秒数。
+ * @delay: 延迟这么多时钟周期。
  */
 struct timer_opts {
 	char* name;
@@ -24,6 +25,7 @@ struct timer_opts {
 	void (*delay)(unsigned long);
 };
 
+/* 定时选项 */
 struct init_timer_opts {
 	int (*init)(char *override);
 	struct timer_opts *opts;

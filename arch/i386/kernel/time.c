@@ -86,11 +86,10 @@ DEFINE_SPINLOCK(rtc_lock);
 DEFINE_SPINLOCK(i8253_lock);
 EXPORT_SYMBOL(i8253_lock);
 
-struct timer_opts *cur_timer = &timer_none;
+struct timer_opts *cur_timer = &timer_none;		// 初始化为一个空的定时器对象
 
 /*
- * This version of gettimeofday has microsecond resolution
- * and better than microsecond precision on fast x86 machines with TSC.
+ * 此版本的 gettimeofday 在具有 TSC 的快速 x86 机器上具有微秒分辨率和优于微秒精度。
  */
 void do_gettimeofday(struct timeval *tv)
 {
@@ -101,15 +100,14 @@ void do_gettimeofday(struct timeval *tv)
 	do {
 		unsigned long lost;
 
-		seq = read_seqbegin(&xtime_lock);
+		seq = read_seqbegin(&xtime_lock);		// 获取顺序计数器
 
-		usec = cur_timer->get_offset();
+		usec = cur_timer->get_offset();		// 从上一个tick开始到现在的时间
 		lost = jiffies - wall_jiffies;
 
 		/*
-		 * If time_adjust is negative then NTP is slowing the clock
-		 * so make sure not to go into next possible interval.
-		 * Better to lose some accuracy than have time go backwards..
+		 * 如果 time_adjust 为负，则 NTP 正在减慢时钟，因此请确保不要进入下一个可能的间隔。
+		 * 与其让时间倒流，不如失去一些准确性。
 		 */
 		if (unlikely(time_adjust < 0)) {
 			max_ntp_tick = (USEC_PER_SEC / HZ) - tickadj;
@@ -215,11 +213,9 @@ EXPORT_SYMBOL(profile_pc);
 #endif
 
 /*
- * timer_interrupt() needs to keep up the real-time clock,
- * as well as call the "do_timer()" routine every clocktick
+ * timer_interrupt() 需要跟上实时时钟，并在每个时钟滴答时调用“do_timer()”例程
  */
-static inline void do_timer_interrupt(int irq, void *dev_id,
-					struct pt_regs *regs)
+static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 #ifdef CONFIG_X86_IO_APIC
 	if (timer_ack) {
@@ -278,9 +274,8 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 }
 
 /*
- * This is the same as the above, except we _also_ save the current
- * Time Stamp Counter value at the time of the timer interrupt, so that
- * we later on can estimate the time of day more exactly.
+ * 这与上面的相同，除了我们_还_保存定时器中断时的当前时间戳计数器值，
+ * 以便我们以后可以更准确地估计一天中的时间。
  */
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -293,7 +288,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	write_seqlock(&xtime_lock);
 
-	cur_timer->mark_offset();
+	cur_timer->mark_offset();		// nop
  
 	do_timer_interrupt(irq, NULL, regs);
 
@@ -377,7 +372,7 @@ device_initcall(time_init_device);
 
 #ifdef CONFIG_HPET_TIMER
 extern void (*late_time_init)(void);
-/* Duplicate of time_init() below, with hpet_enable part added */
+/* 下面的 time_init() 重复，添加了 hpet_enable 部分 */
 void __init hpet_time_init(void)
 {
 	xtime.tv_sec = get_cmos_time();
@@ -396,24 +391,27 @@ void __init hpet_time_init(void)
 }
 #endif
 
+/* 时间度量初始化
+ * 执行的操作和hpet_time_init一样
+ * */
 void __init time_init(void)
 {
 #ifdef CONFIG_HPET_TIMER
 	if (is_hpet_capable()) {
 		/*
-		 * HPET initialization needs to do memory-mapped io. So, let
-		 * us do a late initialization after mem_init().
+		 * HPET初始化需要做内存映射io。所以，让我们在 mem_init() 之后做一个后期初始化。
 		 */
 		late_time_init = hpet_time_init;
 		return;
 	}
 #endif
-	xtime.tv_sec = get_cmos_time();
+	// xtime是struct timespec，秒+纳秒
+	xtime.tv_sec = get_cmos_time();		// 获取实时时钟RTC，BIOS提供
+	// (-300 000毫秒 % 1000) * (1000 000 000/1000)
 	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
-	set_normalized_timespec(&wall_to_monotonic,
-		-xtime.tv_sec, -xtime.tv_nsec);
+	set_normalized_timespec(&wall_to_monotonic, -xtime.tv_sec, -xtime.tv_nsec);
 
-	cur_timer = select_timer();
+	cur_timer = select_timer();		// 选择定时器
 	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
 
 	time_init_hook();

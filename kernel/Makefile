@@ -2,6 +2,12 @@
 # Makefile for the linux kernel.
 #
 
+# 从Linux 内核2.6 开始，Linux 内核的编译采用Kbuild 系统 ，
+# 这同过去的编译系统有很大的不同，Kbuild 系统使用Kbuild Makefile 来编译内核或模块。
+# 当Kernel Makefile 被解析完成后，Kbuild 会读取相关的Kbuild Makefile
+# 进行内核或模块的编译。Kbuild Makefile 有特定的语法指定哪些编译进内核中、
+# 哪些编译为模块、及对应的源文件是什么等。内核及驱动开发人员需要编写这个Kbuild Makefile 文件。
+
 obj-y     = sched.o fork.o exec_domain.o panic.o printk.o profile.o \
 	    exit.o itimer.o time.o softirq.o resource.o \
 	    sysctl.o capability.o ptrace.o timer.o user.o \

@@ -34,7 +34,7 @@ struct vm_area_struct;
  * __GFP_NORETRY: The VM implementation must not retry indefinitely.
  */
 // 行为修饰符
-#define __GFP_WAIT	0x10	/* Can wait and reschedule? */
+#define __GFP_WAIT	0x10	/* 可以等待和重新调度? */
 #define __GFP_HIGH	0x20	/* Should access emergency pools? */
 #define __GFP_IO	0x40	/* Can start physical IO? */
 #define __GFP_FS	0x80	/* Can call down to low-level FS? */

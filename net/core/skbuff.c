@@ -113,17 +113,15 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *
  */
 
-/**
+/*
  *	alloc_skb	-	allocate a network buffer
  *	@size: size to allocate
  *	@gfp_mask: allocation mask
  *
- *	Allocate a new &sk_buff. The returned buffer has no headroom and a
- *	tail room of size bytes. The object has a reference count of one.
- *	The return is the buffer. On a failure the return is %NULL.
+ *	分配一个新的 &sk_buff。返回的缓冲区没有空间和大小字节的尾部空间。
+ *	该对象的引用计数为 1。返回的是缓冲区。失败时返回 %NULL。
  *
- *	Buffers may only be allocated from interrupts using a @gfp_mask of
- *	%GFP_ATOMIC.
+ *	缓冲区只能从使用 %GFP_ATOMIC 的 @gfp_mask 的中断分配。
  *
  *	分配套接字缓存区
  */
@@ -143,15 +141,15 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 	if (!data)
 		goto nodata;
 
-	memset(skb, 0, offsetof(struct sk_buff, truesize));
-	skb->truesize = size + sizeof(struct sk_buff);
-	atomic_set(&skb->users, 1);
-	skb->head = data;
-	skb->data = data;
-	skb->tail = data;
-	skb->end  = data + size;
+	memset(skb, 0, offsetof(struct sk_buff, truesize));		// 只清空部分数据
+	skb->truesize = size + sizeof(struct sk_buff);		// sk_buff的真实大小
+	atomic_set(&skb->users, 1);		// 引用计数
+	skb->head = data;		// 首部起始
+	skb->data = data;		// payload开始
+	skb->tail = data;		// payload结束
+	skb->end  = data + size;	// 结束
 
-	atomic_set(&(skb_shinfo(skb)->dataref), 1);
+	atomic_set(&(skb_shinfo(skb)->dataref), 1);		// skb_shared_info中的引用计数
 	skb_shinfo(skb)->nr_frags  = 0;
 	skb_shinfo(skb)->tso_size = 0;
 	skb_shinfo(skb)->tso_segs = 0;
@@ -164,7 +162,7 @@ nodata:
 	goto out;
 }
 
-/**
+/*
  *	alloc_skb_from_cache	-	allocate a network buffer
  *	@cp: kmem_cache from which to allocate the data area
  *           (object size must be big enough for @size bytes + skb overheads)
