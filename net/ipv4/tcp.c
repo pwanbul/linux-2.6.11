@@ -1,3 +1,5 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnreachableCode"
 /*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
@@ -2328,8 +2330,7 @@ void __init tcp_init(void)
 		INIT_HLIST_HEAD(&tcp_bhash[i].chain);
 	}
 
-	/* Try to be a bit smarter and adjust defaults depending
-	 * on available memory.
+	/* 尝试更聪明一点，并根据可用内存调整默认值。
 	 */
 	for (order = 0; ((1 << order) << PAGE_SHIFT) <
 			(tcp_bhash_size * sizeof(struct tcp_bind_hashbucket));
@@ -2381,3 +2382,5 @@ EXPORT_SYMBOL(tcp_setsockopt);
 EXPORT_SYMBOL(tcp_shutdown);
 EXPORT_SYMBOL(tcp_statistics);
 EXPORT_SYMBOL(tcp_timewait_cachep);
+
+#pragma clang diagnostic pop

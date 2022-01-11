@@ -48,10 +48,9 @@ EXPORT_SYMBOL(sys_tz);
 #ifdef __ARCH_WANT_SYS_TIME
 
 /*
- * sys_time() can be implemented in user-level using
- * sys_gettimeofday().  Is this for backwards compatibility?  If so,
- * why not move it into the appropriate arch directory (for those
- * architectures that need it).
+ * sys_time()可以使用sys_gettimeofday()在用户级实现。
+ * 这是为了向后兼容吗？如果是这样，为什么不将它移动到
+ * 适当的arch目录（对于那些需要它的体系结构）。
  */
 asmlinkage long sys_time(time_t __user * tloc)
 {

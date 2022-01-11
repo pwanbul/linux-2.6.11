@@ -1296,9 +1296,8 @@ asmlinkage long sys_bind(int fd, struct sockaddr __user *umyaddr, int addrlen)
 
 
 /*
- *	Perform a listen. Basically, we allow the protocol to do anything
- *	necessary for a listen, and if that works, we mark the socket as
- *	ready for listening.
+ *	进行聆听。基本上，我们允许协议为监听做任何必要的事情，
+ *	如果可行，我们将套接字标记为准备好监听。
  */
 
 int sysctl_somaxconn = SOMAXCONN;
@@ -1310,7 +1309,7 @@ asmlinkage long sys_listen(int fd, int backlog)
 	
 	if ((sock = sockfd_lookup(fd, &err)) != NULL) {
 		if ((unsigned) backlog > sysctl_somaxconn)
-			backlog = sysctl_somaxconn;
+			backlog = sysctl_somaxconn;			// 默认128，不能超过
 
 		err = security_socket_listen(sock, backlog);
 		if (err) {

@@ -13,7 +13,18 @@ struct open_intent {
 };
 
 enum { MAX_NESTED_LINKS = 5 };
-
+/*
+ * 查找过程涉及到很多函数调用，在这些调用过程中，
+ * nameidata起到了很重要的作用：
+ * 1. 向查找函数传递参数；
+ * 2. 保存查找结果。
+ *
+ * 查找完成后@dentry 包含了找到文件的dentry目录项。
+ * @mnt 包含了文件目录项所在的vfsmount。
+ * @last 包含了需要查找的名称，这是一个快速字符串，除了路径字符串本身外，还包含字符串的长度和一个散列值。
+ * @depth 当前路径深度。
+ * @saved_names：由于在符号链接处理时，nd的名字一直发生变化，这里用来保存符号链接处理中的路径名。
+ * */
 struct nameidata {
 	struct dentry	*dentry;		// 目录项
 	struct vfsmount *mnt;		// 挂载点
@@ -35,12 +46,12 @@ struct nameidata {
 enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT, LAST_BIND};
 
 /*
- * The bitmask for a lookup event:
- *  - follow links at the end
- *  - require a directory
- *  - ending slashes ok even for nonexistent files
- *  - internal "there are more path compnents" flag
- *  - locked when lookup done with dcache_lock held
+ * 查找事件的位掩码：
+ *  - 按照最后的链接
+ *  - 需要一个目录
+ *  - 即使对于不存在的文件，结束斜线也可以
+ *  - 内部“有更多路径组件”标志
+ *  - 使用 dcache_lock 完成查找时锁定
  */
 #define LOOKUP_FOLLOW		 1
 #define LOOKUP_DIRECTORY	 2

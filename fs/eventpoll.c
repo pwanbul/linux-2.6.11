@@ -171,8 +171,7 @@ struct wake_task_node {
 };
 
 /*
- * This is used to implement the safe poll wake up avoiding to reenter
- * the poll callback from inside wake_up().
+ * 这用于实现安全轮询唤醒，避免从wake_up() 内部重新进入轮询回调.
  */
 struct poll_safewake {
 	struct list_head wake_task_list;
@@ -314,11 +313,11 @@ static struct super_block *eventpollfs_get_sb(struct file_system_type *fs_type,
 					      void *data);
 
 /*
- * This semaphore is used to serialize ep_free() and eventpoll_release_file().
+ * 该信号量用于序列化 ep_free() 和 eventpoll_release_file().
  */
 struct semaphore epsem;
 
-/* Safe wake up implementation */
+/* 安全唤醒实现 */
 static struct poll_safewake psw;
 
 /* Slab cache used to allocate "struct epitem" */
@@ -327,7 +326,7 @@ static kmem_cache_t *epi_cache;
 /* Slab cache used to allocate "struct eppoll_entry" */
 static kmem_cache_t *pwq_cache;
 
-/* Virtual fs used to allocate inodes for eventpoll files */
+/* 用于为 eventpoll 文件分配 inode 的虚拟 fs */
 static struct vfsmount *eventpoll_mnt;
 
 /* 实现事件轮询文件行为的文件回调 */
@@ -337,8 +336,7 @@ static struct file_operations eventpoll_fops = {
 };
 
 /*
- * This is used to register the virtual file system from where
- * eventpoll inodes are allocated.
+ * 这用于注册分配 eventpoll inode 的虚拟文件系统。
  */
 static struct file_system_type eventpoll_fs_type = {
 	.name		= "eventpollfs",
@@ -684,13 +682,13 @@ static int ep_getfd(int *efd, struct inode **einode, struct file **efile)
 	if (!file)
 		goto eexit_1;
 
-	/* Allocates an inode from the eventpoll file system */
+	/* 从 eventpoll 文件系统分配一个 inode */
 	inode = ep_eventpoll_inode();
 	error = PTR_ERR(inode);
 	if (IS_ERR(inode))
 		goto eexit_2;
 
-	/* Allocates a free descriptor to plug the file onto */
+	/* 分配一个空闲描述符来插入文件 */
 	error = get_unused_fd();
 	if (error < 0)
 		goto eexit_3;
@@ -721,7 +719,7 @@ static int ep_getfd(int *efd, struct inode **einode, struct file **efile)
 	file->f_version = 0;
 	file->private_data = NULL;
 
-	/* Install the new setup file into the allocated fd. */
+	/* 将新的安装文件安装到分配的 fd 中。 */
 	fd_install(fd, file);
 
 	*efd = fd;
@@ -772,12 +770,9 @@ static void ep_free(struct eventpoll *ep)
 		ep_poll_safewake(&psw, &ep->poll_wait);
 
 	/*
-	 * We need to lock this because we could be hit by
-	 * eventpoll_release_file() while we're freeing the "struct eventpoll".
-	 * We do not need to hold "ep->sem" here because the epoll file
-	 * is on the way to be removed and no one has references to it
-	 * anymore. The only hit might come from eventpoll_release_file() but
-	 * holding "epsem" is sufficent here.
+	 * 我们需要锁定它，因为我们可能会在释放“struct eventpoll”时被 eventpoll_release_file() 击中。
+	 * 我们不需要在这里保留“ep->sem”，因为 epoll 文件即将被删除，并且没有人再引用它。
+	 * 唯一的命中可能来自 eventpoll_release_file() 但在这里持有“epsem”就足够了。
 	 */
 	down(&epsem);
 
@@ -1569,35 +1564,34 @@ eventpollfs_get_sb(struct file_system_type *fs_type, int flags,
 	return get_sb_pseudo(fs_type, "eventpoll:", NULL, EVENTPOLLFS_MAGIC);
 }
 
-
+/* 初始化epoll */
 static int __init eventpoll_init(void)
 {
 	int error;
 
-	init_MUTEX(&epsem);
+	init_MUTEX(&epsem);     // 互斥量
 
-	/* Initialize the structure used to perform safe poll wait head wake ups */
+	/* 初始化用于执行安全轮询等待头唤醒的结构 */
 	ep_poll_safewake_init(&psw);
 
-	/* Allocates slab cache used to allocate "struct epitem" items */
+	/* 分配用于分配“struct epitem”项目的slab缓存 */
 	epi_cache = kmem_cache_create("eventpoll_epi", sizeof(struct epitem),
 			0, SLAB_HWCACHE_ALIGN|EPI_SLAB_DEBUG|SLAB_PANIC,
 			NULL, NULL);
 
-	/* Allocates slab cache used to allocate "struct eppoll_entry" */
+	/* 分配用于分配“struct eppoll_entry”的slab缓存 */
 	pwq_cache = kmem_cache_create("eventpoll_pwq",
 			sizeof(struct eppoll_entry), 0,
 			EPI_SLAB_DEBUG|SLAB_PANIC, NULL, NULL);
 
 	/*
-	 * Register the virtual file system that will be the source of inodes
-	 * for the eventpoll files
+	 * 注册将成为 eventpoll 文件的 inode 源的虚拟文件系统
 	 */
 	error = register_filesystem(&eventpoll_fs_type);
 	if (error)
 		goto epanic;
 
-	/* Mount the above commented virtual file system */
+	/*挂载上面注释的虚拟文件系统 */
 	eventpoll_mnt = kern_mount(&eventpoll_fs_type);
 	error = PTR_ERR(eventpoll_mnt);
 	if (IS_ERR(eventpoll_mnt))

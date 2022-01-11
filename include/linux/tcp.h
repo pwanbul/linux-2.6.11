@@ -115,7 +115,7 @@ enum {
 	TCP_DATA_OFFSET = __constant_htonl(0xF0000000)
 }; 
 
-/* TCP 选项 */
+/* 套接字选项 */
 #define TCP_NODELAY		1	/* Turn off Nagle's algorithm. */
 #define TCP_MAXSEG		2	/* Limit MSS */
 #define TCP_CORK		3	/* Never send partially complete segments */
@@ -251,7 +251,7 @@ struct tcp_sock {
  	__u32	rcv_nxt;	/* What we want to receive next 	*/
  	__u32	snd_nxt;	/* Next sequence we send		*/
 
- 	__u32	snd_una;	/* First byte we want an ack for	*/
+ 	__u32	snd_una;	/* 我们想要确认的第一个字节	*/
  	__u32	snd_sml;	/* Last byte of the most recently transmitted small packet */
 	__u32	rcv_tstamp;	/* timestamp of last received ACK (for keepalives) */
 	__u32	lsndtime;	/* timestamp of last sent data packet (for restart window) */
@@ -297,12 +297,12 @@ struct tcp_sock {
 	__u8	defer_accept;	/* User waits for some data after accept() */
 
 /* RTT measurement */
-	__u32	srtt;		/* smoothed round trip time << 3	*/
-	__u32	mdev;		/* medium deviation			*/
-	__u32	mdev_max;	/* maximal mdev for the last rtt period	*/
-	__u32	rttvar;		/* smoothed mdev_max			*/
-	__u32	rtt_seq;	/* sequence number to update rttvar	*/
-	__u32	rto;		/* retransmit timeout			*/
+	__u32	srtt;		/* 平滑往返时间<<3	*/
+	__u32	mdev;		/* 中偏差			*/
+	__u32	mdev_max;	/* 最后一个 rtt 周期的最大 mdev	*/
+	__u32	rttvar;		/* 平滑 mdev_max			*/
+	__u32	rtt_seq;	/* 更新 rttvar 的序列号	*/
+	__u32	rto;		/* 重传超时			*/
 
 	__u32	packets_out;	/* Packets which are "in flight"	*/
 	__u32	left_out;	/* Packets which leaved network	*/

@@ -252,16 +252,13 @@ static __inline__ u16 tcp_select_window(struct sock *sk)
 }
 
 
-/* This routine actually transmits TCP packets queued in by
- * tcp_do_sendmsg().  This is used by both the initial
- * transmission and possible later retransmissions.
- * All SKB's seen here are completely headerless.  It is our
- * job to build the TCP header, and pass the packet down to
- * IP so it can do the same plus pass the packet off to the
- * device.
+/* 该例程实际上传输由 tcp_do_sendmsg() 排队的 TCP 数据包。
+ * 这被初始传输和可能的稍后重传使用。
+ * 这里看到的所有 SKB 都是完全无标题的。
+ * 我们的工作是构建 TCP 标头，并将数据包向下传递到 IP，
+ * 以便它可以执行相同的操作并将数据包传递给设备。
  *
- * We are working here with either a clone of the original
- * SKB, or a fresh unique copy made by the retransmit engine.
+ * 我们在这里使用原始 SKB 的克隆，或由重新传输引擎制作的新的独特副本。
  */
 static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 {
@@ -282,15 +279,19 @@ static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 
 		sysctl_flags = 0;
 		if (tcb->flags & TCPCB_FLAG_SYN) {
+            // MSS
 			tcp_header_size = sizeof(struct tcphdr) + TCPOLEN_MSS;
-			if(sysctl_tcp_timestamps) {
+			//时间戳
+            if(sysctl_tcp_timestamps) {
 				tcp_header_size += TCPOLEN_TSTAMP_ALIGNED;
 				sysctl_flags |= SYSCTL_FLAG_TSTAMPS;
 			}
-			if(sysctl_tcp_window_scaling) {
+			// 窗口缩放因子
+            if(sysctl_tcp_window_scaling) {
 				tcp_header_size += TCPOLEN_WSCALE_ALIGNED;
 				sysctl_flags |= SYSCTL_FLAG_WSCALE;
 			}
+            // sack使能
 			if(sysctl_tcp_sack) {
 				sysctl_flags |= SYSCTL_FLAG_SACK;
 				if(!(sysctl_flags & SYSCTL_FLAG_TSTAMPS))
@@ -729,21 +730,17 @@ unsigned int tcp_current_mss(struct sock *sk, int large)
 	return mss_now;
 }
 
-/* This routine writes packets to the network.  It advances the
- * send_head.  This happens as incoming acks open up the remote
- * window for us.
+/* 此例程将数据包写入网络。 它推进了send_head。这发生在传入的 ack 为我们打开远程窗口时。
  *
- * Returns 1, if no segments are in flight and we have queued segments, but
- * cannot send anything now because of SWS or another problem.
+ * 返回 1，如果没有段在飞行中并且我们有排队的段，但由于 SWS 或其他问题现在无法发送任何内容。
  */
 int tcp_write_xmit(struct sock *sk, int nonagle)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	unsigned int mss_now;
 
-	/* If we are closed, the bytes will have to remain here.
-	 * In time closedown will finish, we empty the write queue and all
-	 * will be happy.
+	/* 如果我们关闭，字节将不得不保留在这里。
+	 * 及时关闭将完成，我们清空写入队列，所有人都会很高兴。
 	 */
 	if (sk->sk_state != TCP_CLOSE) {
 		struct sk_buff *skb;

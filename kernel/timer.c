@@ -46,12 +46,12 @@ static void time_interpolator_update(long delta_nsec);
 #endif
 
 /*
- * per-CPU timer vector definitions:
+ * 每 CPU 定时器向量定义：
  */
 #define TVN_BITS 6
 #define TVR_BITS 8
-#define TVN_SIZE (1 << TVN_BITS)
-#define TVR_SIZE (1 << TVR_BITS)
+#define TVN_SIZE (1 << TVN_BITS)        // 64
+#define TVR_SIZE (1 << TVR_BITS)        // 256
 #define TVN_MASK (TVN_SIZE - 1)
 #define TVR_MASK (TVR_SIZE - 1)
 
@@ -63,6 +63,7 @@ typedef struct tvec_root_s {
 	struct list_head vec[TVR_SIZE];
 } tvec_root_t;
 
+/* 分层时间轮定时器 */
 struct tvec_t_base_s {
 	spinlock_t lock;
 	unsigned long timer_jiffies;
@@ -112,16 +113,17 @@ static inline void check_timer(struct timer_list *timer)
 }
 
 
+/* 将timer加时间轮中 */
 static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
 {
 	unsigned long expires = timer->expires;
-	unsigned long idx = expires - base->timer_jiffies;
+	unsigned long idx = expires - base->timer_jiffies;      // 还差idx超时
 	struct list_head *vec;
 
-	if (idx < TVR_SIZE) {
+	if (idx < TVR_SIZE) {           // 小于2^8个tick
 		int i = expires & TVR_MASK;
 		vec = base->tv1.vec + i;
-	} else if (idx < 1 << (TVR_BITS + TVN_BITS)) {
+	} else if (idx < 1 << (TVR_BITS + TVN_BITS)) {      // 小于2^(8+6)个tick
 		int i = (expires >> TVR_BITS) & TVN_MASK;
 		vec = base->tv2.vec + i;
 	} else if (idx < 1 << (TVR_BITS + 2 * TVN_BITS)) {
@@ -132,14 +134,13 @@ static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
 		vec = base->tv4.vec + i;
 	} else if ((signed long) idx < 0) {
 		/*
-		 * Can happen if you add a timer with expires == jiffies,
-		 * or you set a timer to go off in the past
+		 * 如果您添加一个带 expires == jiffies 的计时器，
+		 * 或者您将计时器设置为在过去关闭，就会发生这种情况
 		 */
 		vec = base->tv1.vec + (base->timer_jiffies & TVR_MASK);
 	} else {
 		int i;
-		/* If the timeout is larger than 0xffffffff on 64-bit
-		 * architectures then we use the maximum timeout:
+		/* 如果超时在 64 位架构上大于 0xffffffff，那么我们使用最大超时:
 		 */
 		if (idx > 0xffffffffUL) {
 			idx = 0xffffffffUL;
@@ -220,11 +221,11 @@ repeat:
 EXPORT_SYMBOL(__mod_timer);
 
 /***
- * add_timer_on - start a timer on a particular CPU
+ * add_timer_on - 在特定 CPU 上启动计时器
  * @timer: the timer to be added
  * @cpu: the CPU to start it on
  *
- * This is not very scalable on SMP. Double adds are not possible.
+ * 这在 SMP 上不是很可扩展。双加是不可能的。
  */
 void add_timer_on(struct timer_list *timer, int cpu)
 {
@@ -400,7 +401,7 @@ EXPORT_SYMBOL(del_singleshot_timer_sync);
 
 static int cascade(tvec_base_t *base, tvec_t *tv, int index)
 {
-	/* cascade all the timers from tv up one level */
+	/* 将tv上的所有定时器级联上一层 */
 	struct list_head *head, *curr;
 
 	head = tv->vec + index;
@@ -426,8 +427,7 @@ static int cascade(tvec_base_t *base, tvec_t *tv, int index)
  * __run_timers - run all expired timers (if any) on this CPU.
  * @base: the timer vector to be processed.
  *
- * This function cascades all vectors and executes all expired timer
- * vectors.
+ * 该函数级联所有向量并执行所有过期的定时器向量。
  */
 #define INDEX(N) (base->timer_jiffies >> (TVR_BITS + N * TVN_BITS)) & TVN_MASK
 
@@ -435,14 +435,15 @@ static inline void __run_timers(tvec_base_t *base)
 {
 	struct timer_list *timer;
 
-	spin_lock_irq(&base->lock);
+	spin_lock_irq(&base->lock);             // 关闭中断
 	while (time_after_eq(jiffies, base->timer_jiffies)) {
+        // jiffies 大于等于 base->timer_jiffies
 		struct list_head work_list = LIST_HEAD_INIT(work_list);
 		struct list_head *head = &work_list;
- 		int index = base->timer_jiffies & TVR_MASK;
+ 		int index = base->timer_jiffies & TVR_MASK;         // idx为timer_jiffies的低8位
  
 		/*
-		 * Cascade timers:
+		 * 级联定时器：
 		 */
 		if (!index &&
 			(!cascade(base, &base->tv2, INDEX(0))) &&
@@ -869,7 +870,7 @@ EXPORT_SYMBOL(xtime_lock);
 #endif
 
 /*
- * This function runs timers and the timer-tq in bottom half context.
+ * 此函数在下半部分上下文中运行计时器和 timer-tq。
  */
 static void run_timer_softirq(struct softirq_action *h)
 {
@@ -897,7 +898,7 @@ static inline void update_times(void)
 	ticks = jiffies - wall_jiffies;
 	if (ticks) {		// 正常ticks为1，因为irq0是可屏蔽的中断，所以中断可能会丢失
 		wall_jiffies += ticks;
-		update_wall_time(ticks);
+		update_wall_time(ticks);        // 更新墙上时钟
 	}
 	calc_load(ticks);		// 计算负载
 }
@@ -1036,24 +1037,24 @@ static void process_timeout(unsigned long __data)
 
 /**
  * schedule_timeout - 休眠直到超时
- * @timeout: timeout value in jiffies
+ * timeout: jiffies为的超时值
  *
- * 使当前任务休眠，直到@timeout jiffies 过去。除非设置了当前任务状态
+ * 使当前任务休眠，直到timeout jiffies 过去。除非设置了当前任务状态
  * （请参阅 set_current_state()），否则例程将立即返回。
  *
  * 您可以按如下方式设置任务状态 -
  *
- * %TASK_UNINTERRUPTIBLE - 至少@timeout jiffies 保证在例程返回之前通过。例程将返回0
+ * %TASK_UNINTERRUPTIBLE - 至少timeout jiffies 保证在例程返回之前通过。例程将返回0
  *
- * %TASK_INTERRUPTIBLE - the routine may return early if a signal is
- * delivered to the current task. In this case the remaining time
- * in jiffies will be returned, or 0 if the timer expired in time
+ * %TASK_INTERRUPTIBLE - 如果将信号传递给当前任务，则例程可能会提前返回。
+ *在这种情况下，将返回 jiffies 中的剩余时间，如果计时器及时到期，则返回 0
  *
  * 当此例程返回时，当前任务状态保证为 TASK_RUNNING。
  *
- * 指定 %MAX_SCHEDULE_TIMEOUT 的@timeout 值将在没有超时限制的情况下调度 CPU。在这种情况下，返回值将是 %MAX_SCHEDULE_TIMEOUT。
+ * 指定 %MAX_SCHEDULE_TIMEOUT 的timeout 值将在没有超时限制的情况下调度CPU。
+ * 在这种情况下，返回值将是 %MAX_SCHEDULE_TIMEOUT。
  *
- * In all cases the return value is guaranteed to be non-negative.
+ * 在所有情况下，返回值都保证为非负。
  */
 fastcall signed long __sched schedule_timeout(signed long timeout)
 {
@@ -1066,6 +1067,8 @@ fastcall signed long __sched schedule_timeout(signed long timeout)
 		/*
 		 * 这两个特殊情况对于让调用者感到舒适很有用。而已。我们可以从负值之一中获取 MAX_SCHEDULE_TIMEOUT，
 		 * 但我想返回一个有效的偏移量 (>=0) 以允许调用者使用 retval 做它想做的一切。
+		 *
+		 * 表示一直延时下去，不主动唤醒，直接schedule切换走
 		 */
 		schedule();
 		goto out;
@@ -1087,16 +1090,22 @@ fastcall signed long __sched schedule_timeout(signed long timeout)
 		}
 	}
 
-	expire = timeout + jiffies;
+	expire = timeout + jiffies;     // 超时时间戳
 
-	init_timer(&timer);
+	init_timer(&timer);         // 初始化定时器对象
+	// 设置参数
 	timer.expires = expire;
 	timer.data = (unsigned long) current;
 	timer.function = process_timeout;
 
-	add_timer(&timer);
+	add_timer(&timer);          // 加入定时器中
+	/* 调度走当前进程，并当前检查阻塞该接口上
+	 * 两种情况会到该接扣返回
+	 * 1. 定时器超时，通过process_timeout将进程唤醒，此时timeout应当为0
+	 * 2. 被信号唤醒，此时timeout为剩余时间
+	 * */
 	schedule();
-	del_singleshot_timer_sync(&timer);
+	del_singleshot_timer_sync(&timer);      // 删除定时器
 
 	timeout = expire - jiffies;
 
@@ -1138,6 +1147,7 @@ static long __sched nanosleep_restart(struct restart_block *restart)
 	return ret;
 }
 
+/* nanosleep实现 */
 asmlinkage long sys_nanosleep(struct timespec __user *rqtp, struct timespec __user *rmtp)
 {
 	struct timespec t;
@@ -1150,22 +1160,23 @@ asmlinkage long sys_nanosleep(struct timespec __user *rqtp, struct timespec __us
 	if ((t.tv_nsec >= 1000000000L) || (t.tv_nsec < 0) || (t.tv_sec < 0))
 		return -EINVAL;
 
-	expire = timespec_to_jiffies(&t) + (t.tv_sec || t.tv_nsec);
-	current->state = TASK_INTERRUPTIBLE;
+	expire = timespec_to_jiffies(&t) + (t.tv_sec || t.tv_nsec);     // 超时时间
+	current->state = TASK_INTERRUPTIBLE;        // 可被信号唤醒，rmtp返回剩余时间
 	expire = schedule_timeout(expire);
 
 	ret = 0;
-	if (expire) {
+	if (expire) {           // expire非0时，表示进程被信号提前唤醒
 		struct restart_block *restart;
 		jiffies_to_timespec(expire, &t);
-		if (rmtp && copy_to_user(rmtp, &t, sizeof(t)))
+		if (rmtp && copy_to_user(rmtp, &t, sizeof(t)))          // rmtp非空，返回值-结果参数
 			return -EFAULT;
 
+		// 保存好相关参数
 		restart = &current_thread_info()->restart_block;
 		restart->fn = nanosleep_restart;
 		restart->arg0 = jiffies + expire;
 		restart->arg1 = (unsigned long) rmtp;
-		ret = -ERESTART_RESTARTBLOCK;
+		ret = -ERESTART_RESTARTBLOCK;       // 该ecode会被内核拦截，内核自动重启系统调用
 	}
 	return ret;
 }
@@ -1258,7 +1269,7 @@ asmlinkage long sys_sysinfo(struct sysinfo __user *info)
 
 	return 0;
 }
-
+/* 初始化定时器 */
 static void __devinit init_timers_cpu(int cpu)
 {
 	int j;
@@ -1436,7 +1447,7 @@ void time_interpolator_reset(void)
 
 unsigned long time_interpolator_get_offset(void)
 {
-	/* If we do not have a time interpolator set up then just return zero */
+	/* 如果我们没有设置时间插值器，则只需返回零 */
 	if (!time_interpolator)
 		return 0;
 

@@ -779,7 +779,7 @@ struct super_block {
 	unsigned char		s_blocksize_bits;
 	unsigned char		s_dirt;
 	unsigned long long	s_maxbytes;	/* Max file size */
-	struct file_system_type	*s_type;
+	struct file_system_type	*s_type;        /* 文件系统类型 */
 	struct super_operations	*s_op;			/* 超级块方法 */
 	struct dquot_operations	*dq_op;
  	struct quotactl_ops	*s_qcop;

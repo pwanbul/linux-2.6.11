@@ -280,11 +280,10 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	/*
-	 * Here we are in the timer irq handler. We just have irqs locally
-	 * disabled but we don't know if the timer_bh is running on the other
-	 * CPU. We need to avoid to SMP race with it. NOTE: we don' t need
-	 * the irq version of write_lock because as just said we have irq
-	 * locally disabled. -arca
+	 * 在这里，我们在计时器irq处理程序中。我们只是在本地禁用了irqs，
+	 * 但我们不知道timer_bh是否正在另一个CPU上运行。
+	 * 我们需要避免与SMP竞争。注意: 我们不需要write_lock的irq版本，
+	 * 因为正如刚才所说，我们在本地禁用了irq。 -arca
 	 */
 	write_seqlock(&xtime_lock);
 

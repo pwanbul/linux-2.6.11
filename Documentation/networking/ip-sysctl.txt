@@ -89,18 +89,14 @@ tcp_synack_retries - INTEGER
 	is 5, which corresponds to ~180seconds.
 
 tcp_keepalive_time - INTEGER
-	How often TCP sends out keepalive messages when keepalive is enabled.
-	Default: 2hours.
+	启用 keepalive 时，TCP 多久发送一次 keepalive 消息。默认值：2 小时。
 
 tcp_keepalive_probes - INTEGER
-	How many keepalive probes TCP sends out, until it decides that the
-	connection is broken. Default value: 9.
+	TCP 发出多少个 keepalive 探测，直到它决定连接中断。默认值：9。
 
 tcp_keepalive_intvl - INTEGER
-	How frequently the probes are send out. Multiplied by
-	tcp_keepalive_probes it is time to kill not responding connection,
-	after probes started. Default value: 75sec i.e. connection
-	will be aborted after ~11 minutes of retries.
+	发送探测的频率。乘以 tcp_keepalive_probes 是时候终止没有响应的连接，在探测开始后。
+	默认值：75 秒，即连接将在约 11 分钟的重试后中止。
 
 tcp_retries1 - INTEGER
 	How many times to retry before deciding that something is wrong
@@ -141,15 +137,11 @@ tcp_max_tw_buckets - INTEGER
 	if network conditions require more than default value.
 
 tcp_tw_recycle - BOOLEAN
-	Enable fast recycling TIME-WAIT sockets. Default value is 0.
-	It should not be changed without advice/request of technical
-	experts.
+	启用快速回收 TIME-WAIT 套接字。默认值为0。未经技术专家的建议，不得更改。
 
 tcp_tw_reuse - BOOLEAN
-	Allow to reuse TIME-WAIT sockets for new connections when it is
-	safe from protocol viewpoint. Default value is 0.
-	It should not be changed without advice/request of technical
-	experts.
+	允许在从协议角度安全的情况下为新连接重用 TIME-WAIT 套接字。默认值为 0。
+	未经技术专家的建议，不得更改。
 
 tcp_max_orphans - INTEGER
 	Maximal number of TCP sockets not attached to any user file handle,

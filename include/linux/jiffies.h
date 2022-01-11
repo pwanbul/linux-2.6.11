@@ -74,6 +74,7 @@
  * 除非我们强制执行此问题，否则可能无法正确访问作为 8 字节变量一部分的 jiffies
  */
 #define __jiffy_data  __attribute__((section(".data")))
+// https://www.cnblogs.com/mewmicro/p/6421254.html?utm_source=itdadao&utm_medium=referral
 
 /*
  * 64 位值不是易失性的 - 您不得在不对 xtime_lock 中的序列号进行采样的情况下读取它。

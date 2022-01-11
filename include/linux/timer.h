@@ -8,6 +8,7 @@
 
 struct tvec_t_base_s;
 
+/* 定时器中保存的对象 */
 struct timer_list {
 	struct list_head entry;
 	unsigned long expires;

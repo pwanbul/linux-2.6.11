@@ -216,7 +216,7 @@ struct ucred {
 #define PF_BLUETOOTH	AF_BLUETOOTH
 #define PF_MAX		AF_MAX
 
-/* Maximum queue length specifiable by listen.  */
+/* 可通过侦听指定的最大队列长度。  */
 #define SOMAXCONN	128
 
 /* Flags we can use with send/ and recv. 

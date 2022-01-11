@@ -374,7 +374,7 @@ running once the system is up.
 			See Documentation/filesystems/devfs/boot-options.
 
 	dhash_entries=	[KNL]
-			Set number of hash buckets for dentry cache.
+			设置 dentry 缓存的哈希桶数。
  
 	digi=		[HW,SERIAL]
 			IO parameters + enable/disable command.

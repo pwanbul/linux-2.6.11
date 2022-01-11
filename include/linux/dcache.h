@@ -44,8 +44,8 @@ struct dentry_stat_t {
 };
 extern struct dentry_stat_t dentry_stat;
 
-/* Name hashing routines. Initial hash value */
-/* Hash courtesy of the R5 hash in reiserfs modulo sign bits */
+/* 命名散列例程。初始哈希值 */
+/* 散列由 reiserfs 模符号位中的 R5 散列提供 */
 #define init_name_hash()		0
 
 /* 部分哈希更新函数。假设每个字符大约 4 位 */
@@ -98,8 +98,8 @@ struct dentry {
 	struct inode *d_inode;		/* Where the name belongs to - NULL is
 					 * negative 相关联的索引节点 */
 	/*
-	 * The next three fields are touched by __d_lookup.  Place them here
-	 * so they all fit in a 16-byte range, with 16-byte alignment.
+	 * __d_lookup 涉及接下来的三个字段。
+	 * 将它们放在这里，以便它们都适合 16 字节的范围，并具有 16 字节的对齐方式。
 	 */
 	struct dentry *d_parent;	/* parent directory 父目录的目录项对象*/
 	struct qstr d_name;		// 目录项名称

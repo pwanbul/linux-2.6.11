@@ -1368,17 +1368,13 @@ static inline struct ip_options *tcp_v4_save_options(struct sock *sk,
 }
 
 /*
- * Maximum number of SYN_RECV sockets in queue per LISTEN socket.
- * One SYN_RECV socket costs about 80bytes on a 32bit machine.
- * It would be better to replace it with a global counter for all sockets
- * but then some measure against one socket starving all other sockets
- * would be needed.
+ * 每个 LISTEN 套接字队列中的最大 SYN_RECV 套接字数。
+ * 一个 SYN_RECV 套接字在 32 位机器上花费大约 80 字节。
+ * 最好将它替换为所有套接字的全局计数器，但随后需要采取一些措施来防止一个套接字耗尽所有其他套接字。
  *
- * It was 128 by default. Experiments with real servers show, that
- * it is absolutely not enough even at 100conn/sec. 256 cures most
- * of problems. This value is adjusted to 128 for very small machines
- * (<=32Mb of memory) and to 1024 on normal or better ones (>=256Mb).
- * Further increasing requires to change hash table size.
+ * 默认为 128。真实服务器的实验表明，即使在 100conn/sec 也绝对不够。 256解决了大部分问题。
+ * 对于非常小的机器（<=32Mb 的内存），这个值被调整为 128，在普通或更好的机器（>=256Mb）
+ * 上被调整为 1024。进一步增加需要更改哈希表大小。
  */
 int sysctl_max_syn_backlog = 256;
 

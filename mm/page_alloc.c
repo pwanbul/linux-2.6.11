@@ -2123,10 +2123,10 @@ __setup("hashdist=", set_hashdist);
  * - limit 是哈希桶的数量，而不是总分配大小
  */
 void *__init  alloc_large_system_hash(const char *tablename,
-				     unsigned long bucketsize,
-				     unsigned long numentries,
+				     unsigned long bucketsize,			// sizeof(struct hlist_head)
+				     unsigned long numentries,			// 桶的数量，如1024
 				     int scale,
-				     int flags,
+				     int flags,			// 早期或考虑highmem
 				     unsigned int *_hash_shift,
 				     unsigned int *_hash_mask,
 				     unsigned long limit)
@@ -2137,7 +2137,7 @@ void *__init  alloc_large_system_hash(const char *tablename,
 
 	/* 允许内核 cmdline 有发言权 */
 	if (!numentries) {
-		/* round applicable memory size up to nearest megabyte */
+		/* 将适用的内存大小四舍五入到最接近的兆字节 */
 		numentries = (flags & HASH_HIGHMEM) ? nr_all_pages : nr_kernel_pages;
 		numentries += (1UL << (20 - PAGE_SHIFT)) - 1;
 		numentries >>= 20 - PAGE_SHIFT;

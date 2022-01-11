@@ -44,11 +44,11 @@ static inline unsigned long hash_long(unsigned long val, unsigned int bits)
 	n <<= 2;
 	hash += n;
 #else
-	/* On some cpus multiply is faster, on others gcc will do shifts */
+	/* 在某些cpu上乘法更快，在其他cpu上gcc会做移位*/
 	hash *= GOLDEN_RATIO_PRIME;     // 0x9e370001UL是一个接近(sqrt(5)-1)/2的素数，计算结果会溢出，相当于取模
 #endif
 
-	/* High bits are more random, so use them. */
+	/* 高位更随机，所以使用它们。 */
 	return hash >> (BITS_PER_LONG - bits);      // BITS_PER_LONG为32
 }
 	

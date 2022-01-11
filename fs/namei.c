@@ -644,9 +644,7 @@ struct path {
 };
 
 /*
- *  It's more convoluted than I'd like it to be, but... it's still fairly
- *  small and for now I'd prefer to have fast path as straight as possible.
- *  It _is_ time-critical.
+ *  它比我希望的更复杂，但是......它仍然相当小，现在我更喜欢尽可能直的快速路径。它_是_时间紧迫的。
  */
 static int do_lookup(struct nameidata *nd, struct qstr *name,
 		     struct path *path)
@@ -957,7 +955,11 @@ set_it:
 	}
 }
 
-// 文件路径查找
+/* 文件路径查找
+ * name: 文件路径名(可以是全路径，也可以是相对路径名)
+ * flags: flags路径查找标记
+ * nd: 此时不包含任何有用信息，用来返回查找结果
+ * */
 int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata *nd)
 {
 	int retval;
@@ -984,7 +986,7 @@ int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata 
 		nd->dentry = dget(current->fs->pwd);		// current的pwd
 	}
 	read_unlock(&current->fs->lock);
-	current->total_link_count = 0;
+	current->total_link_count = 0;			// 符号连接查询深度，防止死循环
 	retval = link_path_walk(name, nd);		// 核心
 	if (unlikely(current->audit_context
 		     && nd && nd->dentry && nd->dentry->d_inode))

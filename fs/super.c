@@ -50,8 +50,8 @@ DEFINE_SPINLOCK(sb_lock);		// 操作链表时的自旋锁
 /**
  *	alloc_super	-	create new superblock
  *
- *	Allocates and initializes a new &struct super_block.  alloc_super()
- *	returns a pointer new superblock or %NULL if allocation had failed.
+ *	分配并初始化一个新的 &struct super_block。
+ *	alloc_super() 返回一个指针 new superblock 或 %NULL 如果分配失败。
  */
 static struct super_block *alloc_super(void)
 {
@@ -106,8 +106,7 @@ static inline void destroy_super(struct super_block *s)
 /* Superblock refcounting  */
 
 /*
- * Drop a superblock's refcount.  Returns non-zero if the superblock was
- * destroyed.  The caller must hold sb_lock.
+ * 删除超级块的引用计数。如果超级块被销毁，则返回非零值。调用者必须持有 sb_lock。
  */
 int __put_super(struct super_block *sb)
 {

@@ -429,8 +429,7 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 				 */
 
 
-#define TCP_TIMEWAIT_LEN (60*HZ) /* how long to wait to destroy TIME-WAIT
-				  * state, about 60 seconds	*/
+#define TCP_TIMEWAIT_LEN (60*HZ) /* TIME-WAIT 状态销毁需要等待多长时间，大约 60 秒 */
 #define TCP_FIN_TIMEOUT	TCP_TIMEWAIT_LEN
                                  /* BSD style FIN_WAIT2 deadlock breaker.
 				  * It used to be 3min, new value is 60sec,
@@ -524,27 +523,27 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 					  */
 
 /*
- *	TCP option
+ *	TCP选项
  */
  
-#define TCPOPT_NOP		1	/* Padding */
-#define TCPOPT_EOL		0	/* End of options */
-#define TCPOPT_MSS		2	/* Segment size negotiating */
-#define TCPOPT_WINDOW		3	/* Window scaling */
-#define TCPOPT_SACK_PERM        4       /* SACK Permitted */
-#define TCPOPT_SACK             5       /* SACK Block */
-#define TCPOPT_TIMESTAMP	8	/* Better RTT estimations/PAWS */
+#define TCPOPT_NOP		1	/* 填充 */
+#define TCPOPT_EOL		0	/*选项结束 */
+#define TCPOPT_MSS		2	/* 段大小协商 */
+#define TCPOPT_WINDOW		3	/* 窗口缩放 */
+#define TCPOPT_SACK_PERM        4       /* sack允许 */
+#define TCPOPT_SACK             5       /* SACK 块 */
+#define TCPOPT_TIMESTAMP	8	/* 更好的RTT估计PAWS */
 
 /*
- *     TCP option lengths
+ *    TCP 选项长度
  */
 
-#define TCPOLEN_MSS            4
-#define TCPOLEN_WINDOW         3
-#define TCPOLEN_SACK_PERM      2
-#define TCPOLEN_TIMESTAMP      10
+#define TCPOLEN_MSS            4            // MSS
+#define TCPOLEN_WINDOW         3            // 窗口缩放因子
+#define TCPOLEN_SACK_PERM      2            // sack使能
+#define TCPOLEN_TIMESTAMP      10           // 时间戳
 
-/* But this is what stacks really send out. */
+/* 但这就是堆栈真正发出的。 */
 #define TCPOLEN_TSTAMP_ALIGNED		12
 #define TCPOLEN_WSCALE_ALIGNED		4
 #define TCPOLEN_SACKPERM_ALIGNED	4
@@ -564,14 +563,14 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 
 /* sysctl variables for tcp */
 extern int sysctl_max_syn_backlog;
-extern int sysctl_tcp_timestamps;
-extern int sysctl_tcp_window_scaling;
-extern int sysctl_tcp_sack;
+extern int sysctl_tcp_timestamps;		// 时间戳选项
+extern int sysctl_tcp_window_scaling;		// 窗口缩放因子
+extern int sysctl_tcp_sack;			// 选择性确认使能
 extern int sysctl_tcp_fin_timeout;
 extern int sysctl_tcp_tw_recycle;
-extern int sysctl_tcp_keepalive_time;
-extern int sysctl_tcp_keepalive_probes;
-extern int sysctl_tcp_keepalive_intvl;
+extern int sysctl_tcp_keepalive_time;       // 保活相关
+extern int sysctl_tcp_keepalive_probes;       // 保活相关
+extern int sysctl_tcp_keepalive_intvl;       // 保活相关
 extern int sysctl_tcp_syn_retries;
 extern int sysctl_tcp_synack_retries;
 extern int sysctl_tcp_retries1;
@@ -1102,20 +1101,15 @@ static __inline__ u32 tcp_receive_window(const struct tcp_sock *tp)
  */
 extern u32	__tcp_select_window(struct sock *sk);
 
-/* TCP timestamps are only 32-bits, this causes a slight
- * complication on 64-bit systems since we store a snapshot
- * of jiffies in the buffer control blocks below.  We decidely
- * only use of the low 32-bits of jiffies and hide the ugly
- * casts with the following macro.
+/* TCP 时间戳只有 32 位，这会在 64 位系统上造成轻微的复杂化，
+ * 因为我们将 jiffies 的快照存储在下面的缓冲区控制块中。
+ * 我们决定只使用 jiffies 的低 32 位并使用以下宏隐藏丑陋的演员表。
  */
 #define tcp_time_stamp		((__u32)(jiffies))
 
-/* This is what the send packet queueing engine uses to pass
- * TCP per-packet control information to the transmission
- * code.  We also store the host-order sequence numbers in
- * here too.  This is 36 bytes on 32-bit architectures,
- * 40 bytes on 64-bit machines, if this grows please adjust
- * skbuff.h:skbuff->cb[xxx] size appropriately.
+/* 这是发送数据包排队引擎用于将TCP每数据包控制信息传递给传输代码的内容。
+ * 我们也在这里存储主机订单序列号。这是32位架构上的36字节，
+ * 64位机器上的40字节，如果增加请适当调整skbuff.h:skbuff->cb[xxx]大小。
  */
 struct tcp_skb_cb {
 	union {
@@ -1123,14 +1117,13 @@ struct tcp_skb_cb {
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 		struct inet6_skb_parm	h6;
 #endif
-	} header;	/* For incoming frames		*/
+	} header;	/* 对于传入帧		*/
 	__u32		seq;		/* Starting sequence number	*/
 	__u32		end_seq;	/* SEQ + FIN + SYN + datalen	*/
-	__u32		when;		/* used to compute rtt's	*/
-	__u8		flags;		/* TCP header flags.		*/
+	__u32		when;		/* 用于计算rtt，纪律发送时间戳 */
+	__u8		flags;		/* TCP 标头标志.		*/
 
-	/* NOTE: These must match up to the flags byte in a
-	 *       real TCP header.
+	/* NOTE: 这些必须与真实 TCP 标头中的标志字节匹配。
 	 */
 #define TCPCB_FLAG_FIN		0x01
 #define TCPCB_FLAG_SYN		0x02
@@ -1396,12 +1389,12 @@ static __inline__ void tcp_minshall_update(struct tcp_sock *tp, int mss,
 		tp->snd_sml = TCP_SKB_CB(skb)->end_seq;
 }
 
-/* Return 0, if packet can be sent now without violation Nagle's rules:
-   1. It is full sized.
-   2. Or it contains FIN.
-   3. Or TCP_NODELAY was set.
-   4. Or TCP_CORK is not set, and all sent packets are ACKed.
-      With Minshall's modification: all sent small packets are ACKed.
+/* 返回 0，如果现在可以发送数据包而不违反 Nagle 规则：
+   1. 它是全尺寸的(MSS)。
+   2. 或者它包含FIN。
+   3. 或者设置了TCP_NODELAY。
+   4. 或者TCP_CORK没有设置，所有发送的数据包都被确认。
+     Minshall 的修改：所有发送的小数据包都被确认。
  */
 
 static __inline__ int

@@ -672,12 +672,11 @@ static void tcp_rtt_estimator(struct tcp_sock *tp, __u32 mrtt)
 	tcp_westwood_update_rtt(tp, tp->srtt >> 3);
 }
 
-/* Calculate rto without backoff.  This is the second half of Van Jacobson's
- * routine referred to above.
+/* 计算没有退避的rto。这是上面提到的范雅各布森套路的后半部分。
  */
 static inline void tcp_set_rto(struct tcp_sock *tp)
 {
-	/* Old crap is replaced with new one. 8)
+	/* 旧垃圾被新垃圾取代。8)
 	 *
 	 * More seriously:
 	 * 1. If rtt variance happened to be less 50msec, it is hallucination.
@@ -696,8 +695,7 @@ static inline void tcp_set_rto(struct tcp_sock *tp)
 	 */
 }
 
-/* NOTE: clamping at TCP_RTO_MIN is not required, current algo
- * guarantees that rto is higher.
+/*注意：不需要在 TCP_RTO_MIN 处进行钳位，当前算法保证 rto 更高。
  */
 static inline void tcp_bound_rto(struct tcp_sock *tp)
 {
@@ -812,7 +810,7 @@ __u32 tcp_init_cwnd(struct tcp_sock *tp, struct dst_entry *dst)
 	return min_t(__u32, cwnd, tp->snd_cwnd_clamp);
 }
 
-/* Initialize metrics on socket. */
+/* 初始化套接字上的指标。 */
 
 static void tcp_init_metrics(struct sock *sk)
 {
@@ -2410,7 +2408,7 @@ static int tcp_tso_acked(struct sock *sk, struct sk_buff *skb,
 }
 
 
-/* Remove acknowledged frames from the retransmission queue. */
+/* 从重传队列中删除已确认的帧。 */
 static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -2424,10 +2422,7 @@ static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 		struct tcp_skb_cb *scb = TCP_SKB_CB(skb); 
 		__u8 sacked = scb->sacked;
 
-		/* If our packet is before the ack sequence we can
-		 * discard it as it's confirmed to have arrived at
-		 * the other end.
-		 */
+		/* 如果我们的数据包在 ack 序列之前，我们可以丢弃它，因为它已确认已到达另一端。*/
 		if (after(scb->end_seq, tp->snd_una)) {
 			if (tcp_skb_pcount(skb) > 1)
 				acked |= tcp_tso_acked(sk, skb,
@@ -2871,7 +2866,7 @@ static inline void tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
                 __tcp_westwood_slow_bw(sk, skb);
 }
 
-/* This routine deals with incoming acks, but not outgoing ones. */
+/* 此例程处理传入的 ack，但不处理传出的. */
 static int tcp_ack(struct sock *sk, struct sk_buff *skb, int flag)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -2930,7 +2925,7 @@ static int tcp_ack(struct sock *sk, struct sk_buff *skb, int flag)
 
 	prior_in_flight = tcp_packets_in_flight(tp);
 
-	/* See if we can take anything off of the retransmit queue. */
+	/* 看看我们是否可以从重传队列中取出任何东西。 */
 	flag |= tcp_clean_rtx_queue(sk, &seq_rtt);
 
 	if (tp->frto_counter)
