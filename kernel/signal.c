@@ -423,6 +423,7 @@ flush_signal_handlers(struct task_struct *t, int force_default)
 	int i;
 	struct k_sigaction *ka = &t->sighand->action[0];
 	for (i = _NSIG ; i != 0 ; i--) {
+        // 没有被父进程忽略的信号，会被刷新成SIG_DEL，父进程忽略的信号，子进程保持忽略
 		if (force_default || ka->sa.sa_handler != SIG_IGN)
 			ka->sa.sa_handler = SIG_DFL;
 		ka->sa.sa_flags = 0;
@@ -1050,12 +1051,12 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 		 */
 		ret = info->si_sys_private;
 
-	/* Short-circuit ignored signals.  */
+	/* 短路忽略信号。  */
 	if (sig_ignored(p, sig))
 		return ret;
 
 	if (LEGACY_QUEUE(&p->signal->shared_pending, sig))
-		/* This is a non-RT signal and we already have one queued.  */
+		/* 这是一个非RT信号，我们已经有一个排队。  */
 		return ret;
 
 	/*
@@ -2289,7 +2290,7 @@ asmlinkage long sys_tgkill(int tgid, int pid, int sig)
 }
 
 /*
- *  Send a signal to only one task, even if it's a CLONE_THREAD task.
+ *  仅向一个任务发送信号，即使它是CLONE_THREAD任务。
  */
 asmlinkage long
 sys_tkill(int pid, int sig)

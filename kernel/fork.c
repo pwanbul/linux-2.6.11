@@ -536,6 +536,7 @@ struct fs_struct *copy_fs_struct(struct fs_struct *old)
 
 EXPORT_SYMBOL_GPL(copy_fs_struct);
 
+// 复制与文件系统相关的数据
 static inline int copy_fs(unsigned long clone_flags, struct task_struct * tsk)
 {
 	if (clone_flags & CLONE_FS) {
@@ -710,10 +711,12 @@ int unshare_files(void)
 
 EXPORT_SYMBOL(unshare_files);
 
+// struct sighand_struct
 static inline int copy_sighand(unsigned long clone_flags, struct task_struct * tsk)
 {
 	struct sighand_struct *sig;
 
+    // 创建线程时共享
 	if (clone_flags & (CLONE_SIGHAND | CLONE_THREAD)) {
 		atomic_inc(&current->sighand->count);
 		return 0;
@@ -818,20 +821,18 @@ static task_t *copy_process(
 	 * Thread groups must share signals as well, and detached threads
 	 * can only be started up within the thread group.
 	 */
-	// If CLONE_THREAD is set, the child is placed in the same thread group as the calling process.
-	// If CLONE_SIGHAND is set, the calling process and the child process share the same table of signal handlers.  If the  calling  process
-	// or  child process calls sigaction(2) to change the behavior associated with a signal, the behavior is changed in the other process as
-	// well. However, the calling process and child processes still have distinct signal masks and sets of pending  signals. So,  one  of
-	// them may block or unblock some signals using sigprocmask(2) without affecting the other process.
+	// 如果设置了CLONE_THREAD，则子进程与调用进程位于同一线程组中。
+	// 如果设置了CLONE_SIGHAND，则调用进程和子进程共享同一个信号处理程序表。
+    // 如果调用进程或子进程调用sigaction(2)来更改与信号关联的行为，则其他进程中的行为也会发生更改。
+    // 但是，调用进程和子进程仍然具有不同的信号掩码和未决信号集。因此，其中一个可以使用sigprocmask(2)阻止或取消阻止某些信号，而不会影响其他进程。
 	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND))
 		return ERR_PTR(-EINVAL);
 
 	/*
-	 * Shared signal handlers imply shared VM. By way of the above,
-	 * thread groups also imply shared VM. Blocking this case allows
-	 * for various simplifications in other code.
+	 * 共享信号处理程序意味着共享VM。综上所述，
+	 * 线程组也意味着共享VM。阻止这种情况允许在其他代码中进行各种简化。
 	 */
-	// If CLONE_VM is set, the calling process and the child process run in the same memory space.
+	// 如果设置了CLONE_VM，则调用进程和子进程运行在同一个内存空间。
 	if ((clone_flags & CLONE_SIGHAND) && !(clone_flags & CLONE_VM))
 		return ERR_PTR(-EINVAL);
 
@@ -933,15 +934,15 @@ static task_t *copy_process(
 	if ((retval = copy_semundo(clone_flags, p)))
 		goto bad_fork_cleanup_audit;
 	// 复制打开的文件描述符表
-	if ((retval = copy_files(clone_flags, p)))
+	if ((retval = copy_files(clone_flags, p)))         // CLONE_FILES
 		goto bad_fork_cleanup_semundo;
-	if ((retval = copy_fs(clone_flags, p)))
+	if ((retval = copy_fs(clone_flags, p)))           // CLONE_FS
 		goto bad_fork_cleanup_files;
-	if ((retval = copy_sighand(clone_flags, p)))
+	if ((retval = copy_sighand(clone_flags, p)))     // CLONE_SIGHAND
 		goto bad_fork_cleanup_fs;
-	if ((retval = copy_signal(clone_flags, p)))
+	if ((retval = copy_signal(clone_flags, p)))     // CLONE_THREAD
 		goto bad_fork_cleanup_sighand;
-	if ((retval = copy_mm(clone_flags, p)))
+	if ((retval = copy_mm(clone_flags, p)))         // CLONE_VM
 		goto bad_fork_cleanup_signal;
 	if ((retval = copy_keys(clone_flags, p)))
 		goto bad_fork_cleanup_mm;
@@ -1177,15 +1178,14 @@ long do_fork(
 	// 3.
 	p = copy_process(clone_flags, stack_start, regs, stack_size, parent_tidptr, child_tidptr, pid);
 	/*
-	 * Do this prior waking up the new thread - the thread pointer
-	 * might get invalid after that point, if the thread exits quickly.
+	 * 在唤醒新线程之前执行此操作
+	 * - 如果线程快速退出，线程指针可能会在该点之后变得无效。
 	 */
 	if (!IS_ERR(p)) {		// 创建子进程成功，当失败时指针p中会含有错误码
 		struct completion vfork;        // 定义完成体
 		
-		/* If CLONE_VFORK is set, the execution of the calling process is suspended
-		 * until the child releases its virtual memory resources via a
-		 * call to execve(2) or _exit(2) (as with vfork(2)).
+		/* 如果设置了CLONE_VFORK，则调用进程的执行将暂停，
+		 * 直到子进程通过调用execve(2)或_exit(2)释放其虚拟内存资源（与vfork(2)一样）。
 		 */
 		if (clone_flags & CLONE_VFORK) {
 			p->vfork_done = &vfork;		// 完成机制（completions mechanism）

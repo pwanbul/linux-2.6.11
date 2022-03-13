@@ -899,7 +899,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 	current->self_exec_id++;
 			
-	flush_signal_handlers(current, 0);
+	flush_signal_handlers(current, 0);      // 将信号的行为刷新成SIG_DFL
 	flush_old_files(current->files);
 
 	return 0;

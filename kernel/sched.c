@@ -2940,7 +2940,7 @@ need_resched:
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync, void *key)
 {
 	task_t *p = curr->task;
-	return try_to_wake_up(p, mode, sync);
+	return try_to_try_to_wake_upwake_up(p, mode, sync);
 }
 
 EXPORT_SYMBOL(default_wake_function);

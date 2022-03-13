@@ -118,15 +118,11 @@ tcp_orphan_retries - INTEGER
 	may consume significant resources. Cf. tcp_max_orphans.
 
 tcp_fin_timeout - INTEGER
-	Time to hold socket in state FIN-WAIT-2, if it was closed
-	by our side. Peer can be broken and never close its side,
-	or even died unexpectedly. Default value is 60sec.
-	Usual value used in 2.2 was 180 seconds, you may restore
-	it, but remember that if your machine is even underloaded WEB server,
-	you risk to overflow memory with kilotons of dead sockets,
-	FIN-WAIT-2 sockets are less dangerous than FIN-WAIT-1,
-	because they eat maximum 1.5K of memory, but they tend
-	to live longer.	Cf. tcp_max_orphans.
+	主动关闭的一方，则将套接字保持在状态FIN-WAIT-2的时间。
+	对等体可以被打破并且永远不会关闭它的身边，甚至会意外死亡。默认值为60秒。
+	2.2中使用的通常值是180秒，您可以恢复它，但请记住，如果您的机器甚至是负载不足的WEB服务器，
+	您可能会因大量死套接字而导致内存溢出，FIN-WAIT-2套接字比FIN-WAIT-1更危险，
+	因为它们最多吃掉1.5K的内存，但它们的寿命往往更长。参照。 tcp_max_orphans。
 
 tcp_max_tw_buckets - INTEGER
 	Maximal number of timewait sockets held by system simultaneously.

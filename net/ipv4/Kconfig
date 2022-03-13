@@ -266,28 +266,21 @@ config SYN_COOKIES
 	bool "IP: TCP syncookie support (disabled per default)"
 	depends on INET
 	---help---
-	  Normal TCP/IP networking is open to an attack known as "SYN
-	  flooding". This denial-of-service attack prevents legitimate remote
-	  users from being able to connect to your computer during an ongoing
-	  attack and requires very little work from the attacker, who can
-	  operate from anywhere on the Internet.
+	  正常的TCP/IP网络容易受到称为“SYN泛洪”的攻击。
+      这种拒绝服务攻击可防止合法的远程用户在持续攻击期间连接到您的计算机，
+      并且攻击者只需很少的工作即可在Internet上的任何位置进行操作。
 
-	  SYN cookies provide protection against this type of attack. If you
-	  say Y here, the TCP/IP stack will use a cryptographic challenge
-	  protocol known as "SYN cookies" to enable legitimate users to
-	  continue to connect, even when your machine is under attack. There
-	  is no need for the legitimate users to change their TCP/IP software;
-	  SYN cookies work transparently to them. For technical information
-	  about SYN cookies, check out <http://cr.yp.to/syncookies.html>.
+	  SYN cookie提供针对此类攻击的保护。如果您在此处选择Y，TCP/IP堆栈
+      将使用称为“SYN cookie”的加密挑战协议，以使合法用户能够继续连接，
+      即使您的机器受到攻击。合法用户无需更改其TCP/IP软件；
+      SYN cookie对它们透明地工作。有关SYN cookie的技术信息，
+      请查看 <http://cr.yp.to/syncookies.html>。
 
-	  If you are SYN flooded, the source address reported by the kernel is
-	  likely to have been forged by the attacker; it is only reported as
-	  an aid in tracing the packets to their actual source and should not
-	  be taken as absolute truth.
+	  如果你被SYN flooded，内核上报的源地址很可能是被攻击者伪造的；
+      它只是作为帮助追踪数据包的实际来源而报告的，不应被视为绝对事实。
 
-	  SYN cookies may prevent correct error reporting on clients when the
-	  server is really overloaded. If this happens frequently better turn
-	  them off.
+	 当服务器真的超载时，SYN cookie可能会阻止客户端上正确的错误报告。
+     如果这种情况经常发生，最好关闭它们。
 
 	  If you say Y here, note that SYN cookies aren't enabled by default;
 	  you can enable them by saying Y to "/proc file system support" and

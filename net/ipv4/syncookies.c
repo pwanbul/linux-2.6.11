@@ -23,9 +23,9 @@
 extern int sysctl_tcp_syncookies;
 
 /* 
- * This table has to be sorted and terminated with (__u16)-1.
- * XXX generate a better table.
- * Unresolved Issues: HIPPI with a 64k MSS is not well supported.
+ * 该表必须以 (__u16)-1 进行排序和终止。
+ * XXX生成一个更好的表。
+ * 未解决的问题：具有64k MSS的HIPPI没有得到很好的支持。
  */
 static __u16 const msstab[] = {
 	64 - 1,
@@ -38,12 +38,12 @@ static __u16 const msstab[] = {
 	4312 - 1,
 	(__u16)-1
 };
-/* The number doesn't include the -1 terminator */
+/* 该数字不包括 -1 终止符 */
 #define NUM_MSS (ARRAY_SIZE(msstab) - 1)
 
 /*
- * Generate a syncookie.  mssp points to the mss, which is returned
- * rounded down to the value encoded in the cookie.
+ * 生成一个syncookie。
+ * mssp指向mss，它向下舍入返回到cookie中编码的值。
  */
 __u32 cookie_v4_init_sequence(struct sock *sk, struct sk_buff *skb, __u16 *mssp)
 {

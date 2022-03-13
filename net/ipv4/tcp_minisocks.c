@@ -94,26 +94,21 @@ static void tcp_timewait_kill(struct tcp_tw_bucket *tw)
 }
 
 /* 
- * * Main purpose of TIME-WAIT state is to close connection gracefully,
- *   when one of ends sits in LAST-ACK or CLOSING retransmitting FIN
- *   (and, probably, tail of data) and one or more our ACKs are lost.
- * * What is TIME-WAIT timeout? It is associated with maximal packet
- *   lifetime in the internet, which results in wrong conclusion, that
- *   it is set to catch "old duplicate segments" wandering out of their path.
- *   It is not quite correct. This timeout is calculated so that it exceeds
- *   maximal retransmission timeout enough to allow to lose one (or more)
- *   segments sent by peer and our ACKs. This time may be calculated from RTO.
- * * When TIME-WAIT socket receives RST, it means that another end
- *   finally closed and we are allowed to kill TIME-WAIT too.
- * * Second purpose of TIME-WAIT is catching old duplicate segments.
- *   Well, certainly it is pure paranoia, but if we load TIME-WAIT
- *   with this semantics, we MUST NOT kill TIME-WAIT state with RSTs.
- * * If we invented some more clever way to catch duplicates
- *   (f.e. based on PAWS), we could truncate TIME-WAIT to several RTOs.
+ * * TIME-WAIT状态的主要目的是优雅地关闭连接，
+ *   当一端位于LAST-ACK或CLOSING重传FIN（可能还有数据尾）并且我们的一个或多个ACK丢失时。
  *
- * The algorithm below is based on FORMAL INTERPRETATION of RFCs.
- * When you compare it to RFCs, please, read section SEGMENT ARRIVES
- * from the very beginning.
+ * * 什么是TIME-WAIT超时？它与互联网中的最大数据包生命周期相关联，这导致错误的结论，
+ *   即它被设置为捕获“旧重复段”在其路径之外徘徊。这并不完全正确。
+ *   计算此超时，使其超过最大重传超时，足以允许丢失对等方和我们的 ACK 发送的一个（或多个）段。
+ *   这个时间可以从RTO计算。
+ * * 当TIME-WAIT套接字收到RST时，意味着另一端终于关闭，我们也可以杀死TIME-WAIT。
+ * * TIME-WAIT的第二个目的是捕捉旧的重复段。
+ *   好吧，这当然是纯粹的偏执狂，但如果我们用这种语义加载TIME-WAIT，
+ *   我们绝不能用RST杀死TIME-WAIT状态。
+ * * 如果我们发明一些更聪明的方法来捕获重复项（例如基于 PAWS），
+ *   我们可以将TIME-WAIT截断为多个RTO。
+ *
+ * 下面的算法基于 RFC 的正式解释。当您将其与 RFC 进行比较时，请从一开始就阅读 SEGMENT ARRIVES 部分。
  *
  * NOTE. With recycling (and later with fin-wait-2) TW bucket
  * is _not_ stateless. It means, that strictly speaking we must
@@ -271,7 +266,7 @@ kill:
 		NET_INC_STATS_BH(LINUX_MIB_PAWSESTABREJECTED);
 
 	if(!th->rst) {
-		/* In this case we must reset the TIMEWAIT timer.
+		/* 在这种情况下，我们必须重置 TIMEWAIT 计时器。
 		 *
 		 * If it is ACKless SYN it may be both old duplicate
 		 * and new good SYN with random sequence number <rcv_nxt.
@@ -324,7 +319,7 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 }
 
 /* 
- * Move a socket to time-wait or dead fin-wait-2 state.
+ * 将套接字移动到time-wait或dead fin-wait-2状态。
  */ 
 void tcp_time_wait(struct sock *sk, int state, int timeo)
 {
@@ -332,14 +327,17 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 	struct tcp_sock *tp = tcp_sk(sk);
 	int recycle_ok = 0;
 
+	/* tcp_tw_recycle需要在时间戳选项打开后才能生效 */
 	if (sysctl_tcp_tw_recycle && tp->rx_opt.ts_recent_stamp)
 		recycle_ok = tp->af_specific->remember_stamp(sk);
 
+	/* 检查tw桶数量 */
 	if (tcp_tw_count < sysctl_tcp_max_tw_buckets)
 		tw = kmem_cache_alloc(tcp_timewait_cachep, SLAB_ATOMIC);
 
 	if(tw != NULL) {
 		struct inet_sock *inet = inet_sk(sk);
+		/* 3.5倍的tp->rto */
 		int rto = (tp->rto<<2) - (tp->rto>>1);
 
 		/* Give us an identity. */
@@ -380,7 +378,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		/* Linkage updates. */
 		__tcp_tw_hashdance(sk, tw);
 
-		/* 获取 TIME_WAIT 超时触发。 */
+		/* 获取TIME_WAIT超时触发。 */
 		if (timeo < rto)
 			timeo = rto;
 
@@ -395,9 +393,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		tcp_tw_schedule(tw, timeo);
 		tcp_tw_put(tw);
 	} else {
-		/* Sorry, if we're out of memory, just CLOSE this
-		 * socket up.  We've got bigger problems than
-		 * non-graceful socket closings.
+		/* 抱歉，如果内存不足，请关闭此socket。我们有比非优雅的套接字关闭更大的问题。
 		 */
 		if (net_ratelimit())
 			printk(KERN_INFO "TCP: time wait bucket table overflow\n");

@@ -54,13 +54,11 @@ static int task_free_notify(struct notifier_block * self, unsigned long val, voi
 }
 
 
-/* The task is on its way out. A sync of the buffer means we can catch
- * any remaining samples for this task.
+/* 任务即将结束。缓冲区的同步意味着我们可以捕获此任务的任何剩余样本。
  */
 static int task_exit_notify(struct notifier_block * self, unsigned long val, void * data)
 {
-	/* To avoid latency problems, we only process the current CPU,
-	 * hoping that most samples for the task are on this CPU
+	/* 为了避免延迟问题，我们只处理当前 CPU，希望任务的大多数样本都在这个 CPU 上
 	 */
 	sync_buffer(_smp_processor_id());
   	return 0;

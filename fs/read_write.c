@@ -331,6 +331,7 @@ asmlinkage ssize_t sys_read(unsigned int fd, char __user * buf, size_t count)
 }
 EXPORT_SYMBOL_GPL(sys_read);
 
+// write实现
 asmlinkage ssize_t sys_write(unsigned int fd, const char __user * buf, size_t count)
 {
 	struct file *file;
@@ -339,7 +340,7 @@ asmlinkage ssize_t sys_write(unsigned int fd, const char __user * buf, size_t co
 
 	file = fget_light(fd, &fput_needed);
 	if (file) {
-		loff_t pos = file_pos_read(file);
+		loff_t pos = file_pos_read(file);           // 获取文件的游标，正常情况下为文件起始处
 		ret = vfs_write(file, buf, count, &pos);
 		file_pos_write(file, pos);
 		fput_light(file, fput_needed);

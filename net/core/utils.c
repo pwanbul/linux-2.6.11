@@ -143,7 +143,7 @@ int net_msg_cost = 5*HZ;
 int net_msg_burst = 10;
 
 /* 
- * All net warning printk()s should be guarded by this function.
+ * 所有网络警告printk()都应受此函数保护。
  */ 
 int net_ratelimit(void)
 {

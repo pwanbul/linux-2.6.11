@@ -493,9 +493,9 @@ extern void sk_stream_kill_queues(struct sock *sk);
 
 extern int sk_wait_data(struct sock *sk, long *timeo);
 
-/* Networking protocol blocks we attach to sockets.
- * socket layer -> transport layer interface
- * transport -> network interface is defined by struct inet_proto
+/* 我们附加到套接字的网络协议块。
+ * 套接字层 -> 传输层接口
+ * 传输 -> 网络接口由 struct inet_proto 定义
  */
 struct proto {
 	void			(*close)(struct sock *sk, 

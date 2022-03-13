@@ -139,7 +139,7 @@ typedef struct siginfo {
 
 /*
  * si_code values
- * Digital reserves positive values for kernel-generated signals.
+ * 数字为内核生成的信号保留正值。
  */
 #define SI_USER		0		/* sent by kill, sigsend, raise */
 #define SI_KERNEL	0x80		/* sent by the kernel from somewhere */

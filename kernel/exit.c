@@ -469,8 +469,7 @@ void exit_fs(struct task_struct *tsk)
 EXPORT_SYMBOL_GPL(exit_fs);
 
 /*
- * Turn us into a lazy TLB process if we
- * aren't already..
+ * 如果我们还没有，把我们变成一个懒惰的TLB进程。
  */
 void exit_mm(struct task_struct * tsk)
 {
@@ -480,7 +479,7 @@ void exit_mm(struct task_struct * tsk)
 	if (!mm)
 		return;
 	/*
-	 * Serialize with any possible pending coredump.
+	 * 使用任何可能的待处理核心转储进行序列化。
 	 * We must hold mmap_sem around checking core_waiters
 	 * and clearing tsk->mm.  The core-inducing thread
 	 * will increment core_waiters for each thread in the
@@ -811,11 +810,11 @@ fastcall NORET_TYPE void do_exit(long code)
 	group_dead = atomic_dec_and_test(&tsk->signal->live);
 	if (group_dead)
 		acct_process(code);
-	exit_mm(tsk);
+	exit_mm(tsk);           /* 释放mm_struct */
 
 	exit_sem(tsk);
-	__exit_files(tsk);
-	__exit_fs(tsk);
+	__exit_files(tsk);      /* 释放files_struct */
+	__exit_fs(tsk);         /* 释放fs_struct */
 	exit_namespace(tsk);
 	exit_thread();
 	exit_keys(tsk);
@@ -851,6 +850,7 @@ NORET_TYPE void complete_and_exit(struct completion *comp, long code)
 
 EXPORT_SYMBOL(complete_and_exit);
 
+/* _exit实现 */
 asmlinkage long sys_exit(int error_code)
 {
 	do_exit((error_code&0xff)<<8);

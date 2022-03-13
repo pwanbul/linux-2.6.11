@@ -856,14 +856,13 @@ static struct net_proto_family inet_family_ops = {
 extern void tcp_init(void);
 extern void tcp_v4_init(struct net_proto_family *);
 
-/* Upon startup we insert all the elements in inetsw_array[] into
- * the linked list inetsw.
+/* 在启动时，我们将inetsw_array[]中的所有元素插入到链表inetsw中。
  */
 static struct inet_protosw inetsw_array[] =
 {
         {
-                .type =       SOCK_STREAM,
-                .protocol =   IPPROTO_TCP,
+                .type =       SOCK_STREAM,      // 流式协议
+                .protocol =   IPPROTO_TCP,      // tcp协议号，6
                 .prot =       &tcp_prot,
                 .ops =        &inet_stream_ops,
                 .capability = -1,
@@ -872,8 +871,8 @@ static struct inet_protosw inetsw_array[] =
         },
 
         {
-                .type =       SOCK_DGRAM,
-                .protocol =   IPPROTO_UDP,
+                .type =       SOCK_DGRAM,       // 数据包协议
+                .protocol =   IPPROTO_UDP,      // udp协议号，17
                 .prot =       &udp_prot,
                 .ops =        &inet_dgram_ops,
                 .capability = -1,
@@ -883,7 +882,7 @@ static struct inet_protosw inetsw_array[] =
         
 
        {
-               .type =       SOCK_RAW,
+               .type =       SOCK_RAW,          // 原始协议
                .protocol =   IPPROTO_IP,	/* wild card */
                .prot =       &raw_prot,
                .ops =        &inet_sockraw_ops,
@@ -1021,6 +1020,7 @@ static int __init inet_init(void)
 	struct list_head *r;
 	int rc = -EINVAL;
 
+    // 最多40字节，如果要调整，需要改代码
 	if (sizeof(struct inet_skb_parm) > sizeof(dummy_skb->cb)) {
 		printk(KERN_CRIT "%s: panic\n", __FUNCTION__);
 		goto out;

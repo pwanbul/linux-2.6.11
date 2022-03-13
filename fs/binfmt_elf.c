@@ -741,7 +741,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		}
 	}
 
-	/* Flush all traces of the currently running executable */
+	/* 刷新当前运行的可执行文件的所有痕迹 */
 	retval = flush_old_exec(bprm);
 	if (retval)
 		goto out_free_dentry;

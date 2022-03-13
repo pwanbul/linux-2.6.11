@@ -1110,6 +1110,8 @@ extern u32	__tcp_select_window(struct sock *sk);
 /* 这是发送数据包排队引擎用于将TCP每数据包控制信息传递给传输代码的内容。
  * 我们也在这里存储主机订单序列号。这是32位架构上的36字节，
  * 64位机器上的40字节，如果增加请适当调整skbuff.h:skbuff->cb[xxx]大小。
+ *
+ * 传输控制块
  */
 struct tcp_skb_cb {
 	union {
@@ -1118,9 +1120,9 @@ struct tcp_skb_cb {
 		struct inet6_skb_parm	h6;
 #endif
 	} header;	/* 对于传入帧		*/
-	__u32		seq;		/* Starting sequence number	*/
+	__u32		seq;		/* 起始序号	*/
 	__u32		end_seq;	/* SEQ + FIN + SYN + datalen	*/
-	__u32		when;		/* 用于计算rtt，纪律发送时间戳 */
+	__u32		when;		/* 用于计算rtt，记录发送时间戳 */
 	__u8		flags;		/* TCP 标头标志.		*/
 
 	/* NOTE: 这些必须与真实 TCP 标头中的标志字节匹配。
