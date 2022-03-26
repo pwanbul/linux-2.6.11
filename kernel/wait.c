@@ -55,8 +55,7 @@ EXPORT_SYMBOL(remove_wait_queue);
  * spin_unlock（）本身是半渗透性的，并且仅以一种方式进行保护
  * （它仅保护关键区域内的东西并阻止它们渗出-仍将允许后续负载移入关键区域）。
  */
-void fastcall
-prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
+void fastcall prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 {
 	unsigned long flags;
 
@@ -73,8 +72,7 @@ prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 }
 EXPORT_SYMBOL(prepare_to_wait);
 
-void fastcall
-prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
+void fastcall prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
 {
 	unsigned long flags;
 
@@ -109,7 +107,7 @@ void fastcall finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
 	 *    have _one_ other CPU that looks at or modifies
 	 *    the list).
 	 */
-	if (!list_empty_careful(&wait->task_list)) {
+	if (!list_empty_careful(&wait->task_list)) {		// wait->task_list可以不在list中
 		spin_lock_irqsave(&q->lock, flags);
 		list_del_init(&wait->task_list);
 		spin_unlock_irqrestore(&q->lock, flags);

@@ -279,14 +279,13 @@ work_resched:
 	testb $_TIF_NEED_RESCHED, %cl		// 如果need_resched再次置位,则继续调度
 	jnz work_resched
 
-work_notifysig:				# deal with pending signals and
-					# notify-resume requests
+work_notifysig:				# 处理未决信号 and notify-resume requests
 	testl $VM_MASK, EFLAGS(%esp)
 	movl %esp, %eax
 	jne work_notifysig_v86		# returning to kernel-space or
 					# vm86-space
 	xorl %edx, %edx
-	call do_notify_resume
+	call do_notify_resume			// 处理未阻塞未决信号
 	jmp restore_all
 
 	ALIGN

@@ -479,7 +479,7 @@ int_msg:
 
 .globl boot_gdt_descr
 .globl idt_descr
-.globl cpu_gdt_descr
+.globl cpu_gdt_descr			// 全局变量，本质是一个数组，记录每个CPU的gdt的entry数量，以及gdt的地址
 
 	ALIGN
 # early boot GDT descriptor (must use 1:1 address mapping)
@@ -496,10 +496,10 @@ idt_descr:
 # boot GDT descriptor (later on used by CPU#0):
 	.word 0				# 32 bit align gdt_desc.address
 cpu_gdt_descr:
-	.word GDT_ENTRIES*8-1
-	.long cpu_gdt_table
+	.word GDT_ENTRIES*8-1			// gdt有32个entry,每个entry 8字节，这里记录整个gdt的大小
+	.long cpu_gdt_table				// gdt的地址
 
-	.fill NR_CPUS-1,8,0		# space for the other GDT descriptors
+	.fill NR_CPUS-1,8,0		# 如果CPU的数量大于1，那么为其他CPU的GDT描述符的分配空间
 
 /*
  * The boot_gdt_table must mirror the equivalent in setup.S and is
@@ -512,9 +512,11 @@ ENTRY(boot_gdt_table)
 	.quad 0x00cf92000000ffff	/* kernel 4GB data at 0x00000000 */
 
 /*
- * The Global Descriptor Table contains 28 quadwords, per-CPU.
+ * 全局描述符表包含28个四字（8字节），每个 CPU。
+ * 共32个entry
+ * 这只是个模板，后续可能会修改某些entry
  */
-	.align PAGE_SIZE_asm
+	.align PAGE_SIZE_asm			//
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* 0x0b reserved */
@@ -522,20 +524,20 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0x1b reserved */
 	.quad 0x0000000000000000	/* 0x20 unused */
 	.quad 0x0000000000000000	/* 0x28 unused */
-	.quad 0x0000000000000000	/* 0x33 TLS entry 1 */
-	.quad 0x0000000000000000	/* 0x3b TLS entry 2 */
-	.quad 0x0000000000000000	/* 0x43 TLS entry 3 */
+	.quad 0x0000000000000000	/* 0x33 TLS entry 1 */			// 6
+	.quad 0x0000000000000000	/* 0x3b TLS entry 2 */			// 7
+	.quad 0x0000000000000000	/* 0x43 TLS entry 3 */			// 8
 	.quad 0x0000000000000000	/* 0x4b reserved */
 	.quad 0x0000000000000000	/* 0x53 reserved */
 	.quad 0x0000000000000000	/* 0x5b reserved */
 
-	.quad 0x00cf9a000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
-	.quad 0x00cf92000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
-	.quad 0x00cffa000000ffff	/* 0x73 user 4GB code at 0x00000000 */
-	.quad 0x00cff2000000ffff	/* 0x7b user 4GB data at 0x00000000 */
+	.quad 0x00cf9a000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */		// 12
+	.quad 0x00cf92000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */		// 13
+	.quad 0x00cffa000000ffff	/* 0x73 user 4GB code at 0x00000000 */			// 14
+	.quad 0x00cff2000000ffff	/* 0x7b user 4GB data at 0x00000000 */			// 15
 
-	.quad 0x0000000000000000	/* 0x80 TSS descriptor */
-	.quad 0x0000000000000000	/* 0x88 LDT descriptor */
+	.quad 0x0000000000000000	/* 0x80 TSS descriptor */			// 16，每个CPU都有自己的tss，通过set_tss_desc将init_tss填充进来
+	.quad 0x0000000000000000	/* 0x88 LDT descriptor */			// 17
 
 	/* Segments used for calling PnP BIOS */
 	.quad 0x00c09a0000000000	/* 0x90 32-bit code */

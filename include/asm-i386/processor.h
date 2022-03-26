@@ -373,9 +373,11 @@ typedef struct {
 
 struct thread_struct;
 
+/* 任务状态段 */
 struct tss_struct {
 	unsigned short	back_link,__blh;
 	unsigned long	esp0;
+
 	unsigned short	ss0,__ss0h;
 	unsigned long	esp1;
 	unsigned short	ss1,__ss1h;	/* ss1 is used to cache MSR_IA32_SYSENTER_CS */
@@ -417,12 +419,13 @@ struct tss_struct {
 	 * .. and then another 0x100 bytes for emergency kernel stack
 	 */
 	unsigned long stack[64];
-} __attribute__((packed));
+} __attribute__((packed));				// 取消对齐
 
 #define ARCH_MIN_TASKALIGN	16
 
+/* 保存tss中的部分硬件上下文信息 */
 struct thread_struct {
-/* cached TLS descriptors. */
+	/* 缓存的TLS描述符,共有3个entery，对应cpu_gdt_table中的6,7,8项 */
 	struct desc_struct tls_array[GDT_ENTRY_TLS_ENTRIES];
 	unsigned long	esp0;
 	unsigned long	sysenter_cs;

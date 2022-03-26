@@ -24,8 +24,8 @@
 #include <asm/ipc.h>
 
 /*
- * sys_pipe() is the normal C calling standard for creating
- * a pipe. It's not the way Unix traditionally does this, though.
+ * sys_pipe()是用于创建管道的普通C调用标准。
+ * 不过，这不是Unix传统上这样做的方式。
  */
 asmlinkage int sys_pipe(unsigned long __user * fildes)
 {

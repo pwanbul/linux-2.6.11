@@ -39,6 +39,7 @@ int getrusage(struct task_struct *, int, struct rusage __user *);
 
 static void __unhash_process(struct task_struct *p)
 {
+	// 从进程标识符的hash表中删除
 	nr_threads--;
 	detach_pid(p, PIDTYPE_PID);
 	detach_pid(p, PIDTYPE_TGID);
@@ -49,6 +50,7 @@ static void __unhash_process(struct task_struct *p)
 			__get_cpu_var(process_counts)--;
 	}
 
+	// 从进程链表中删除，从父进程的子进程链表中删除
 	REMOVE_LINKS(p);
 }
 
@@ -310,8 +312,7 @@ int disallow_signal(int sig)
 EXPORT_SYMBOL(disallow_signal);
 
 /*
- *	Put all the gunge required to become a kernel thread without
- *	attached user resources in one place where it belongs.
+ *	将成为没有附加用户资源的内核线程所需的所有东西放在它所属的地方。
  */
 
 void daemonize(const char *name, ...)
@@ -771,7 +772,7 @@ static void exit_notify(struct task_struct *tsk)
 	if (state == EXIT_DEAD)
 		release_task(tsk);
 
-	/* PF_DEAD causes final put_task_struct after we schedule. */
+	/* PF_DEAD在我们调度后导致最终的put_task_struct。 */
 	preempt_disable();
 	tsk->flags |= PF_DEAD;
 }
@@ -797,7 +798,7 @@ fastcall NORET_TYPE void do_exit(long code)
 		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
 	}
 
-	tsk->flags |= PF_EXITING;
+	tsk->flags |= PF_EXITING;		// 进程已经结束，但还未执行exit_notify
 	del_timer_sync(&tsk->real_timer);
 
 	if (unlikely(in_atomic()))
@@ -864,23 +865,23 @@ task_t fastcall *next_thread(const task_t *p)
 EXPORT_SYMBOL(next_thread);
 
 /*
- * Take down every thread in the group.  This is called by fatal signals
- * as well as by sys_exit_group (below).
+ * 取下组中的每个线程。这由致命信号以及sys_exit_group（如下）调用。
  */
-NORET_TYPE void
-do_group_exit(int exit_code)
+NORET_TYPE void do_group_exit(int exit_code)
 {
 	BUG_ON(exit_code & 0x80); /* core dumps don't get here */
 
 	if (current->signal->flags & SIGNAL_GROUP_EXIT)
+		// 内核已经为进程执行退出过程
 		exit_code = current->signal->group_exit_code;
 	else if (!thread_group_empty(current)) {
+		// 多线程
 		struct signal_struct *const sig = current->signal;
 		struct sighand_struct *const sighand = current->sighand;
 		read_lock(&tasklist_lock);
 		spin_lock_irq(&sighand->siglock);
 		if (sig->flags & SIGNAL_GROUP_EXIT)
-			/* Another thread got here before we took the lock.  */
+			/* 在我们获得锁之前，另一个线程到达了这里。 */
 			exit_code = sig->group_exit_code;
 		else {
 			sig->flags = SIGNAL_GROUP_EXIT;
@@ -896,9 +897,10 @@ do_group_exit(int exit_code)
 }
 
 /*
- * this kills every thread in the thread group. Note that any externally
- * wait4()-ing process will get the correct exit code - even if this
- * thread is not the thread group leader.
+ * 这会杀死线程组中的每个线程。
+ * 请注意，任何外部wait4()-ing进程都将获得正确的退出代码——即使该线程不是线程组的领导者。
+ *
+ * exit(3)或者_exit(2)退出进程时就会调用该函数。
  */
 asmlinkage void sys_exit_group(int error_code)
 {
@@ -919,8 +921,7 @@ static int eligible_child(pid_t pid, int options, task_t *p)
 	}
 
 	/*
-	 * Do not consider detached threads that are
-	 * not ptraced:
+	 * 不要考虑未ptrace的分离线程：
 	 */
 	if (p->exit_signal == -1 && !p->ptrace)
 		return 0;
@@ -1321,8 +1322,7 @@ static long do_wait(pid_t pid, int options, struct siginfo __user *infop,
 	add_wait_queue(&current->signal->wait_chldexit,&wait);
 repeat:
 	/*
-	 * We will set this flag if we see any child that might later
-	 * match our criteria, even if we are not able to reap it yet.
+	 * 如果我们看到任何以后可能符合我们标准的孩子，我们将设置这个标志，即使我们还不能收获它。
 	 */
 	flag = 0;
 	current->state = TASK_INTERRUPTIBLE;

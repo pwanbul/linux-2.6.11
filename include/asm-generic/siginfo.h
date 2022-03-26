@@ -11,8 +11,7 @@ typedef union sigval {
 } sigval_t;
 
 /*
- * This is the size (including padding) of the part of the
- * struct siginfo that is before the union.
+ * 这是联合之前的结构 siginfo 部分的大小（包括填充）。
  */
 #ifndef __ARCH_SI_PREAMBLE_SIZE
 #define __ARCH_SI_PREAMBLE_SIZE	(3 * sizeof(int))
@@ -275,7 +274,7 @@ static inline void copy_siginfo(struct siginfo *to, struct siginfo *from)
 	if (from->si_code < 0)
 		memcpy(to, from, sizeof(*to));
 	else
-		/* _sigchld is currently the largest know union member */
+		/* sigchld 是目前已知最大的工会成员 */
 		memcpy(to, from, __ARCH_SI_PREAMBLE_SIZE + sizeof(from->_sifields._sigchld));
 }
 

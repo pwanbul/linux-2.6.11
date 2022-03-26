@@ -544,6 +544,7 @@ void create_seq_entry(char *name, mode_t mode, struct file_operations *f)
 		entry->proc_fops = f;
 }
 
+/* linux与系统相关的命令 */
 void __init proc_misc_init(void)
 {
 	struct proc_dir_entry *entry;

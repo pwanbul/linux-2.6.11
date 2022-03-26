@@ -118,7 +118,7 @@ static kmem_cache_t *sigqueue_cachep;
 #if SIGRTMIN > BITS_PER_LONG
 #define M(sig) (1ULL << ((sig)-1))
 #else
-#define M(sig) (1UL << ((sig)-1))
+#define M(sig) (1UL << ((sig)-1))			// 信号编转换成位图
 #endif
 #define T(sig, mask) (M(sig) & (mask))
 
@@ -149,6 +149,7 @@ static kmem_cache_t *sigqueue_cachep;
 	(((t)->sighand->action[(signr)-1].sa.sa_handler != SIG_DFL) &&	\
 	 ((t)->sighand->action[(signr)-1].sa.sa_handler != SIG_IGN))
 
+// 非致命信号并且使用信号的默认行为
 #define sig_fatal(t, signr) \
 	(!T(signr, SIG_KERNEL_IGNORE_MASK|SIG_KERNEL_STOP_MASK) && \
 	 (t)->sighand->action[(signr)-1].sa.sa_handler == SIG_DFL)
@@ -158,35 +159,35 @@ static int sig_ignored(struct task_struct *t, int sig)
 	void __user * handler;
 
 	/*
-	 * Tracers always want to know about signals..
+	 * 追踪者总是想知道信号。
 	 */
 	if (t->ptrace & PT_PTRACED)
 		return 0;
 
 	/*
-	 * Blocked signals are never ignored, since the
-	 * signal handler may change by the time it is
-	 * unblocked.
+	 * 阻塞的信号永远不会被忽略，
+	 * 因为信号处理程序可能会在它被解除阻塞时发生变化。
+	 *
+	 * 阻塞的信号能正常的注册到进程中。
 	 */
 	if (sigismember(&t->blocked, sig))
 		return 0;
 
-	/* Is it explicitly or implicitly ignored? */
+	/* 它是显式地还是隐式地忽略？ */
 	handler = t->sighand->action[sig-1].sa.sa_handler;
 	return   handler == SIG_IGN ||
 		(handler == SIG_DFL && sig_kernel_ignore(sig));
 }
 
 /*
- * Re-calculate pending state from the set of locally pending
- * signals, globally pending signals, and blocked signals.
+ * 从本地挂起信号、全局挂起信号和阻塞信号的集合中重新计算挂起状态。
  */
 static inline int has_pending_signals(sigset_t *signal, sigset_t *blocked)
 {
 	unsigned long ready;
 	long i;
 
-	switch (_NSIG_WORDS) {
+	switch (_NSIG_WORDS) {			// 2
 	default:
 		for (i = _NSIG_WORDS, ready = 0; --i >= 0 ;)
 			ready |= signal->sig[i] &~ blocked->sig[i];
@@ -212,9 +213,9 @@ static inline int has_pending_signals(sigset_t *signal, sigset_t *blocked)
 fastcall void recalc_sigpending_tsk(struct task_struct *t)
 {
 	if (t->signal->group_stop_count > 0 ||
-	    PENDING(&t->pending, &t->blocked) ||
-	    PENDING(&t->signal->shared_pending, &t->blocked))
-		set_tsk_thread_flag(t, TIF_SIGPENDING);
+	    PENDING(&t->pending, &t->blocked) ||		// 私有未决信号，是否存在未阻塞，并且未决的信号
+	    PENDING(&t->signal->shared_pending, &t->blocked))		// 共享未决信号，是否存在未阻塞，并且未决的信号
+		set_tsk_thread_flag(t, TIF_SIGPENDING);			// 记上标记，等到返回用户空间时使未决信号生效
 	else
 		clear_tsk_thread_flag(t, TIF_SIGPENDING);
 }
@@ -515,7 +516,7 @@ static int __dequeue_signal(struct sigpending *pending, sigset_t *mask,
 {
 	int sig = 0;
 
-	sig = next_signal(pending, mask);
+	sig = next_signal(pending, mask);		// 优先低编号
 	if (sig) {
 		if (current->notifier) {
 			if (sigismember(current->notifier_mask, sig)) {
@@ -536,17 +537,16 @@ static int __dequeue_signal(struct sigpending *pending, sigset_t *mask,
 }
 
 /*
- * Dequeue a signal and return the element to the caller, which is 
- * expected to free it.
+ * 将信号出列并将元素返回给调用者，调用者预计会释放它。
  *
- * All callers have to hold the siglock.
+ * 所有呼叫者都必须持有信号锁。
  */
 int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
 {
+	// 优先私有，
 	int signr = __dequeue_signal(&tsk->pending, mask, info);
 	if (!signr)
-		signr = __dequeue_signal(&tsk->signal->shared_pending,
-					 mask, info);
+		signr = __dequeue_signal(&tsk->signal->shared_pending, mask, info);
  	if (signr && unlikely(sig_kernel_stop(signr))) {
  		/*
  		 * Set a marker that we have dequeued a stop signal.  Our
@@ -628,8 +628,7 @@ static int rm_from_queue(unsigned long mask, struct sigpending *s)
 /*
  * 发送信号的权限错误
  */
-static int check_kill_permission(int sig, struct siginfo *info,
-				 struct task_struct *t)
+static int check_kill_permission(int sig, struct siginfo *info, struct task_struct *t)
 {
 	int error = -EINVAL;
 	if (sig < 0 || sig > _NSIG)
@@ -773,6 +772,10 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 	}
 }
 
+/* 两件事情：
+ * 1. 加入队列中
+ * 2. 加入sigset_t中
+ * */
 static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
 			struct sigpending *signals)
 {
@@ -780,23 +783,20 @@ static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
 	int ret = 0;
 
 	/*
-	 * fast-pathed signals for kernel-internal things like SIGSTOP
-	 * or SIGKILL.
+	 * 用于内核内部事物（如 SIGSTOP 或 SIGKILL）的快速路径信号。
 	 */
 	if ((unsigned long)info == 2)
 		goto out_set;
 
-	/* Real-time signals must be queued if sent by sigqueue, or
-	   some other real-time mechanism.  It is implementation
-	   defined whether kill() does so.  We attempt to do so, on
-	   the principle of least surprise, but since kill is not
-	   allowed to fail with EAGAIN when low on memory we just
-	   make sure at least one signal gets delivered and don't
-	   pass on the info struct.  */
+	/* 如果通过sigqueue或其他一些实时机制发送实时信号，则必须排队。
+	 * kill()是否这样做是由实现定义的。
+	 * 我们尝试这样做，本着最小意外的原则，
+	 * 但是由于在内存不足时不允许kill以EAGAIN失败，
+	 * 我们只需确保至少传递一个信号并且不传递信息结构。  */
 
 	q = __sigqueue_alloc(t, GFP_ATOMIC);
 	if (q) {
-		list_add_tail(&q->list, &signals->list);
+		list_add_tail(&q->list, &signals->list);		// 尾插，队列中顺序是否，不会决定处理的顺序
 		switch ((unsigned long) info) {
 		case 0:
 			q->info.si_signo = sig;
@@ -816,7 +816,7 @@ static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
 			copy_siginfo(&q->info, info);
 			break;
 		}
-	} else {
+	} else {			// 内存不足
 		if (sig >= SIGRTMIN && info && (unsigned long)info != 1
 		   && info->si_code != SI_USER)
 		/*
@@ -911,65 +911,62 @@ force_sig_specific(int sig, struct task_struct *t)
 }
 
 /*
- * Test if P wants to take SIG.  After we've checked all threads with this,
- * it's equivalent to finding no threads not blocking SIG.  Any threads not
- * blocking SIG were ruled out because they are not running and already
- * have pending signals.  Such threads will dequeue from the shared queue
- * as soon as they're available, so putting the signal on the shared queue
- * will be equivalent to sending it to one such thread.
+ * 测试P是否想接受SIG。 在我们用这个检查了所有线程之后，这相当于没有发现没有阻塞SIG的线程。
+ * 任何不阻塞SIG的线程都被排除在外，因为它们没有运行并且已经有挂起的信号。
+ * 此类线程一旦可用就会从共享队列中出列，因此将信号放在共享队列上将等同于将其发送到一个这样的线程。
  */
-#define wants_signal(sig, p, mask) 			\
+#define wants_signal(sig, p, mask) \
+    // 没有阻塞
 	(!sigismember(&(p)->blocked, sig)		\
-	 && !((p)->state & mask)			\
-	 && !((p)->flags & PF_EXITING)			\
+	// 不是TASK_STOPPED或者TASK_TRACED状态
+	&& !((p)->state & mask)			\
+	// 不是PF_EXITING状态
+	&& !((p)->flags & PF_EXITING)			\
+	// 是否为CPU上正在的运行的进程或者没有设置TIF_SIGPENDING
 	 && (task_curr(p) || !signal_pending(p)))
 
 
-static void
-__group_complete_signal(int sig, struct task_struct *p)
+//
+static void __group_complete_signal(int sig, struct task_struct *p)
 {
 	unsigned int mask;
 	struct task_struct *t;
 
 	/*
-	 * Don't bother traced and stopped tasks (but
-	 * SIGKILL will punch through that).
+	 * 不要打扰跟踪和停止的任务（但SIGKILL会通过它）。
 	 */
 	mask = TASK_STOPPED | TASK_TRACED;
 	if (sig == SIGKILL)
-		mask = 0;
+		mask = 0;		// SIGKILL在任何时候都能发出
 
 	/*
-	 * Now find a thread we can wake up to take the signal off the queue.
+	 * 现在找到一个我们可以唤醒的线程以将信号从队列中取出。
 	 *
-	 * If the main thread wants the signal, it gets first crack.
-	 * Probably the least surprising to the average bear.
+	 * 如果主线程想要信号，它会先破解。对于普通的熊来说，这可能是最不令人惊讶的。
 	 */
 	if (wants_signal(sig, p, mask))
 		t = p;
-	else if (thread_group_empty(p))
+	else if (thread_group_empty(p))			// 单线程的进程
 		/*
-		 * There is just one thread and it does not need to be woken.
-		 * It will dequeue unblocked signals before it runs again.
+		 * 只有一个线程，它不需要被唤醒。它将在再次运行之前将未阻塞的信号出列。
 		 */
 		return;
 	else {
 		/*
-		 * Otherwise try to find a suitable thread.
+		 * 否则尝试找到合适的线程。
 		 */
 		t = p->signal->curr_target;
 		if (t == NULL)
-			/* restart balancing at this thread */
+			/* 在这个线程重新开始平衡 */
 			t = p->signal->curr_target = p;
-		BUG_ON(t->tgid != p->tgid);
+		BUG_ON(t->tgid != p->tgid);			// 正常应该是同一个线程组中的线程
 
 		while (!wants_signal(sig, t, mask)) {
 			t = next_thread(t);
 			if (t == p->signal->curr_target)
 				/*
-				 * No thread needs to be woken.
-				 * Any eligible threads will see
-				 * the signal in the queue soon.
+				 * 不需要唤醒任何线程。
+				 * 任何符合条件的线程都将很快看到队列中的信号。
 				 */
 				return;
 		}
@@ -977,14 +974,13 @@ __group_complete_signal(int sig, struct task_struct *p)
 	}
 
 	/*
-	 * Found a killable thread.  If the signal will be fatal,
-	 * then start taking the whole group down immediately.
+	 * 找到一个可杀死的线程。如果信号是致命的，则立即开始将整个小组击落。
 	 */
 	if (sig_fatal(p, sig) && !(p->signal->flags & SIGNAL_GROUP_EXIT) &&
 	    !sigismember(&t->real_blocked, sig) &&
 	    (sig == SIGKILL || !(t->ptrace & PT_PTRACED))) {
 		/*
-		 * This signal will be fatal to the whole group.
+		 * 这个信号对整个群体都是致命的。
 		 */
 		if (!sig_kernel_coredump(sig)) {
 			/*
@@ -1030,15 +1026,13 @@ __group_complete_signal(int sig, struct task_struct *p)
 	}
 
 	/*
-	 * The signal is already in the shared-pending queue.
-	 * Tell the chosen thread to wake up and dequeue it.
+	 * 该信号已经在共享待处理队列中。告诉所选线程唤醒并使其出队。
 	 */
 	signal_wake_up(t, sig == SIGKILL);
 	return;
 }
 
-static int
-__group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
+static int __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	int ret = 0;
 
@@ -1047,7 +1041,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 
 	if (((unsigned long)info > 2) && (info->si_code == SI_TIMER))
 		/*
-		 * Set up a return to indicate that we dropped the signal.
+		 * 设置返回以指示我们放弃了信号。
 		 */
 		ret = info->si_sys_private;
 
@@ -1060,9 +1054,8 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 		return ret;
 
 	/*
-	 * Put this signal on the shared-pending queue, or fail with EAGAIN.
-	 * We always use the shared queue for process-wide signals,
-	 * to avoid several races.
+	 * 将此信号放在共享待处理队列中，或以EAGAIN失败。
+	 * 我们总是将共享队列用于进程范围的信号，以避免多次竞争。
 	 */
 	ret = send_signal(sig, info, p, &p->signal->shared_pending);
 	if (unlikely(ret))
@@ -1073,7 +1066,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 }
 
 /*
- * Nuke all other threads in the group.
+ * 核对组中的所有其他线程。
  */
 void zap_other_threads(struct task_struct *p)
 {
@@ -1110,13 +1103,14 @@ void zap_other_threads(struct task_struct *p)
 }
 
 /*
- * 必须在持有 tasklist_lock 的情况下调用以进行读取！
+ * 必须在持有tasklist_lock的情况下调用以进行读取！
  */
 int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	unsigned long flags;
 	int ret;
 
+	// 检查权限
 	ret = check_kill_permission(sig, info, p);
 	if (!ret && sig && p->sighand) {
 		spin_lock_irqsave(&p->sighand->siglock, flags);
@@ -1161,14 +1155,14 @@ kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 
 	return retval;
 }
-/* 杀指定进程 */
+/* 杀指定进程/线程组 */
 int kill_proc_info(int sig, struct siginfo *info, pid_t pid)
 {
 	int error;
 	struct task_struct *p;
 
 	read_lock(&tasklist_lock);
-	p = find_task_by_pid(pid);
+	p = find_task_by_pid(pid);		// p可以是单线程的进程，也可以是线程组的组长；不能是非组长的线程，找不到
 	error = -ESRCH;
 	if (p)
 		error = group_send_sig_info(sig, info, p);
@@ -1185,12 +1179,15 @@ int kill_proc_info(int sig, struct siginfo *info, pid_t pid)
  * pid == 0:杀当前进程组
  * pid > 0:杀指定进程
  * pid == -1: pid大于0的进程的非当前进程组进程
- * pid < 0:杀进程组ID等于|pid|的
+ * pid < 0:杀进程组ID等于|pid|的进程组
+ *
+ * 想想sig为0
  */
 
 static int kill_something_info(int sig, struct siginfo *info, int pid)
 {
 	if (!pid) {
+		// 同进程组/线程组的进程
 		return kill_pg_info(sig, info, process_group(current));
 	} else if (pid == -1) {
 		int retval = 0, count = 0;
@@ -1210,6 +1207,7 @@ static int kill_something_info(int sig, struct siginfo *info, int pid)
 	} else if (pid < 0) {
 		return kill_pg_info(sig, info, -pid);
 	} else {
+		// 指定的进程/线程组
 		return kill_proc_info(sig, info, pid);
 	}
 }
@@ -1819,6 +1817,11 @@ int get_signal_to_deliver(siginfo_t *info, struct k_sigaction *return_ka,
 
 relock:
 	spin_lock_irq(&current->sighand->siglock);
+	/* 在循环中不停的通过dequeue_signal，
+	 * 去共享的未决信号队列中和私有的未决信号队列中取出信号，
+	 * 如果取出，则返回非0，
+	 * 如果取不出，则返回0。
+	 * */
 	for (;;) {
 		struct k_sigaction *ka;
 
@@ -1826,7 +1829,7 @@ relock:
 		    handle_group_stop())
 			goto relock;
 
-		signr = dequeue_signal(current, mask, info);
+		signr = dequeue_signal(current, mask, info);		// signr为需要处理的信号编号
 
 		if (!signr)
 			break; /* will return 0 */
@@ -1863,13 +1866,15 @@ relock:
 			}
 		}
 
+		// 找到的信号行为
 		ka = &current->sighand->action[signr-1];
 		if (ka->sa.sa_handler == SIG_IGN) /* Do nothing.  */
-			continue;
+			continue;		// 忽略
 		if (ka->sa.sa_handler != SIG_DFL) {
-			/* Run the handler.  */
+			/* 运行处理程序。 */
 			*return_ka = *ka;
 
+			// 防止重复出发信号处理函数
 			if (ka->sa.sa_flags & SA_ONESHOT)
 				ka->sa.sa_handler = SIG_DFL;
 
@@ -1877,16 +1882,16 @@ relock:
 		}
 
 		/*
-		 * Now we are doing the default action for this signal.
+		 * 现在我们正在为此信号执行默认操作。
 		 */
-		if (sig_kernel_ignore(signr)) /* Default is nothing. */
+		if (sig_kernel_ignore(signr)) /* 忽略 */
 			continue;
 
-		/* Init gets no signals it doesn't want.  */
+		/* Init没有收到它不想要的信号。 */
 		if (current->pid == 1)
 			continue;
 
-		if (sig_kernel_stop(signr)) {
+		if (sig_kernel_stop(signr)) {		/* 暂停 */
 			/*
 			 * The default action is to stop all threads in
 			 * the thread group.  The job control signals
@@ -1926,7 +1931,7 @@ relock:
 		 * Anything else is fatal, maybe with a core dump.
 		 */
 		current->flags |= PF_SIGNALED;
-		if (sig_kernel_coredump(signr)) {
+		if (sig_kernel_coredump(signr)) {			/* core dump */
 			/*
 			 * If it was able to dump core, this kills all
 			 * other threads in the group and synchronizes with
@@ -1941,7 +1946,7 @@ relock:
 		/*
 		 * Death signals, no core dump.
 		 */
-		do_group_exit(signr);
+		do_group_exit(signr);			/* term */
 		/* NOTREACHED */
 	}
 	spin_unlock_irq(&current->sighand->siglock);
@@ -2057,6 +2062,7 @@ out:
 	return error;
 }
 
+/* 获取未决并且被阻塞的信号 */
 long do_sigpending(void __user *set, unsigned long sigsetsize)
 {
 	long error = -EINVAL;
@@ -2066,11 +2072,13 @@ long do_sigpending(void __user *set, unsigned long sigsetsize)
 		goto out;
 
 	spin_lock_irq(&current->sighand->siglock);
+	// pending = pending.signal | shared_pending.signal
 	sigorsets(&pending, &current->pending.signal,
 		  &current->signal->shared_pending.signal);
 	spin_unlock_irq(&current->sighand->siglock);
 
-	/* Outside the lock because only this thread touches it.  */
+	/* 在锁之外，因为只有这个线程接触它。 */
+	// pending = blocked & pending
 	sigandsets(&pending, &current->blocked, &pending);
 
 	error = -EFAULT;
@@ -2234,10 +2242,10 @@ asmlinkage long sys_kill(int pid, int sig)
 {
 	struct siginfo info;
 
-	info.si_signo = sig;
+	info.si_signo = sig;			// 信号编号
 	info.si_errno = 0;
-	info.si_code = SI_USER;
-	info.si_pid = current->tgid;
+	info.si_code = SI_USER;			// 发送者
+	info.si_pid = current->tgid;	// 线程组ID
 	info.si_uid = current->uid;
 
 	return kill_something_info(sig, &info, pid);
@@ -2355,13 +2363,13 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 	if (sig < 1 || sig > _NSIG || (act && sig_kernel_only(sig)))
 		return -EINVAL;
 
+	// 获取信号的行为
 	k = &current->sighand->action[sig-1];
 
 	spin_lock_irq(&current->sighand->siglock);
 	if (signal_pending(current)) {
 		/*
-		 * If there might be a fatal signal pending on multiple
-		 * threads, make sure we take it before changing the action.
+		 * 如果多个线程上可能有一个致命信号未决，请确保我们在更改操作之前接受它。
 		 */
 		spin_unlock_irq(&current->sighand->siglock);
 		return -ERESTARTNOINTR;
@@ -2386,10 +2394,8 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 		    (act->sa.sa_handler == SIG_DFL &&
 		     sig_kernel_ignore(sig))) {
 			/*
-			 * This is a fairly rare case, so we only take the
-			 * tasklist_lock once we're sure we'll need it.
-			 * Now we must do this little unlock and relock
-			 * dance to maintain the lock hierarchy.
+			 * 这是一个相当罕见的情况，所以我们只在确定需要它时才使用tasklist_lock。
+			 * 现在我们必须做这个小小的解锁和重新锁定舞蹈来维护锁的层次结构。
 			 */
 			struct task_struct *t = current;
 			spin_unlock_irq(&t->sighand->siglock);
@@ -2484,6 +2490,7 @@ out:
 
 #ifdef __ARCH_WANT_SYS_SIGPENDING
 
+/* 获取未决信号 */
 asmlinkage long
 sys_sigpending(old_sigset_t __user *set)
 {
@@ -2493,8 +2500,9 @@ sys_sigpending(old_sigset_t __user *set)
 #endif
 
 #ifdef __ARCH_WANT_SYS_SIGPROCMASK
-/* Some platforms have their own version with special arguments others
-   support only sys_rt_sigprocmask.  */
+/* 一些平台有自己的带有特殊参数的版本，其他平台只支持 sys_rt_sigprocmask。
+ * 设置进程的阻塞信号。
+ * */
 
 asmlinkage long
 sys_sigprocmask(int how, old_sigset_t __user *set, old_sigset_t __user *oset)
@@ -2506,28 +2514,29 @@ sys_sigprocmask(int how, old_sigset_t __user *set, old_sigset_t __user *oset)
 		error = -EFAULT;
 		if (copy_from_user(&new_set, set, sizeof(*set)))
 			goto out;
+		// 如果用户要清除SIGKILL和SIGSTOP，则清除，这两个信号不能被阻塞，捕获和忽略。
 		new_set &= ~(sigmask(SIGKILL) | sigmask(SIGSTOP));
 
 		spin_lock_irq(&current->sighand->siglock);
-		old_set = current->blocked.sig[0];
+		old_set = current->blocked.sig[0];			// 获取当前的阻塞的信号集，非实时信号
 
 		error = 0;
 		switch (how) {
 		default:
 			error = -EINVAL;
 			break;
-		case SIG_BLOCK:
+		case SIG_BLOCK:			// &current->blocked |= new_set;
 			sigaddsetmask(&current->blocked, new_set);
 			break;
-		case SIG_UNBLOCK:
+		case SIG_UNBLOCK:		// &current->blocked &= ~new_set;
 			sigdelsetmask(&current->blocked, new_set);
 			break;
-		case SIG_SETMASK:
+		case SIG_SETMASK:		// 覆盖
 			current->blocked.sig[0] = new_set;
 			break;
 		}
 
-		recalc_sigpending();
+		recalc_sigpending();			// 重新检查，是否存在未阻塞的未决信号
 		spin_unlock_irq(&current->sighand->siglock);
 		if (error)
 			goto out;

@@ -5,7 +5,7 @@
  * Resource limits
  */
 
-/* 允许 arch 控制资源顺序 */
+/* 允许arch控制资源顺序 */
 #ifndef __ARCH_RLIMIT_ORDER
 #define RLIMIT_CPU		0	/* CPU time in ms */
 #define RLIMIT_FSIZE		1	/* Maximum filesize */
@@ -18,10 +18,10 @@
 #define RLIMIT_MEMLOCK		8	/* max locked-in-memory address space */
 #define RLIMIT_AS		9	/* address space limit */
 #define RLIMIT_LOCKS		10	/* maximum file locks held */
-#define RLIMIT_SIGPENDING	11	/* max number of pending signals */
+#define RLIMIT_SIGPENDING	11	/* 最大未决信号的数量 */
 #define RLIMIT_MSGQUEUE		12	/* maximum bytes in POSIX mqueues */
 
-#define RLIM_NLIMITS		13
+#define RLIM_NLIMITS		13			// 最大值
 #endif
 
 /*

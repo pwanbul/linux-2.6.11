@@ -570,31 +570,34 @@ handle_io_bitmap(struct thread_struct *next, struct tss_struct *tss)
  * The return value (in %eax) will be the "prev" task after
  * the task-switch, and shows up in ret_from_fork in entry.S,
  * for example.
+ *
+ * fastcall：
+ * - prev_p从eax取参数
+ * - next_p从edx取参数
  */
 struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
-	int cpu = smp_processor_id();
-	struct tss_struct *tss = &per_cpu(init_tss, cpu);
+	int cpu = smp_processor_id();			// cpu逻辑ID
+	struct tss_struct *tss = &per_cpu(init_tss, cpu);		// 本地CPU的tss
 
 	/* never put a printk in __switch_to... printk() calls wake_up*() indirectly */
 
-	__unlazy_fpu(prev_p);
+	__unlazy_fpu(prev_p);			// 有选择的保存prev_p的FPU、MMX、XMM
 
 	/*
-	 * Reload esp0, LDT and the page table pointer:
+	 * 重新加载 esp0、LDT 和页表指针：
 	 */
-	load_esp0(tss, next);
+	load_esp0(tss, next);		// 将next->thread.esp0加载到本地CPU的tss中的esp0
 
 	/*
-	 * Load the per-thread Thread-Local Storage descriptor.
+	 * 加载每线程线程本地存储描述符。
 	 */
-	load_TLS(next, cpu);
+	load_TLS(next, cpu);		// 加载3个TSL
 
 	/*
-	 * Save away %fs and %gs. No need to save %es and %ds, as
-	 * those are always kernel segments while inside the kernel.
+	 * 保存%fs和%gs。无需保存%es和%ds，因为它们在内核中始终是内核段。
 	 */
 	asm volatile("movl %%fs,%0":"=m" (*(int *)&prev->fs));
 	asm volatile("movl %%gs,%0":"=m" (*(int *)&prev->gs));

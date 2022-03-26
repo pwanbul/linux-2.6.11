@@ -46,13 +46,13 @@ struct rlimit {
 #define	PRIO_MIN	(-20)
 #define	PRIO_MAX	20
 
-#define	PRIO_PROCESS	0
-#define	PRIO_PGRP	1
-#define	PRIO_USER	2
+#define	PRIO_PROCESS	0			// 进程优先级
+#define	PRIO_PGRP	1				// 进程组优先级
+#define	PRIO_USER	2				// 用户优先级
 
 /*
- * Limit the stack by to some sane default: root can always
- * increase this limit if needed..  8MB seems reasonable.
+ * 将堆栈限制为一些合理的默认值：
+ * 如果需要，root可以随时增加此限制.. 8MB似乎是合理的。
  */
 #define _STK_LIM	(8*1024*1024)
 

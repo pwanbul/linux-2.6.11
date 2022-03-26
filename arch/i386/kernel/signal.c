@@ -573,9 +573,9 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 }
 
 /*
- * Note that 'init' is a special process: it doesn't get signals it doesn't
- * want to handle. Thus you cannot kill init even with a SIGKILL even by
- * mistake.
+ * 请注意，'init' 是一个特殊的过程：它不会收到它不想处理的信号。因此，即使错误地使用 SIGKILL，您也无法杀死 init。
+ *
+ * regs：用户态的寄存器上下文
  */
 int fastcall do_signal(struct pt_regs *regs, sigset_t *oldset)
 {
@@ -584,11 +584,10 @@ int fastcall do_signal(struct pt_regs *regs, sigset_t *oldset)
 	struct k_sigaction ka;
 
 	/*
-	 * We want the common case to go fast, which
-	 * is why we may in certain cases get here from
-	 * kernel mode. Just return without doing anything
-	 * if so.
+	 * 我们希望常见情况能够快速运行，这就是为什么我们在某些情况下可能会从内核模式到达这里。
+	 * 如果是这样，就直接返回而不做任何事情。
 	 */
+	// 如果中断处理程序走到这里，返回
 	if ((regs->xcs & 3) != 3)
 		return 1;
 
@@ -598,7 +597,7 @@ int fastcall do_signal(struct pt_regs *regs, sigset_t *oldset)
 	}
 
 	if (!oldset)
-		oldset = &current->blocked;
+		oldset = &current->blocked;			// 阻塞信号集
 
 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
@@ -611,7 +610,7 @@ int fastcall do_signal(struct pt_regs *regs, sigset_t *oldset)
 			__asm__("movl %0,%%db7"	: : "r" (current->thread.debugreg[7]));
 		}
 
-		/* Whee!  Actually deliver the signal.  */
+		/* 运行信号处理函数 */
 		handle_signal(signr, &info, &ka, oldset, regs);
 		return 1;
 	}
@@ -647,9 +646,9 @@ void do_notify_resume(struct pt_regs *regs, sigset_t *oldset,
 		regs->eflags |= TF_MASK;
 		clear_thread_flag(TIF_SINGLESTEP);
 	}
-	/* deal with pending signal delivery */
+	/*处理挂起的信号传递 */
 	if (thread_info_flags & _TIF_SIGPENDING)
-		do_signal(regs,oldset);
+		do_signal(regs,oldset);			// 处理未阻塞的未决信号
 	
 	clear_thread_flag(TIF_IRET);
 }

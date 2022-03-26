@@ -49,7 +49,7 @@
 #include <asm/tlbflush.h>
 
 /*
- * Protected counters by write_lock_irq(&tasklist_lock)
+ * write_lock_irq(&tasklist_lock) 保护的计数器
  */
 unsigned long total_forks;	/* Handle normal Linux uptimes. */
 int nr_threads; 		/* The idle threads do not count.. */
@@ -748,17 +748,17 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	atomic_set(&sig->live, 1);
 	init_waitqueue_head(&sig->wait_chldexit);
 	sig->flags = 0;
-	sig->group_exit_code = 0;
+	sig->group_exit_code = 0;			// 线程组退出码
 	sig->group_exit_task = NULL;
 	sig->group_stop_count = 0;
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
 	INIT_LIST_HEAD(&sig->posix_timers);
 
-	sig->tty = current->signal->tty;
-	sig->pgrp = process_group(current);
-	sig->session = current->signal->session;
-	sig->leader = 0;	/* session leadership doesn't inherit */
+	sig->tty = current->signal->tty;			// 终端
+	sig->pgrp = process_group(current);			// 复制父进程的进程组ID
+	sig->session = current->signal->session;		// 复制父进程的会话ID
+	sig->leader = 0;	/* 会话领导不继承，setsid时会改成1 */
 	sig->tty_old_pgrp = 0;
 
 	sig->utime = sig->stime = sig->cutime = sig->cstime = cputime_zero;
@@ -873,7 +873,7 @@ static task_t *copy_process(
 
 	p->did_exec = 0;
 	copy_flags(clone_flags, p);
-	p->pid = pid;
+	p->pid = pid;			// 不管是创建进程和线程，pid都是新分配的，不会和父进程相同
 	retval = -EFAULT;
 	if (clone_flags & CLONE_PARENT_SETTID)
 		if (put_user(p->pid, parent_tidptr))
@@ -924,7 +924,7 @@ static task_t *copy_process(
 
 	p->tgid = p->pid;
 	if (clone_flags & CLONE_THREAD)
-		p->tgid = current->tgid;
+		p->tgid = current->tgid;			// 线程的tgid和父进程的相同
 
 	if ((retval = security_task_alloc(p)))
 		goto bad_fork_cleanup_policy;
@@ -948,6 +948,15 @@ static task_t *copy_process(
 		goto bad_fork_cleanup_mm;
 	if ((retval = copy_namespace(clone_flags, p)))
 		goto bad_fork_cleanup_keys;
+	/* clone(th2, child_stack=0x7fac00b02fb0,
+	 * flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|
+	 * CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|
+	 * CLONE_CHILD_CLEARTID,
+	 * parent_tidptr=0x7fac00b039d0,
+	 * tls=0x7fac00b03700,
+	 * child_tidptr=0x7fac00b039d0
+	 * ) = 30446
+	 * */
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
 		goto bad_fork_cleanup_namespace;
@@ -1043,7 +1052,7 @@ static task_t *copy_process(
 		spin_unlock(&current->sighand->siglock);
 	}
 
-	SET_LINKS(p);
+	SET_LINKS(p);			// 加入进程链表，和父进程的子进程链表
 	if (unlikely(p->ptrace & PT_PTRACED))
 		__ptrace_link(p, current->parent);
 

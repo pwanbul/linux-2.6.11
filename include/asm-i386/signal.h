@@ -15,10 +15,11 @@ struct siginfo;
 
 #define _NSIG		64		// 64个信号
 #define _NSIG_BPW	32
-#define _NSIG_WORDS	(_NSIG / _NSIG_BPW)
+#define _NSIG_WORDS	(_NSIG / _NSIG_BPW)		// 2
 
-typedef unsigned long old_sigset_t;		/* at least 32 bits */
+typedef unsigned long old_sigset_t;		/* 至少32位 */
 
+// 信号集
 typedef struct {
 	unsigned long sig[_NSIG_WORDS];
 } sigset_t;

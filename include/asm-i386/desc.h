@@ -33,6 +33,9 @@ extern struct Xgt_desc_struct idt_descr, cpu_gdt_descr[NR_CPUS];
 extern struct desc_struct default_ldt[];
 extern void set_intr_gate(unsigned int irq, void * addr);
 
+/* 复制init_tss到CPU的cpu_gdt_table的第16项中
+ * 共mov了8个字节
+ * */
 #define _set_tssldt_desc(n,addr,limit,type) \
 __asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
 	"movw %%ax,2(%2)\n\t" \
@@ -49,7 +52,7 @@ static inline void __set_tss_desc(unsigned int cpu, unsigned int entry, void *ad
 	_set_tssldt_desc(&per_cpu(cpu_gdt_table, cpu)[entry], (int)addr,
 		offsetof(struct tss_struct, __cacheline_filler) - 1, 0x89);
 }
-
+// GDT_ENTRY_TSS为16
 #define set_tss_desc(cpu,addr) __set_tss_desc(cpu, GDT_ENTRY_TSS, addr)
 
 static inline void set_ldt_desc(unsigned int cpu, void *addr, unsigned int size)

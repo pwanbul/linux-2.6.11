@@ -74,7 +74,8 @@
 #define GDT_ENTRY_DOUBLEFAULT_TSS	31
 
 /*
- * The GDT has 32 entries
+ * GDT有32个entry，
+ * 每个entry有8个字节
  */
 #define GDT_ENTRIES 32
 

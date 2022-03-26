@@ -339,10 +339,10 @@ struct signal_struct {
 
 	/*
 	 * 我们根本不费心去同步大多数读者，
-	 * 因为没有读者检查实际上需要原子地同时获取 rlim_cur 和 rlim_max 的限制，
+	 * 因为没有读者检查实际上需要原子地同时获取rlim_cur和rlim_max的限制，
 	 * 并且其中任何一个都是可以安全正常读取的单个单词。
-	 * getrlimit/setrlimit 使用 task_lock(current->group_leader)
-	 * 来保护它而不是 siglock，因为他们真的不需要禁用 irqs。
+	 * getrlimit/setrlimit使用task_lock(current->group_leader)
+	 * 来保护它而不是siglock，因为他们真的不需要禁用irqs。
 	 */
 	struct rlimit rlim[RLIM_NLIMITS];       // resource limit
 };
@@ -353,7 +353,7 @@ struct signal_struct {
 #define SIGNAL_STOP_STOPPED	0x00000001 /* job control stop in effect */
 #define SIGNAL_STOP_DEQUEUED	0x00000002 /* stop signal dequeued */
 #define SIGNAL_STOP_CONTINUED	0x00000004 /* SIGCONT since WCONTINUED reap */
-#define SIGNAL_GROUP_EXIT	0x00000008 /* group exit in progress */
+#define SIGNAL_GROUP_EXIT	0x00000008 /* 整个线程组退出 */
 
 
 /*
@@ -371,6 +371,7 @@ struct signal_struct {
 
 #define MAX_PRIO		(MAX_RT_PRIO + 40)
 
+// 动态优先级小于100称为实时进程，大于等于100称为分时进程
 #define rt_task(p)		(unlikely((p)->prio < MAX_RT_PRIO))
 
 /*
@@ -542,14 +543,17 @@ struct task_struct {
 	volatile long state;	/* 进程状态 -1 unrunnable, 0 runnable, >0 stopped */
 	struct thread_info *thread_info;     // 线程描述符指针
 	atomic_t usage;
-	unsigned long flags;	/* per process flags, defined below */
+	unsigned long flags;	/* 每个进程标志，定义如下 */
 	unsigned long ptrace;	// 进程跟踪
 
 	int lock_depth;		/* Lock depth */
 	
-	// 优先级相关
-	int prio, static_prio;      // 动态优先级，静态优先级
-	struct list_head run_list;
+	/* 优先级相关
+	 * 动态优先级，静态优先级，默认值均为140-20，取值范围[100, 139]
+	 * 静态优先级会影响基本时间片的计算
+	 * */
+	int prio, static_prio;
+	struct list_head run_list;		// TASK_RUNNING的进程链表，加入相应的优先级队列中
 	prio_array_t *array;
 
 	unsigned long sleep_avg;
@@ -595,9 +599,9 @@ struct task_struct {
 	 * children/sibling forms the list of my children plus the
 	 * tasks I'm ptracing.
 	 */
-	struct list_head children;	/* list of my children */
-	struct list_head sibling;	/* linkage in my parent's children list */
-	struct task_struct *group_leader;	/* 指向进程组组长 threadgroup leader */
+	struct list_head children;	/* 子进程链表 */
+	struct list_head sibling;	/* 通过这个字段加入父进程的children链表 */
+	struct task_struct *group_leader;	/* 指向进程组组长 thread group leader */
 
 	/* PID/PID hash table linkage. 进程标识符*/
 	struct pid pids[PIDTYPE_MAX];       // 链入pid_chain和pid_list
@@ -606,7 +610,7 @@ struct task_struct {
 	int __user *set_child_tid;		/* CLONE_CHILD_SETTID */
 	int __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */
 
-	unsigned long rt_priority;
+	unsigned long rt_priority;			// 实时优先级，取值访问[0-99]，值越大优先级越高
 	unsigned long it_real_value, it_real_incr;
 	cputime_t it_virt_value, it_virt_incr;
 	cputime_t it_prof_value, it_prof_incr;
@@ -650,7 +654,7 @@ struct task_struct {
 	int link_count, total_link_count;
 /* ipc stuff */
 	struct sysv_sem sysvsem;
-/* CPU-specific state of this task */
+/* 此任务的CPU特定状态，tss中的部分硬件上下文信息会保存在这里，其余的保存在内核栈中 */
 	struct thread_struct thread;
 /* filesystem information 文件系统相关*/
 	struct fs_struct *fs;
@@ -717,6 +721,7 @@ struct task_struct {
 #endif
 };
 
+// 获取进程组/线程组ID
 static inline pid_t process_group(struct task_struct *tsk)
 {
 	return tsk->signal->pgrp;
@@ -833,9 +838,10 @@ void yield(void);
  */
 extern struct exec_domain	default_exec_domain;
 
+/* 进程内核栈，栈由高地址向低地址增长 */
 union thread_union {
-	struct thread_info thread_info;
-	unsigned long stack[THREAD_SIZE/sizeof(long)];
+	struct thread_info thread_info;			// 线性描述符，放在最低地址上
+	unsigned long stack[THREAD_SIZE/sizeof(long)];		// 内核栈，8K
 };
 
 #ifndef __HAVE_ARCH_KSTACK_END
@@ -930,7 +936,7 @@ extern int send_group_sigqueue(int, struct sigqueue *,  struct task_struct *);
 extern int do_sigaction(int, const struct k_sigaction *, struct k_sigaction *);
 extern int do_sigaltstack(const stack_t __user *, stack_t __user *, unsigned long);
 
-/* These can be the second arg to send_sig_info/send_group_sig_info.  */
+/* 这些可以是 send_sig_info/send_group_sig_info 的第二个参数。  */
 #define SEND_SIG_NOINFO ((struct siginfo *) 0)
 #define SEND_SIG_PRIV	((struct siginfo *) 1)
 #define SEND_SIG_FORCED	((struct siginfo *) 2)
@@ -1025,6 +1031,7 @@ extern void wait_task_inactive(task_t * p);
 	remove_parent(p);					\
 	} while (0)
 
+/* 进程p加进程链表，并设置父进程 */
 #define SET_LINKS(p) do {					\
 	if (thread_group_leader(p))				\
 		list_add_tail(&(p)->tasks,&init_task.tasks);	\
@@ -1051,6 +1058,7 @@ extern task_t * FASTCALL(next_thread(const task_t *p));
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
 
+/* 线程组是否为空，即只有p自己一个进程 */
 static inline int thread_group_empty(task_t *p)
 {
 	return list_empty(&p->pids[PIDTYPE_TGID].pid_list);
@@ -1062,12 +1070,12 @@ static inline int thread_group_empty(task_t *p)
 extern void unhash_process(struct task_struct *p);
 
 /*
- * Protects ->fs, ->files, ->mm, ->ptrace, ->group_info, ->comm, keyring
- * subscriptions and synchronises with wait4().  Also used in procfs.
+ * 保护 ->fs、->files、->mm、->ptrace、->group_info、->comm、keyring
+ * 订阅并与 wait4() 同步。
+ * 也用于procfs。
  *
- * Nests both inside and outside of read_lock(&tasklist_lock).
- * It must not be nested with write_lock_irq(&tasklist_lock),
- * neither inside nor outside.
+ * 嵌套在read_lock(&tasklist_lock)的内部和外部。
+ * 它不能与write_lock_irq(&tasklist_lock)嵌套，无论是内部还是外部。
  */
 static inline void task_lock(struct task_struct *p)
 {

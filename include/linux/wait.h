@@ -96,6 +96,7 @@ static inline void init_waitqueue_entry(wait_queue_t *q, struct task_struct *p)
 	q->func = default_wake_function;
 }
 
+// 自定义的等待队列成员
 static inline void init_waitqueue_func_entry(wait_queue_t *q,
 					wait_queue_func_t func)
 {
@@ -104,6 +105,7 @@ static inline void init_waitqueue_func_entry(wait_queue_t *q,
 	q->func = func;
 }
 
+// 队列判空
 static inline int waitqueue_active(wait_queue_head_t *q)
 {
 	return !list_empty(&q->task_list);

@@ -211,8 +211,7 @@ static fastcall int __detach_pid(task_t *task, enum pid_type type)
 		if (list_empty(&pid->pid_list))     // 不存在list_head
 			nr = pid->nr;
 		else {
-			pid_next = list_entry(pid->pid_list.next,
-						struct pid, pid_list);
+			pid_next = list_entry(pid->pid_list.next, struct pid, pid_list);
 			/* insert next pid from pid_list to hash */
 			hlist_add_head(&pid_next->pid_chain,        // 存在则把下一个struct pid插入hash表头部
 				&pid_hash[type][pid_hashfn(pid_next->nr)]);
@@ -256,9 +255,8 @@ task_t *find_task_by_pid_type(int type, int nr)
 EXPORT_SYMBOL(find_task_by_pid_type);
 
 /*
- * This function switches the PIDs if a non-leader thread calls
- * sys_execve() - this must be done without releasing the PID.
- * (which a detach_pid() would eventually do.)
+ * 如果非领导线程调用 sys_execve()，此函数会切换 PID
+ * 这必须在不释放 PID 的情况下完成。 （ detach_pid() 最终会这样做。）
  */
 void switch_exec_pids(task_t *leader, task_t *thread)
 {

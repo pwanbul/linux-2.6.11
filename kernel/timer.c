@@ -823,7 +823,8 @@ void update_process_times(int user_tick)
 }
 
 /*
- * Nr of active tasks - counted in fixed-point numbers
+ * 计算全部CPU上TASK_RUNNING和TASK_UNINTERRUPTIBLE状态的进程
+ * - 以定点数计算
  */
 static unsigned long count_active_tasks(void)
 {
@@ -851,9 +852,9 @@ static inline void calc_load(unsigned long ticks)
 	if (count < 0) {
 		count += LOAD_FREQ;
 		active_tasks = count_active_tasks();
-		CALC_LOAD(avenrun[0], EXP_1, active_tasks);
-		CALC_LOAD(avenrun[1], EXP_5, active_tasks);
-		CALC_LOAD(avenrun[2], EXP_15, active_tasks);
+		CALC_LOAD(avenrun[0], EXP_1, active_tasks);		// 1min
+		CALC_LOAD(avenrun[1], EXP_5, active_tasks);		// 5min
+		CALC_LOAD(avenrun[2], EXP_15, active_tasks);	// 15min
 	}
 }
 

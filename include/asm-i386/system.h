@@ -12,20 +12,25 @@
 struct task_struct;	/* one of the stranger aspects of C forward declarations.. */
 extern struct task_struct * FASTCALL(__switch_to(struct task_struct *prev, struct task_struct *next));
 
+/* 切换进程内核栈和硬件上下文
+ * prev表示被换下的进程，保存在eax中
+ * next表示换上的进程，保存在edx中
+ * last是输出参数，保存的prve进程的task_struct地址
+ * */
 #define switch_to(prev,next,last) do {					\
 	unsigned long esi,edi;						\
-	asm volatile("pushfl\n\t"					\
+	asm volatile("pushfl\n\t"		/* 保存EFLGAS */		\
 		     "pushl %%ebp\n\t"					\
-		     "movl %%esp,%0\n\t"	/* save ESP */		\
-		     "movl %5,%%esp\n\t"	/* restore ESP */	\
-		     "movl $1f,%1\n\t"		/* save EIP */		\
-		     "pushl %6\n\t"		/* restore EIP */	\
+		     "movl %%esp,%0\n\t"	/* 保存prev的ESP */		\
+		     "movl %5,%%esp\n\t"	/* 用next的thread.esp恢复ESP，此后在next的内核栈上运行 */	\
+		     "movl $1f,%1\n\t"		/* 将$1的地址保存在prve的thread.eip中，当prve恢复时，从$1开始运行 */		\
+		     "pushl %6\n\t"		/* 将next的thread.eip，即$1的地址放入next的内核栈 */	\
 		     "jmp __switch_to\n"				\
 		     "1:\t"						\
-		     "popl %%ebp\n\t"					\
-		     "popfl"						\
+		     "popl %%ebp\n\t"		/* prev恢复运行，将之前保存在prve内核栈上的ebp值弹出到ebp里 */	\
+		     "popfl"			/* 同上 */			\
 		     :"=m" (prev->thread.esp),"=m" (prev->thread.eip),	\
-		      "=a" (last),"=S" (esi),"=D" (edi)			\
+		      "=a" (last),"=S" (esi),"=D" (edi)		/* esi中保存prve中的thread */	\
 		     :"m" (next->thread.esp),"m" (next->thread.eip),	\
 		      "2" (prev), "d" (next));				\
 } while (0)

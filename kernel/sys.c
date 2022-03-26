@@ -295,10 +295,8 @@ out:
 }
 
 /*
- * Ugh. To avoid negative return values, "getpriority()" will
- * not return the normal nice-value, but a negated value that
- * has been offset by 20 (ie it returns 40..1 instead of -20..19)
- * to stay compatible.
+ * 啊。为避免返回负值，“getpriority()”不会返回正常的 nice-value，
+ * 而是一个偏移了20的否定值（即返回40..1而不是-20..19）以保持兼容。
  */
 asmlinkage long sys_getpriority(int which, int who)
 {
@@ -311,7 +309,7 @@ asmlinkage long sys_getpriority(int which, int who)
 
 	read_lock(&tasklist_lock);
 	switch (which) {
-		case PRIO_PROCESS:
+		case PRIO_PROCESS:				// 进程优先级
 			if (!who)
 				who = current->pid;
 			p = find_task_by_pid(who);
@@ -1067,22 +1065,25 @@ asmlinkage long sys_getsid(pid_t pid)
 	}
 }
 
+/* 创建新的会话 */
 asmlinkage long sys_setsid(void)
 {
 	struct pid *pid;
 	int err = -EPERM;
 
+	/* 非主控线程不能设置 */
 	if (!thread_group_leader(current))
 		return -EINVAL;
 
 	down(&tty_sem);
 	write_lock_irq(&tasklist_lock);
 
+	/* 进程组的组长和主控线程不能设置 */
 	pid = find_pid(PIDTYPE_PGID, current->pid);
 	if (pid)
 		goto out;
 
-	current->signal->leader = 1;
+	current->signal->leader = 1;		// 只有这一处会修改这个值
 	__set_special_pids(current->pid, current->pid);
 	current->signal->tty = NULL;
 	current->signal->tty_old_pgrp = 0;
@@ -1438,6 +1439,7 @@ asmlinkage long sys_setdomainname(char __user *name, int len)
 	return errno;
 }
 
+/* getrlimit */
 asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
 {
 	if (resource >= RLIM_NLIMITS)
@@ -1475,6 +1477,7 @@ asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit __user *r
 
 #endif
 
+/* setrlimit */
 asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
 {
 	struct rlimit new_rlim, *old_rlim;
@@ -1484,9 +1487,11 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
 		return -EINVAL;
 	if(copy_from_user(&new_rlim, rlim, sizeof(*rlim)))
 		return -EFAULT;
+		// 是否自洽
        if (new_rlim.rlim_cur > new_rlim.rlim_max)
                return -EINVAL;
 	old_rlim = current->signal->rlim + resource;
+	// 超过硬限制
 	if ((new_rlim.rlim_max > old_rlim->rlim_max) &&
 	    !capable(CAP_SYS_RESOURCE))
 		return -EPERM;
@@ -1601,8 +1606,11 @@ asmlinkage long sys_getrusage(int who, struct rusage __user *ru)
 	return getrusage(current, who, ru);
 }
 
+/* 修稿进程的文件访问权限
+ * mask是掩码，被设置的位被屏蔽 */
 asmlinkage long sys_umask(int mask)
 {
+	// 交换，锁内存总线
 	mask = xchg(&current->fs->umask, mask & S_IRWXUGO);
 	return mask;
 }

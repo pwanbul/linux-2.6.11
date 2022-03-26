@@ -552,8 +552,8 @@ void __init early_cpu_init(void)
  */
 void __init cpu_init (void)
 {
-	int cpu = smp_processor_id();
-	struct tss_struct * t = &per_cpu(init_tss, cpu);
+	int cpu = smp_processor_id();			// CPU逻辑ID
+	struct tss_struct * t = &per_cpu(init_tss, cpu);		// tss
 	struct thread_struct *thread = &current->thread;
 
 	if (cpu_test_and_set(cpu, cpu_initialized)) {
@@ -572,12 +572,12 @@ void __init cpu_init (void)
 	}
 
 	/*
-	 * Initialize the per-CPU GDT with the boot GDT,
-	 * and set up the GDT descriptor:
+	 * 使用引导GDT初始化per-CPU GDT，
+	 * 并设置GDT描述符：
 	 */
-	memcpy(&per_cpu(cpu_gdt_table, cpu), cpu_gdt_table,
-	       GDT_SIZE);
-	cpu_gdt_descr[cpu].size = GDT_SIZE - 1;
+	memcpy(&per_cpu(cpu_gdt_table, cpu), cpu_gdt_table, GDT_SIZE);
+	// 设置gdt的描述符
+	cpu_gdt_descr[cpu].size = GDT_SIZE - 1;		// 8*32-1
 	cpu_gdt_descr[cpu].address =
 	    (unsigned long)&per_cpu(cpu_gdt_table, cpu);
 
@@ -605,7 +605,7 @@ void __init cpu_init (void)
 	enter_lazy_tlb(&init_mm, current);
 
 	load_esp0(t, thread);
-	set_tss_desc(cpu,t);
+	set_tss_desc(cpu,t);			// 将t(init_tss)复制到当前CPU的cpu_gdt_table的第16项中
 	load_TR_desc();
 	load_LDT(&init_mm.context);
 

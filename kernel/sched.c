@@ -54,9 +54,10 @@
  * to static priority [ MAX_RT_PRIO..MAX_PRIO-1 ],
  * and back.
  */
+// 静态优先级和用户空间的nice相互转换
 #define NICE_TO_PRIO(nice)	(MAX_RT_PRIO + (nice) + 20)     // MAX_RT_PRIO为100
 #define PRIO_TO_NICE(prio)	((prio) - MAX_RT_PRIO - 20)
-#define TASK_NICE(p)		PRIO_TO_NICE((p)->static_prio)
+#define TASK_NICE(p)		PRIO_TO_NICE((p)->static_prio)			// 进程的nice值
 
 /*
  * 'User priority' is the nice value converted to something we
@@ -176,14 +177,14 @@ static unsigned int task_timeslice(task_t *p)
  * These are the runqueue data structures:
  */
 
-#define BITMAP_SIZE ((((MAX_PRIO+1+7)/8)+sizeof(long)-1)/sizeof(long))
+#define BITMAP_SIZE ((((MAX_PRIO+1+7)/8)+sizeof(long)-1)/sizeof(long))			// 5
 
 typedef struct runqueue runqueue_t;
 
 struct prio_array {			// 进程优先级管理
 	unsigned int nr_active;			// 链表中进程描述符的数量
-	unsigned long bitmap[BITMAP_SIZE];	///
-	struct list_head queue[MAX_PRIO];
+	unsigned long bitmap[BITMAP_SIZE];	//BITMAP_SIZE为5，160位
+	struct list_head queue[MAX_PRIO];		// 140个链表
 };
 
 /*
@@ -199,29 +200,32 @@ struct runqueue {
 	spinlock_t lock;
 
 	/*
-	 * nr_running and cpu_load should be in the same cacheline because
-	 * remote CPUs use both these fields when doing load calculation.
+	 * nr_running和cpu_load应该在同一个缓存行中，
+	 * 因为远程CPU在进行负载计算时会使用这两个字段。
 	 */
-	unsigned long nr_running;
+	unsigned long nr_running;			// TASK_RUNNING状态的进程数量
 #ifdef CONFIG_SMP
 	unsigned long cpu_load;
 #endif
 	unsigned long long nr_switches;
 
 	/*
-	 * This is part of a global counter where only the total sum
-	 * over all CPUs matters. A task can increase this counter on
-	 * one CPU and if it got migrated afterwards it may decrease
-	 * it on another CPU. Always updated under the runqueue lock:
+	 * 这是全局计数器的一部分，其中只有所有CPU的总和很重要。
+	 * 一个任务可以在一个CPU上增加这个计数器，
+	 * 如果它之后被迁移，它可能会在另一个CPU上减少它。
+	 * 总是在运行队列锁下更新：
 	 */
-	unsigned long nr_uninterruptible;
+	unsigned long nr_uninterruptible;			// TASK_UNINTERRUPTIBLE状态进程的数量
 
 	unsigned long expired_timestamp;
 	unsigned long long timestamp_last_tick;
-	task_t *curr, *idle;
+	task_t *curr, *idle;		// curr为正在此CPU上运行的进程指针
 	struct mm_struct *prev_mm;
+	/*  active指向arrays[0], 保存活动进程，即时间片没有用完，可以继续运行的进程
+	 *  expired指向arrays[1], 保存过期进程，即时间片用不能再运行的进程，知道所有的活动进程运行完
+	 * */
 	prio_array_t *active, *expired, arrays[2];
-	int best_expired_prio;
+	int best_expired_prio;			// 140
 	atomic_t nr_iowait;
 
 #ifdef CONFIG_SMP
@@ -278,7 +282,7 @@ struct runqueue {
 #endif
 };
 
-static DEFINE_PER_CPU(struct runqueue, runqueues);
+static DEFINE_PER_CPU(struct runqueue, runqueues);		// per cpu
 
 #define for_each_domain(cpu, domain) \
 	for (domain = cpu_rq(cpu)->sd; domain; domain = domain->parent)
@@ -286,7 +290,7 @@ static DEFINE_PER_CPU(struct runqueue, runqueues);
 #define cpu_rq(cpu)		(&per_cpu(runqueues, (cpu)))        // 指定CPU的运行队列
 #define this_rq()		(&__get_cpu_var(runqueues))     // 本地CPU的运行队列
 #define task_rq(p)		cpu_rq(task_cpu(p))
-#define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
+#define cpu_curr(cpu)		(cpu_rq(cpu)->curr)			// CPU上正常运行的进程指针
 
 /*
  * Default context-switch locking:
@@ -571,12 +575,13 @@ static void dequeue_task(struct task_struct *p, prio_array_t *array)
 		__clear_bit(p->prio, array->bitmap);
 }
 
+/* 将进程p加入优先级p->prio的队列 */
 static void enqueue_task(struct task_struct *p, prio_array_t *array)
 {
 	sched_info_queued(p);
-	list_add_tail(&p->run_list, array->queue + p->prio);
-	__set_bit(p->prio, array->bitmap);
-	array->nr_active++;
+	list_add_tail(&p->run_list, array->queue + p->prio);		// 基于动态优先级
+	__set_bit(p->prio, array->bitmap);			// 链表不为空时，置1
+	array->nr_active++;		// 140个链表中进程数量
 	p->array = array;
 }
 
@@ -796,7 +801,7 @@ static inline void resched_task(task_t *p)
 #endif
 
 /**
- * task_curr - is this task currently executing on a CPU?
+ * task_curr - 此任务当前是否在CPU上执行？
  * @p: the task in question.
  */
 inline int task_curr(const task_t *p)
@@ -1397,14 +1402,15 @@ task_t * context_switch(runqueue_t *rq, task_t *prev, task_t *next)
 /*
  * nr_running, nr_uninterruptible and nr_context_switches:
  *
- * externally visible scheduler statistics: current number of runnable
- * threads, current number of uninterruptible-sleeping threads, total
- * number of context switches performed since bootup.
+ * 外部可见的调度程序统计信息：
+ * - 当前可运行线程数、
+ * - 当前不可中断睡眠线程数、
+ * - 自启动以来执行的上下文切换总数。
  */
 unsigned long nr_running(void)
 {
 	unsigned long i, sum = 0;
-
+	// 各个统计TASK_RUNNING状态数量
 	for_each_online_cpu(i)
 		sum += cpu_rq(i)->nr_running;
 
@@ -1414,13 +1420,13 @@ unsigned long nr_running(void)
 unsigned long nr_uninterruptible(void)
 {
 	unsigned long i, sum = 0;
-
+	// 各个统计TASK_UNINTERRUPTIBLE状态数量
 	for_each_cpu(i)
 		sum += cpu_rq(i)->nr_uninterruptible;
 
 	/*
-	 * Since we read the counters lockless, it might be slightly
-	 * inaccurate. Do not allow it to go below zero though:
+	 * 由于我们读取的计数器是无锁的，因此可能有点不准确。
+	 * 但不要让它低于零：
 	 */
 	if (unlikely((long)sum < 0))
 		sum = 0;
@@ -2940,16 +2946,21 @@ need_resched:
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync, void *key)
 {
 	task_t *p = curr->task;
-	return try_to_try_to_wake_upwake_up(p, mode, sync);
+	return try_to_wake_up(p, mode, sync);
 }
 
 EXPORT_SYMBOL(default_wake_function);
 
 /*
- 核心唤醒功能。非排他性唤醒（nr_exclusive == 0）只会唤醒所有内容。
- 如果是排它性唤醒（nr_exclusive ==small + ve * number），那么我们将唤醒所有非排他性任务和一个排他性任务。
- 在某些情况下，我们可以尝试唤醒已经开始运行但未处于TASK_RUNNING状态的任务。
- 在这种（罕见）情况下，try_to_wake_up（）返回零，我们通过继续扫描队列来处理它。
+ * 核心唤醒功能。非排他性唤醒（nr_exclusive == 0）只会唤醒所有内容。
+ * 如果是排它性唤醒（nr_exclusive ==small + ve * number），那么我们将唤醒所有非排他性任务和一个排他性任务。
+ * 在某些情况下，我们可以尝试唤醒已经开始运行但未处于TASK_RUNNING状态的任务。
+ * 在这种（罕见）情况下，try_to_wake_up（）返回零，我们通过继续扫描队列来处理它。
+ *
+ * q:等待队列头
+ * mode:TASK_INTERRUPTIABLE
+ * nr_exclusive:排他性进程的个数，0表示唤醒全部排他性进程
+ *
  */
 // 唤醒线程/进程核心函数
 static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
@@ -2959,6 +2970,7 @@ static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
 
 	/* 排他性的task尾插链表
 	 * 非排他性的task头插链表
+	 * 唤醒全部的非排他性进程和nr_exclusive个排他性进程
 	 * */
 	list_for_each_safe(tmp, next, &q->task_list) {
 		wait_queue_t *curr;
@@ -3005,12 +3017,10 @@ void fastcall __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
  * @mode: which threads
  * @nr_exclusive: how many wake-one or wake-many threads to wake up
  *
- * The sync wakeup differs that the waker knows that it will schedule
- * away soon, so while the target thread will be woken up, it will not
- * be migrated to another CPU - ie. the two threads are 'synchronized'
- * with each other. This can prevent needless bouncing between CPUs.
+ * 同步唤醒的不同之处在于，唤醒器知道它很快就会被调度出去，所以当目标线程被唤醒时，
+ * 它不会被迁移到另一个CPU - 即。这两个线程彼此“同步”。这可以防止CPU之间不必要的弹跳。
  *
- * On UP it can prevent extra preemption.
+ * 在UP上，它可以防止额外的抢占。
  */
 void fastcall __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 {
@@ -3192,11 +3202,12 @@ EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);
 	__remove_wait_queue(q, &wait);			\
 	spin_unlock_irqrestore(&q->lock, flags);
 
+/* 通用休眠函数，注意和sleep_on的区别 */
 void fastcall __sched interruptible_sleep_on(wait_queue_head_t *q)
 {
 	SLEEP_ON_VAR
 
-	current->state = TASK_INTERRUPTIBLE;
+	current->state = TASK_INTERRUPTIBLE;		// 可以被信号唤醒
 
 	SLEEP_ON_HEAD
 	schedule();
@@ -3205,6 +3216,7 @@ void fastcall __sched interruptible_sleep_on(wait_queue_head_t *q)
 
 EXPORT_SYMBOL(interruptible_sleep_on);
 
+/* 通用休眠函数，可以设置休眠时间 */
 long fastcall __sched interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
 {
 	SLEEP_ON_VAR
@@ -3220,19 +3232,21 @@ long fastcall __sched interruptible_sleep_on_timeout(wait_queue_head_t *q, long 
 
 EXPORT_SYMBOL(interruptible_sleep_on_timeout);
 
+/* 通用休眠函数 */
 void fastcall __sched sleep_on(wait_queue_head_t *q)
 {
-	SLEEP_ON_VAR
+	SLEEP_ON_VAR		// 定义并初始化等待队列的成员，非排他性
 
 	current->state = TASK_UNINTERRUPTIBLE;
 
-	SLEEP_ON_HEAD
-	schedule();
-	SLEEP_ON_TAIL
+	SLEEP_ON_HEAD			// 头插入队列q中
+	schedule();				// 调度走
+	SLEEP_ON_TAIL			// 从队列q中删除
 }
 
 EXPORT_SYMBOL(sleep_on);
 
+/* 通用休眠函数，可以设置休眠时间 */
 long fastcall __sched sleep_on_timeout(wait_queue_head_t *q, long timeout)
 {
 	SLEEP_ON_VAR
@@ -3255,27 +3269,29 @@ void set_user_nice(task_t *p, long nice)
 	runqueue_t *rq;
 	int old_prio, new_prio, delta;
 
+	// 检查是否需要设置
 	if (TASK_NICE(p) == nice || nice < -20 || nice > 19)
 		return;
 	/*
-	 * We have to be careful, if called from sys_setpriority(),
-	 * the task might be in the middle of scheduling on another CPU.
+	 * 我们必须小心，如果从sys_setpriority()调用，
+	 * 该任务可能正在另一个CPU上调度。
 	 */
 	rq = task_rq_lock(p, &flags);
 	/*
-	 * The RT priorities are set via sched_setscheduler(), but we still
-	 * allow the 'normal' nice value to be set - but as expected
-	 * it wont have any effect on scheduling until the task is
-	 * not SCHED_NORMAL:
+	 * RT优先级通过sched_setscheduler()设置，
+	 * 但我们仍然允许设置“正常”nice值
+	 * -但正如预期的那样，在任务不是SCHED_NORMAL之前它不会对调度产生任何影响：
 	 */
-	if (rt_task(p)) {
+	if (rt_task(p)) {		// 实时进程
 		p->static_prio = NICE_TO_PRIO(nice);
 		goto out_unlock;
 	}
+	// 换到相应的优先级队列中
 	array = p->array;
 	if (array)
 		dequeue_task(p, array);
 
+	// 动态优先级的计算
 	old_prio = p->prio;
 	new_prio = NICE_TO_PRIO(nice);
 	delta = new_prio - old_prio;
@@ -3285,8 +3301,7 @@ void set_user_nice(task_t *p, long nice)
 	if (array) {
 		enqueue_task(p, array);
 		/*
-		 * If the task increased its priority or is running and
-		 * lowered its priority, then reschedule its CPU:
+		 * 如果任务提高了优先级或正在运行并降低了优先级，则重新调度其CPU：
 		 */
 		if (delta < 0 || (delta > 0 && task_running(rq, p)))
 			resched_task(rq->curr);
@@ -3300,11 +3315,12 @@ EXPORT_SYMBOL(set_user_nice);
 #ifdef __ARCH_WANT_SYS_NICE
 
 /*
- * sys_nice - change the priority of the current process.
- * @increment: priority increment
+ * sys_nice - 改变当前进程的优先级。
+ * @increment: 优先级递增
  *
- * sys_setpriority is a more generic, but much slower function that
- * does similar things.
+ * sys_setpriority是一个更通用但执行类似操作的函数要慢得多。
+ *
+ * increment的取值范围[-40...0...40]，是一个偏移量
  */
 asmlinkage long sys_nice(int increment)
 {
@@ -3312,9 +3328,8 @@ asmlinkage long sys_nice(int increment)
 	long nice;
 
 	/*
-	 * Setpriority might change our priority at the same moment.
-	 * We don't have to worry. Conceptually one call occurs first
-	 * and we have a single winner.
+	 * Setpriority可能会同时改变我们的优先级。我们不必担心。
+	 * 从概念上讲，首先出现一个跟注，我们只有一个赢家。
 	 */
 	if (increment < 0) {
 		if (!capable(CAP_SYS_NICE))
@@ -3326,6 +3341,7 @@ asmlinkage long sys_nice(int increment)
 		increment = 40;
 
 	nice = PRIO_TO_NICE(current->static_prio) + increment;
+	// nice:[-20,19]
 	if (nice < -20)
 		nice = -20;
 	if (nice > 19)
@@ -3355,7 +3371,7 @@ int task_prio(const task_t *p)
 }
 
 /**
- * task_nice - return the nice value of a given task.
+ * task_nice - 返回给定任务的nice值。
  * @p: the task in question.
  */
 int task_nice(const task_t *p)
@@ -4973,19 +4989,21 @@ int in_sched_functions(unsigned long addr)
 		&& addr < (unsigned long)__sched_text_end);
 }
 
+/* 调度器初始化 */
 void __init sched_init(void)
 {
-	runqueue_t *rq;
+	runqueue_t *rq;			// per cpu
 	int i, j, k;
 
+	// 初始化各个CPU上的数据
 	for (i = 0; i < NR_CPUS; i++) {
 		prio_array_t *array;
 
-		rq = cpu_rq(i);
+		rq = cpu_rq(i);			// 获取当前CPU的rq
 		spin_lock_init(&rq->lock);
 		rq->active = rq->arrays;
 		rq->expired = rq->arrays + 1;
-		rq->best_expired_prio = MAX_PRIO;
+		rq->best_expired_prio = MAX_PRIO;			// 140，最大优先级
 
 #ifdef CONFIG_SMP
 		rq->sd = &sched_domain_dummy;
@@ -5000,10 +5018,10 @@ void __init sched_init(void)
 		for (j = 0; j < 2; j++) {
 			array = rq->arrays + j;
 			for (k = 0; k < MAX_PRIO; k++) {
-				INIT_LIST_HEAD(array->queue + k);
-				__clear_bit(k, array->bitmap);
+				INIT_LIST_HEAD(array->queue + k);		// 140个链表初始化
+				__clear_bit(k, array->bitmap);			// 位图清空，共有160位
 			}
-			// delimiter for bitsearch
+			// 位搜索的分隔符
 			__set_bit(MAX_PRIO, array->bitmap);
 		}
 	}

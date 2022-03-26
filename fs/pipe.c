@@ -721,7 +721,7 @@ int do_pipe(int *fd)
 	int i,j;
 
 	error = -ENFILE;
-	f1 = get_empty_filp();
+	f1 = get_empty_filp();		// 获取空的file
 	if (!f1)
 		goto no_files;
 
