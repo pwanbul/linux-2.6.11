@@ -57,8 +57,7 @@ static int parse_one(char *param,
 	/* Find parameter */
 	for (i = 0; i < num_params; i++) {
 		if (parameq(param, params[i].name)) {
-			DEBUGP("They are equal!  Calling %p\n",
-			       params[i].set);
+			DEBUGP("They are equal!  Calling %p\n", params[i].set);
 			return params[i].set(val, &params[i]);
 		}
 	}
@@ -124,7 +123,7 @@ static char *next_arg(char *args, char **param, char **val)
 	return next;
 }
 
-/* Args looks like "foo=bar,bar2 baz=fuz wiz". */
+/* Args 看起来像“foo=bar,bar2 baz=fuz wiz”。 */
 int parse_args(const char *name,
 	       char *args,
 	       struct kernel_param *params,
@@ -142,8 +141,7 @@ int parse_args(const char *name,
 		ret = parse_one(param, val, params, num, unknown);
 		switch (ret) {
 		case -ENOENT:
-			printk(KERN_ERR "%s: Unknown parameter `%s'\n",
-			       name, param);
+			printk(KERN_ERR "%s: Unknown parameter `%s'\n", name, param);
 			return ret;
 		case -ENOSPC:
 			printk(KERN_ERR

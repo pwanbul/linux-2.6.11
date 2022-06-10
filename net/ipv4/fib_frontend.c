@@ -593,6 +593,7 @@ static struct notifier_block fib_netdev_notifier = {
 	.notifier_call =fib_netdev_event,
 };
 
+// 路由表初始化
 void __init ip_fib_init(void)
 {
 #ifndef CONFIG_IP_MULTIPLE_TABLES

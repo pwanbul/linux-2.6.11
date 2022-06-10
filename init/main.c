@@ -383,17 +383,17 @@ static int __init do_early_param(char *param, char *val)
 	struct obs_kernel_param *p;
 
 	for (p = __setup_start; p < __setup_end; p++) {
+        // early被设置
 		if (p->early && strcmp(param, p->str) == 0) {
 			if (p->setup_func(val) != 0)
-				printk(KERN_WARNING
-				       "Malformed early option '%s'\n", param);
+				printk(KERN_WARNING "Malformed early option '%s'\n", param);
 		}
 	}
 	/* We accept everything at this stage. */
 	return 0;
 }
 
-/* Arch code calls this early on, or if not, just before other parsing. */
+/* Arch 代码在早期调用它，或者如果没有，就在其他解析之前调用它。 */
 void __init parse_early_param(void)
 {
 	static __initdata int done = 0;
@@ -402,8 +402,9 @@ void __init parse_early_param(void)
 	if (done)
 		return;
 
-	/* All fall through to do_early_param. */
+	/* 全部落入do_early_param。 */
 	strlcpy(tmp_cmdline, saved_command_line, COMMAND_LINE_SIZE);
+    // 虚晃一枪，实际调用的是do_early_param
 	parse_args("early options", tmp_cmdline, NULL, 0, do_early_param);
 	done = 1;
 }
@@ -415,7 +416,7 @@ void __init parse_early_param(void)
 asmlinkage void __init start_kernel(void)
 {
 	char * command_line;
-	extern struct kernel_param __start___param[], __stop___param[];
+	extern struct kernel_param __start___param[], __stop___param[]; // 链接脚本中定义特殊符号
 /*
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
@@ -448,12 +449,13 @@ asmlinkage void __init start_kernel(void)
 	preempt_disable();
 	build_all_zonelists();      // 建立结点和内存域的数据结构
 	page_alloc_init();
-	printk("Kernel command line: %s\n", saved_command_line);
+
+	printk("Kernel command line: %s\n", saved_command_line);    // cat /proc/cmdline
 	parse_early_param();
-	parse_args("Booting kernel", command_line, __start___param,
-		   __stop___param - __start___param,
-		   &unknown_bootoption);
-	sort_main_extable();
+    // /sys中的参数
+	parse_args("Booting kernel", command_line, __start___param, __stop___param - __start___param, &unknown_bootoption);
+
+    sort_main_extable();
 	trap_init();		// IDT初始化
 	rcu_init();
 	init_IRQ();
@@ -586,7 +588,7 @@ static void __init do_basic_setup(void)
 	/* Networking initialization needs a process context */ 
 	sock_init();
 
-	do_initcalls();
+	do_initcalls();         // 按顺序调用
 }
 
 static void do_pre_smp_initcalls(void)

@@ -620,6 +620,7 @@ struct proc_dir_entry *proc_mkdir(const char *name,
 	return proc_mkdir_mode(name, S_IRUGO | S_IXUGO, parent);
 }
 
+
 struct proc_dir_entry *create_proc_entry(const char *name, mode_t mode,
 					 struct proc_dir_entry *parent)
 {

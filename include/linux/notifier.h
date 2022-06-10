@@ -16,7 +16,7 @@ struct notifier_block
 {
 	int (*notifier_call)(struct notifier_block *self, unsigned long, void *);  // callback，由被通知方提供
 	struct notifier_block *next;        // 链表指针
-	int priority;       // 优先级
+	int priority;       // 优先级，值越大优先级越高，排在左边
 };
 
 
@@ -26,6 +26,7 @@ extern int notifier_chain_register(struct notifier_block **list, struct notifier
 extern int notifier_chain_unregister(struct notifier_block **nl, struct notifier_block *n);
 extern int notifier_call_chain(struct notifier_block **n, unsigned long val, void *v);
 
+// 回调函数可以返回以下值
 #define NOTIFY_DONE		0x0000		/* 对事件视而不见 Don't care */
 #define NOTIFY_OK		0x0001		/* 事件正确处理 Suits me */
 #define NOTIFY_STOP_MASK	0x8000		/* 由notifier_call_chain检查，看继续调用回调函数，

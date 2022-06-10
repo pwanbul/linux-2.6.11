@@ -51,8 +51,8 @@ static void page_pool_free(void *page, void *data)
  *  n means that there are (n-1) current users of it.       已经映射，有n-1个用户
  */
 #ifdef CONFIG_HIGHMEM
-static int pkmap_count[LAST_PKMAP];     // 页表项的计数器
-static unsigned int last_pkmap_nr;
+static int pkmap_count[LAST_PKMAP];     // highmem页框的计数器，数组的下标为highmem页框的页框号
+static unsigned int last_pkmap_nr;      // highmem页框的起始页框号，0
 static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(kmap_lock);
 
 pte_t * pkmap_page_table;       // 永久内核映射页表
@@ -97,13 +97,14 @@ static void flush_all_zero_pkmaps(void)
 	flush_tlb_kernel_range(PKMAP_ADDR(0), PKMAP_ADDR(LAST_PKMAP));
 }
 
+/* 为page分配虚拟地址，此时的page已经确定是highmem范围的页框 */
 static inline unsigned long map_new_virtual(struct page *page)
 {
 	unsigned long vaddr;
 	int count;
 
 start:
-	count = LAST_PKMAP;
+	count = LAST_PKMAP;         // 最多可以分配1024的映射
 	/* Find an empty entry */
 	for (;;) {
 		last_pkmap_nr = (last_pkmap_nr + 1) & LAST_PKMAP_MASK;
@@ -112,12 +113,12 @@ start:
 			count = LAST_PKMAP;
 		}
 		if (!pkmap_count[last_pkmap_nr])
-			break;	/* Found a usable entry */
+			break;	/* 找到一个可用的条目 */
 		if (--count)
 			continue;
 
 		/*
-		 * Sleep for somebody else to unmap their entries
+		 * 睡觉让其他人取消映射他们的条目
 		 */
 		{
 			DECLARE_WAITQUEUE(wait, current);
@@ -137,7 +138,7 @@ start:
 			goto start;
 		}
 	}
-	vaddr = PKMAP_ADDR(last_pkmap_nr);
+	vaddr = PKMAP_ADDR(last_pkmap_nr);      // 由页框号计算虚拟地址
 	set_pte(&(pkmap_page_table[last_pkmap_nr]), mk_pte(page, kmap_prot));
 
 	pkmap_count[last_pkmap_nr] = 1;
@@ -146,6 +147,7 @@ start:
 	return vaddr;
 }
 
+/* 返回page的虚拟地址，如果不存在，则分配 */
 void fastcall *kmap_high(struct page *page)
 {
 	unsigned long vaddr;
@@ -159,8 +161,9 @@ void fastcall *kmap_high(struct page *page)
 	spin_lock(&kmap_lock);
 	vaddr = (unsigned long)page_address(page);
 	if (!vaddr)
+        // 为page分配虚拟地址
 		vaddr = map_new_virtual(page);
-	pkmap_count[PKMAP_NR(vaddr)]++;
+	pkmap_count[PKMAP_NR(vaddr)]++;     //
 	if (pkmap_count[PKMAP_NR(vaddr)] < 2)
 		BUG();
 	spin_unlock(&kmap_lock);
@@ -488,7 +491,7 @@ EXPORT_SYMBOL(blk_queue_bounce);
 #define PA_HASH_ORDER	7
 
 /*
- * Describes one page->virtual association
+ * 描述一页->虚拟关联
  */
 struct page_address_map {
 	struct page *page;
@@ -497,19 +500,21 @@ struct page_address_map {
 };
 
 /*
- * page_address_map freelist, allocated from page_address_maps.
+ * page_address_map空闲列表，从page_address_maps分配。
  */
 static struct list_head page_address_pool;	/* freelist */
-static spinlock_t pool_lock;			/* protects page_address_pool */
+static spinlock_t pool_lock;			/* 保护page_address_pool */
 
 /*
- * Hash table bucket
+ * 哈希表桶，共有2^7个存储桶（因为highmem的大小为128MB),
+ * 因此每个存储桶，平均算下来，管理1M/4K=256个页框
  */
 static struct page_address_slot {
-	struct list_head lh;			/* List of page_address_maps */
-	spinlock_t lock;			/* Protect this bucket's list */
+	struct list_head lh;			/* page_address_maps列表 */
+	spinlock_t lock;			/* 保护此存储桶列表 */
 } ____cacheline_aligned_in_smp page_address_htable[1<<PA_HASH_ORDER];       // PA_HASH_ORDER为7
 
+// 计算page所在的存储桶
 static struct page_address_slot *page_slot(struct page *page)
 {
 	return &page_address_htable[hash_ptr(page, PA_HASH_ORDER)];
@@ -559,7 +564,7 @@ void set_page_address(struct page *page, void *virtual)
 		BUG_ON(list_empty(&page_address_pool));
 
 		spin_lock_irqsave(&pool_lock, flags);       // 对桶加锁
-		pam = list_entry(page_address_pool.next, struct page_address_map, list);
+		pam = list_entry(page_address_pool.next, struct page_address_map, list);        // 从空闲链表的头部分配
 		list_del(&pam->list);       // 把pam从page_address_pool中删除，即从pool中分配
 		spin_unlock_irqrestore(&pool_lock, flags);      // 对桶解锁
 
@@ -575,6 +580,7 @@ void set_page_address(struct page *page, void *virtual)
 			if (pam->page == page) {        // 遍历hash桶，找到page对应节点
 				list_del(&pam->list);       // 把节点从桶中删除
 				spin_unlock_irqrestore(&pas->lock, flags);
+
 				spin_lock_irqsave(&pool_lock, flags);
 				list_add_tail(&pam->list, &page_address_pool);      // 把节点加入pool中
 				spin_unlock_irqrestore(&pool_lock, flags);
@@ -587,7 +593,7 @@ done:
 	return;
 }
 
-static struct page_address_map page_address_maps[LAST_PKMAP];           // 静态变量，全局唯一
+static struct page_address_map page_address_maps[LAST_PKMAP];           // 静态变量，全局唯一，1024
 
 /* 该函数初始化高端内存（High Memory）线性地址空间中永久映射相关的全局变量。
  * 所以在不支持高端内存即在没有配置CONFIG_HIGHMEM这个宏的时候，该函数是个空函数什么也不做。
@@ -596,9 +602,12 @@ void __init page_address_init(void)         // start_kernel
 {
 	int i;
 
-	INIT_LIST_HEAD(&page_address_pool);
+	INIT_LIST_HEAD(&page_address_pool);         // 空闲链表头结点
+    // 初始化数组，将数组串起来
 	for (i = 0; i < ARRAY_SIZE(page_address_maps); i++)
 		list_add(&page_address_maps[i].list, &page_address_pool);
+
+    // 2^7个hash表
 	for (i = 0; i < ARRAY_SIZE(page_address_htable); i++) {
 		INIT_LIST_HEAD(&page_address_htable[i].lh);
 		spin_lock_init(&page_address_htable[i].lock);

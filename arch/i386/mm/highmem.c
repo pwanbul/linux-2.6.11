@@ -1,5 +1,9 @@
 #include <linux/highmem.h>
 
+/* 返回page的虚拟地址
+ * 1. 如何为lowermem，则通过page_address返回
+ * 2. 否则，调用kmap_high，page可能没有对应的虚拟地址，kmap_high需要正确处理
+ * */
 void *kmap(struct page *page)
 {
 	might_sleep();
@@ -8,6 +12,7 @@ void *kmap(struct page *page)
 	return kmap_high(page);
 }
 
+/* lowermem没有使用映射来管理，因此不存在释放的问题 */
 void kunmap(struct page *page)
 {
 	if (in_interrupt())

@@ -71,7 +71,7 @@ extern initcall_t __security_initcall_start[], __security_initcall_end[];
 extern char saved_command_line[];
 #endif
   
-#ifndef MODULE
+#ifndef MODULE          // 静态链接
 
 #ifndef __ASSEMBLY__
 
@@ -149,32 +149,28 @@ void __init parse_early_param(void);
 #endif /* __ASSEMBLY__ */
 
 /*
- * module_init() - driver initialization entry point
- * @x: function to be run at kernel boot time or module insertion
+ * module_init() - 驱动程序初始化入口点
+ * @x: 在内核启动时或模块插入时运行的函数
  * 
- * module_init() will either be called during do_initcalls (if
- * builtin) or at module insertion time (if a module).  There can only
- * be one per module.
+ * module_init() 将在 do_initcalls 期间（如果是内置的）或在模块插入时（如果是模块）被调用。每个模块只能有一个。
  */
 #define module_init(x)	__initcall(x);
 
 /**
- * module_exit() - driver exit entry point
- * @x: function to be run when driver is removed
+ * module_exit() - 驱动出口入口点
+ * @x: 删除驱动程序时要运行的功能
  * 
- * module_exit() will wrap the driver clean-up code
- * with cleanup_module() when used with rmmod when
- * the driver is a module.  If the driver is statically
- * compiled into the kernel, module_exit() has no effect.
- * There can only be one per module.
+ * 当驱动程序是一个模块时，当与 rmmod 一起使用时，module_exit()
+ * 将使用 cleanup_module() 包装驱动程序清理代码。
+ * 如果驱动程序被静态编译到内核中，module_exit() 没有任何作用。每个模块只能有一个。
  */
 #define module_exit(x)	__exitcall(x);
 
 #else /* MODULE */
 
-/* Don't use these in modules, but some people do... */
+/* 不要在模块中使用这些，但有些人会...... */
 #define core_initcall(fn)		module_init(fn)
-#define postcore_initcall(fn)		module_init(fn)
+#define postcore_initcall(fn)	module_init(fn)
 #define arch_initcall(fn)		module_init(fn)
 #define subsys_initcall(fn)		module_init(fn)
 #define fs_initcall(fn)			module_init(fn)
@@ -183,24 +179,23 @@ void __init parse_early_param(void);
 
 #define security_initcall(fn)		module_init(fn)
 
-/* These macros create a dummy inline: gcc 2.9x does not count alias
- as usage, hence the `unused function' warning when __init functions
- are declared static. We use the dummy __*_module_inline functions
- both to kill the warning and check the type of the init/cleanup
- function. */
+/* 这些宏创建了一个虚拟内联：gcc 2.9x 不将别名计为使用，因此当 __init 函数声明为静态时会出现“未使用函数”警告。
+ * 我们使用虚拟 ___module_inline 函数来终止警告并检查 init/cleanup 函数的类型。 */
 
-/* Each module must use one module_init(), or one no_module_init */
+/* 每个模块必须使用一个 module_init() 或一个 no_module_init */
 #define module_init(initfn)					\
 	static inline initcall_t __inittest(void)		\
 	{ return initfn; }					\
 	int init_module(void) __attribute__((alias(#initfn)));
 
-/* This is only required if you want to be unloadable. */
+/* 仅当您想要可卸载时才需要这样做。 */
 #define module_exit(exitfn)					\
 	static inline exitcall_t __exittest(void)		\
 	{ return exitfn; }					\
 	void cleanup_module(void) __attribute__((alias(#exitfn)));
 
+
+/************************************************************/
 #define __setup_param(str, unique_id, fn)	/* nothing */
 #define __setup_null_param(str, unique_id) 	/* nothing */
 #define __setup(str, func) 			/* nothing */

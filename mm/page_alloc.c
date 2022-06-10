@@ -875,7 +875,7 @@ fastcall unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int orde
 	page = alloc_pages(gfp_mask, order);
 	if (!page)
 		return 0;
-	return (unsigned long) page_address(page);
+	return (unsigned long) page_address(page);          // 返回page的虚拟地址
 }
 
 EXPORT_SYMBOL(__get_free_pages);

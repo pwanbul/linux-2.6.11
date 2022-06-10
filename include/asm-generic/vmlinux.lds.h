@@ -65,7 +65,7 @@
 		*(__ksymtab_strings)					\
 	}								\
 									\
-	/* Built-in module parameters. */				\
+	/* 内置模块参数. */				\
 	__param : AT(ADDR(__param) - LOAD_OFFSET) {			\
 		VMLINUX_SYMBOL(__start___param) = .;			\
 		*(__param)						\

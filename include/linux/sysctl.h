@@ -870,8 +870,7 @@ struct ctl_table
 	void *extra2;
 };
 
-/* struct ctl_table_header is used to maintain dynamic lists of
-   ctl_table trees. */
+/* struct ctl_table_header 用于维护 ctl_table 树的动态列表。 */
 struct ctl_table_header
 {
 	ctl_table *ctl_table;

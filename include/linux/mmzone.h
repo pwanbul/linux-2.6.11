@@ -92,8 +92,8 @@ struct per_cpu_pageset {
  * 如果最左边的区域修饰符是“孤独者”，那么最高的有效区域列表将是四个，允许我们只分配五个区域列表。
  * 当最左边的位不是“孤独者”时使用第一种形式，否则使用第二种形式。
  */
-/* #define GFP_ZONETYPES	(GFP_ZONEMASK + 1) */		/* Non-loner */
-#define GFP_ZONETYPES	((GFP_ZONEMASK + 1) / 2 + 1)		/* Loner */
+/* #define GFP_ZONETYPES	(GFP_ZONEMASK + 1) */		/* Non-loner,4 */
+#define GFP_ZONETYPES	((GFP_ZONEMASK + 1) / 2 + 1)		/* Loner,3 */
 
 /*
  * On machines where it is needed (eg PCs) we divide physical memory

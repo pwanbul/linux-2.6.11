@@ -166,7 +166,7 @@ int notifier_call_chain(struct notifier_block **n, unsigned long val, void *v)
 {
 	int ret=NOTIFY_DONE;
 	struct notifier_block *nb = *n;
-
+    // 只会调用，不会删除
 	while(nb)
 	{
 		ret=nb->notifier_call(nb,val,v);        // 调用该chain下block的callback
@@ -355,18 +355,16 @@ out_unlock:
 
 
 /*
- * Reboot system call: for obvious reasons only root may call it,
- * and even root needs to set up some magic numbers in the registers
- * so that some mistake won't make this reboot the whole machine.
- * You can also set the meaning of the ctrl-alt-del-key here.
+ * 重启系统调用：出于显而易见的原因，只有 root 可以调用它，甚至 root 也需要在寄存器中设置一些幻数，
+ * 这样一些错误就不会导致整个机器重启。您也可以在此处设置 ctrl-alt-del-key 的含义。
  *
- * reboot doesn't sync: do that yourself before calling this.
+ * 重启不同步：在调用它之前自己做。
  */
 asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user * arg)
 {
 	char buffer[256];
 
-	/* We only trust the superuser with rebooting the system. */
+	/* 我们只信任超级用户重启系统。 */
 	if (!capable(CAP_SYS_BOOT))
 		return -EPERM;
 

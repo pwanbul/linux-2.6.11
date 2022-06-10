@@ -943,14 +943,12 @@ int dev_close(struct net_device *dev)
  *	register_netdevice_notifier - register a network notifier block
  *	@nb: notifier
  *
- *	Register a notifier to be called when network device events occur.
- *	The notifier passed is linked into the kernel structures and must
- *	not be reused until it has been unregistered. A negative errno code
- *	is returned on a failure.
+ *	注册一个在网络设备事件发生时调用的通知程序。
+ *	传递的通知器链接到内核结构中，并且在取消注册之前不得重复使用。
+ *	失败时返回负 errno 代码。
  *
- * 	When registered all registration and up events are replayed
- *	to the new notifier to allow device to have a race free 
- *	view of the network device list.
+ * 	注册后，所有注册和注册事件都将重播给新的通知程序，
+ * 	以允许设备对网络设备列表进行无竞争视图。
  */
 
 int register_netdevice_notifier(struct notifier_block *nb)

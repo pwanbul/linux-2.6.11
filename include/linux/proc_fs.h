@@ -47,6 +47,7 @@ typedef	int (write_proc_t)(struct file *file, const char __user *buffer,
 			   unsigned long count, void *data);
 typedef int (get_info_t)(char *, char **, off_t, int);
 
+// proc文件系统中的目录项
 struct proc_dir_entry {
 	unsigned int low_ino;
 	unsigned short namelen;

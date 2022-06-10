@@ -39,7 +39,7 @@ extern void kmap_init(void);
  * 现在我们只初始化一个 pte 表。
  * 它可以轻松扩展，后续的 pte 表必须分配在一个物理 RAM 块中。
  */
-#ifdef CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE           // 物理地址扩展
 #define LAST_PKMAP 512
 #else
 #define LAST_PKMAP 1024     // PKMap的页框数量
@@ -58,13 +58,13 @@ extern void kmap_init(void);
  * 			该区域可以通过enum fixed_addresses细分
  * FIXADDR_START        // 0xfffff000 - __end_of_permanent_fixed_addresses << PAGE_SHIFT
  * 			temp fixed addresses        // 临时固定映射区域
- * FIXADDR_BOOT_START       // 0xfffff000 - __end_of_fixed_addresses << PAGE_SHIFT
+ * FIXADDR_BOOT_START       // 0xfffff000 - __end_of_fixed_addresses << PAGE_SHIFT，以上一共4M
  *          永久映射用于将高端内存域中的非持久页映射到内核中
- * 			Persistent kmap area        // 永久映射区域
+ * 			Persistent kmap area        // 永久映射区域，4M
  * PKMAP_BASE			// (FIXADDR_BOOT_START - PAGE_SIZE*(1024 + 1)) & PMD_MASK
  * 8K缓冲区
  * VMALLOC_END      // 动态映射区域的结束地址，通过PKMAP_BASE-8K(启用highmem)，或者FIXADDR_START-8K
- * 			Vmalloc area            // 该区域用于物理上不连续的内核映射
+ * 			Vmalloc area            // 该区域用于物理上不连续的内核映射，120M
  * VMALLOC_START        // 动态映射区域的起始地址，通过high_memory加出来的，8M对齐
  * 8M缓冲区
  * high_memory      // highmem起始地址869M

@@ -270,7 +270,7 @@ void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
 {
 	if (page_is_ram(pfn) && !(bad_ppro && page_kills_ppro(pfn))) {
 		ClearPageReserved(page);
-		set_bit(PG_highmem, &page->flags);
+		set_bit(PG_highmem, &page->flags);          // 此page被分配成高端内存
 		set_page_count(page, 1);
 		__free_page(page);
 		totalhigh_pages++;
@@ -279,11 +279,13 @@ void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
 }
 
 #ifndef CONFIG_DISCONTIGMEM
+// 初始化高端内存上的页框
 void __init set_highmem_pages_init(int bad_ppro) 
 {
 	int pfn;
+    // 按页框号遍历所有需要分配高端内存的页框
 	for (pfn = highstart_pfn; pfn < highend_pfn; pfn++)
-		one_highpage_init(pfn_to_page(pfn), pfn, bad_ppro);
+		one_highpage_init(pfn_to_page(pfn), pfn, bad_ppro);     // 挨个初始化
 	totalram_pages += totalhigh_pages;
 }
 #else
