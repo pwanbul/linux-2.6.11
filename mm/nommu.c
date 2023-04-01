@@ -38,8 +38,10 @@ unsigned long max_mapnr;
 unsigned long num_physpages;
 unsigned long askedalloc, realalloc;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
+
 int sysctl_overcommit_memory = OVERCOMMIT_GUESS; /* heuristic overcommit */
 int sysctl_overcommit_ratio = 50; /* default is 50% */
+
 int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
 int heap_stack_gap = 0;
 
@@ -981,20 +983,15 @@ void unmap_mapping_range(struct address_space *mapping,
 }
 
 /*
- * Check that a process has enough memory to allocate a new virtual
- * mapping. 0 means there is enough memory for the allocation to
- * succeed and -ENOMEM implies there is not.
+ * 检查进程是否有足够的内存来分配新的虚拟映射。 0 表示有足够的内存让分配成功，-ENOMEM 表示没有。
  *
- * We currently support three overcommit policies, which are set via the
- * vm.overcommit_memory sysctl.  See Documentation/vm/overcommit-accounting
+ *我们目前支持三种过量使用策略，它们是通过 vm.overcommit_memory sysctl 设置的。请参见文档 vm.overcommit-accounting
  *
- * Strict overcommit modes added 2002 Feb 26 by Alan Cox.
- * Additional code 2002 Jul 20 by Robert Love.
+ *严格的过度使用模式由 Alan Cox 于 2002 年 2 月 26 日添加。 Robert Love 的附加代码 2002 年 7 月 20 日。
  *
- * cap_sys_admin is 1 if the process has admin privileges, 0 otherwise.
+ * 如果进程具有管理员权限，cap_sys_admin 为 1，否则为 0。
  *
- * Note this is a helper function intended to be used by LSMs which
- * wish to use this logic.
+ * 请注意，这是一个辅助函数，旨在供希望使用此逻辑的 LSM 使用。
  */
 int __vm_enough_memory(long pages, int cap_sys_admin)
 {
@@ -1003,7 +1000,7 @@ int __vm_enough_memory(long pages, int cap_sys_admin)
 	vm_acct_memory(pages);
 
 	/*
-	 * Sometimes we want to use more memory than we have
+	 * 有时我们想使用比我们拥有的更多的内存
 	 */
 	if (sysctl_overcommit_memory == OVERCOMMIT_ALWAYS)
 		return 0;

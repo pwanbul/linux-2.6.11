@@ -776,9 +776,7 @@ alloc_page_vma(unsigned gfp, struct vm_area_struct *vma, unsigned long addr)
  *      	%GFP_ATOMIC don't sleep.
  *	@order: Power of two of allocation size in pages. 0 is a single page.
  *
- *	Allocate a page from the kernel page pool.  When not in
- *	interrupt context and apply the current process NUMA policy.
- *	Returns NULL when no page can be allocated.
+ *	从内核页面池中分配一个页面。当不在中断上下文中并应用当前进程 NUMA 策略时。当无法分配页面时返回 NULL。
  */
 struct page *alloc_pages_current(unsigned gfp, unsigned order)
 {

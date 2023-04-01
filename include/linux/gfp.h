@@ -19,8 +19,8 @@ struct vm_area_struct;
  * 如果指定__GFP_HIGHMEM，按highmem，normal，mda的顺序找
  * 如果指定没有指定，按normal，mda的顺序找
  * */
-#define __GFP_DMA	0x01
-#define __GFP_HIGHMEM	0x02
+#define __GFP_DMA	0x01   // 所请求的页框必须处于ZONE_DMA管理区。等价于GFP_DMA
+#define __GFP_HIGHMEM	0x02   // 所请求的页框处于ZONE_HIGHMEM管理区
 
 /*
  * Action modifiers - doesn't change the zoning
@@ -34,18 +34,18 @@ struct vm_area_struct;
  * __GFP_NORETRY: The VM implementation must not retry indefinitely.
  */
 // 行为修饰符
-#define __GFP_WAIT	0x10	/* 可以等待和重新调度? */
-#define __GFP_HIGH	0x20	/* Should access emergency pools? */
-#define __GFP_IO	0x40	/* Can start physical IO? */
-#define __GFP_FS	0x80	/* Can call down to low-level FS? */
-#define __GFP_COLD	0x100	/* Cache-cold page required */
-#define __GFP_NOWARN	0x200	/* Suppress page allocation failure warning */
-#define __GFP_REPEAT	0x400	/* Retry the allocation.  Might fail */
-#define __GFP_NOFAIL	0x800	/* Retry for ever.  Cannot fail */
-#define __GFP_NORETRY	0x1000	/* Do not retry.  Might fail */
-#define __GFP_NO_GROW	0x2000	/* Slab internal usage */
-#define __GFP_COMP	0x4000	/* Add compound page metadata */
-#define __GFP_ZERO	0x8000	/* Return zeroed page on success */
+#define __GFP_WAIT	0x10	/* 允许内核对等待空闲页框的当前进程进行阻塞 */
+#define __GFP_HIGH	0x20	/* 允许内核访问保留的页框池 */
+#define __GFP_IO	0x40	/* 允许内核在低端内存页上执行I/O传输以释放页框 */
+#define __GFP_FS	0x80	/* 如果清0，则不允许内核执行依赖于文件系统的操作 */
+#define __GFP_COLD	0x100	/* 所请求的页框可能为“冷的”（参见稍后的“每CPU页框高速缓存”一节)  */
+#define __GFP_NOWARN	0x200	/* 一次内存分配失败将不会产生警告 */
+#define __GFP_REPEAT	0x400	/* 信息内核重试内存分配直到成功 */
+#define __GFP_NOFAIL	0x800	/* 与__GFP_REPEAT相同 */
+#define __GFP_NORETRY	0x1000	/* 一次内存分配失败后不再重试 */
+#define __GFP_NO_GROW	0x2000	/* slab分配器不允许增大slab高速缓存（参见稍后的“slab分配器”一节) */
+#define __GFP_COMP	0x4000	/*  属于扩展页的页框（参见第二章的“扩展分页”一节） */
+#define __GFP_ZERO	0x8000	/* 任何返回的页框必须被填满0 */
 
 #define __GFP_BITS_SHIFT 16	/* Room for 16 __GFP_FOO bits */
 #define __GFP_BITS_MASK ((1 << __GFP_BITS_SHIFT) - 1)

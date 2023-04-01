@@ -227,16 +227,14 @@ struct mm_struct {
 	unsigned long free_area_cache;		/* first hole 搜索起始地址*/
 	
 	pgd_t * pgd;
-	atomic_t mm_users;			/* How many users with user space? */
+	atomic_t mm_users;			/* LWP的引用数 */
 	atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */
 	int map_count;				/* number of VMAs */
 	struct rw_semaphore mmap_sem;		// 修改进程地址空间时需要加读写信号量
 	spinlock_t page_table_lock;		/* Protects page tables, mm->rss, mm->anon_rss */
 
-	struct list_head mmlist;		/* List of maybe swapped mm's.  These are globally strung
-						 * together off init_mm.mmlist, and are protected
-						 * by mmlist_lock
-						 */
+	/* 可能交换的 mm 的列表。这些在 init_mm.mmlist 中全局串在一起，并受 mmlist_lock 保护 */
+	struct list_head mmlist;
 	
 	// 各个段的起始地址
 	unsigned long start_code, end_code, start_data, end_data;
@@ -648,7 +646,7 @@ struct task_struct {
 	struct key *process_keyring;	/* keyring private to this process (CLONE_THREAD) */
 	struct key *thread_keyring;	/* keyring private to this thread */
 #endif
-	int oomkilladj; /* OOM kill score adjustment (bit shift). */
+	int oomkilladj; /* OOM kill 分数调整（位移位）。 */
 	char comm[TASK_COMM_LEN];
 /* file system info */
 	int link_count, total_link_count;
@@ -1041,12 +1039,13 @@ extern void wait_task_inactive(task_t * p);
 #define next_task(p)	list_entry((p)->tasks.next, struct task_struct, tasks)
 #define prev_task(p)	list_entry((p)->tasks.prev, struct task_struct, tasks)
 
+/* 遍历所有的task_struct */
 #define for_each_process(p) \
 	for (p = &init_task ; (p = next_task(p)) != &init_task ; )
 
 /*
- * Careful: do_each_thread/while_each_thread is a double loop so
- *          'break' will not work as expected - use goto instead.
+ * 注意：do_each_thread和
+ * while_each_thread 是一个双循环，因此“break”不会按预期工作 - 请改用 goto。
  */
 #define do_each_thread(g, t) \
 	for (g = t = &init_task ; (g = t = next_task(g)) != &init_task ; ) do

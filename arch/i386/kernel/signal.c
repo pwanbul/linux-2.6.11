@@ -84,9 +84,7 @@ sys_rt_sigsuspend(struct pt_regs regs)
 	}
 }
 
-asmlinkage int 
-sys_sigaction(int sig, const struct old_sigaction __user *act,
-	      struct old_sigaction __user *oact)
+asmlinkage int sys_sigaction(int sig, const struct old_sigaction __user *act, struct old_sigaction __user *oact)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;

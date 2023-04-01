@@ -1489,9 +1489,7 @@ asmlinkage long sys_getpeername(int fd, struct sockaddr __user *usockaddr, int _
 }
 
 /*
- *	Send a datagram to a given address. We move the address into kernel
- *	space and check the user space data area is readable before invoking
- *	the protocol.
+ *	向给定地址发送数据报。我们将地址移动到内核空间并在调用协议之前检查用户空间数据区域是否可读。
  */
 
 asmlinkage long sys_sendto(int fd, void __user * buff, size_t len, unsigned flags,

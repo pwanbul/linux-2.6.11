@@ -645,6 +645,7 @@ static int one_hundred = 100;
 
 static ctl_table vm_table[] = {
 	{
+		/* overcommit 机制 */
 		.ctl_name	= VM_OVERCOMMIT_MEMORY,
 		.procname	= "overcommit_memory",
 		.data		= &sysctl_overcommit_memory,
@@ -653,6 +654,7 @@ static ctl_table vm_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 	{
+		/* overcommit 机制 */
 		.ctl_name	= VM_OVERCOMMIT_RATIO,
 		.procname	= "overcommit_ratio",
 		.data		= &sysctl_overcommit_ratio,

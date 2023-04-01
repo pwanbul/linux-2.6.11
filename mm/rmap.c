@@ -500,8 +500,7 @@ void page_remove_rmap(struct page *page)
 
 /*
  * try_to_unmap的子函数：
- * try_to_unmap_one从try_to_unmap_anon或
- * try_to_unmap_file重复调用。
+ * try_to_unmap_one从try_to_unmap_anon或try_to_unmap_file循环调用。
  */
 static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 {

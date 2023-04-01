@@ -2355,8 +2355,7 @@ sys_rt_sigqueueinfo(int pid, int sig, siginfo_t __user *uinfo)
 	return kill_proc_info(sig, &info, pid);
 }
 
-int
-do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
+int do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 {
 	struct k_sigaction *k;
 
@@ -2416,8 +2415,8 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 		}
 
 		*k = *act;
-		sigdelsetmask(&k->sa.sa_mask,
-			      sigmask(SIGKILL) | sigmask(SIGSTOP));
+		// 保护：从sa_mask中删除SIGKILL和SIGSTOP
+		sigdelsetmask(&k->sa.sa_mask, sigmask(SIGKILL) | sigmask(SIGSTOP));
 	}
 
 	spin_unlock_irq(&current->sighand->siglock);
@@ -2618,8 +2617,7 @@ sys_ssetmask(int newmask)
 /*
  * For backwards compatibility.  Functionality superseded by sigaction.
  */
-asmlinkage unsigned long
-sys_signal(int sig, __sighandler_t handler)
+asmlinkage unsigned long sys_signal(int sig, __sighandler_t handler)
 {
 	struct k_sigaction new_sa, old_sa;
 	int ret;

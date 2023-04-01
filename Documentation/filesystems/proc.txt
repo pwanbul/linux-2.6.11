@@ -418,32 +418,16 @@ VmallocChunk:   111088 kB
    Writeback: Memory which is actively being written back to the disk
       Mapped: files which have been mmaped, such as libraries
               Slab: in-kernel data structures cache
- CommitLimit: Based on the overcommit ratio ('vm.overcommit_ratio'),
-              this is the total amount of  memory currently available to
-              be allocated on the system. This limit is only adhered to
-              if strict overcommit accounting is enabled (mode 2 in
-              'vm.overcommit_memory').
-              The CommitLimit is calculated with the following formula:
-              CommitLimit = ('vm.overcommit_ratio' * Physical RAM) + Swap
-              For example, on a system with 1G of physical RAM and 7G
-              of swap with a `vm.overcommit_ratio` of 30 it would
-              yield a CommitLimit of 7.3G.
-              For more details, see the memory overcommit documentation
-              in vm/overcommit-accounting.
-Committed_AS: The amount of memory presently allocated on the system.
-              The committed memory is a sum of all of the memory which
-              has been allocated by processes, even if it has not been
-              "used" by them as of yet. A process which malloc()'s 1G
-              of memory, but only touches 300M of it will only show up
-              as using 300M of memory even if it has the address space
-              allocated for the entire 1G. This 1G is memory which has
-              been "committed" to by the VM and can be used at any time
-              by the allocating application. With strict overcommit
-              enabled on the system (mode 2 in 'vm.overcommit_memory'),
-              allocations which would exceed the CommitLimit (detailed
-              above) will not be permitted. This is useful if one needs
-              to guarantee that processes will not fail due to lack of
-              memory once that memory has been successfully allocated.
+
+ CommitLimit: 基于过量使用率 ('vm.overcommit_ratio')，这是当前可在系统上分配的内存总量。
+              仅当启用了严格的过量使用记帐（“vm.overcommit_memory”中的模式 2）时，才会遵守此限制。
+              CommitLimit 使用以下公式计算： CommitLimit = ('vm.overcommit_ratio' * Physical RAM) + Swap
+              例如，在具有 1G 物理 RAM 和 7G swap 且 vm.overcommit_ratio 为 30 的系统上，它将产生CommitLimit 为 7.3G。
+             有关详细信息，请参阅 vm.overcommit-accounting 中的内存过量使用文档。
+Committed_AS: 当前在系统上分配的内存量。提交的内存是进程分配的所有内存的总和，即使它们尚未“使用”。
+              malloc() 的 1G 内存但仅触及其中 300M 的进程将只显示为使用 300M 内存，即使它具有为整个 1G 分配的地址空间。
+              这 1G 是 VM 已“提交”的内存，分配应用程序可以随时使用。在系统上启用严格的过量使用（'vm.overcommit_memory' 中的模式 2），
+              将不允许超过 CommitLimit（详见上文）的分配。 如果需要保证在成功分配内存后进程不会因内存不足而失败，这将很有用.
   PageTables: amount of memory dedicated to the lowest level of page
               tables.
 VmallocTotal: total size of vmalloc memory area

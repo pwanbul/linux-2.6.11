@@ -1,29 +1,20 @@
-The Linux kernel supports the following overcommit handling modes
+Linux内核支持以下overcommit处理模式
 
-0	-	Heuristic overcommit handling. Obvious overcommits of
-		address space are refused. Used for a typical system. It
-		ensures a seriously wild allocation fails while allowing
-		overcommit to reduce swap usage.  root is allowed to 
-		allocate slighly more memory in this mode. This is the 
-		default.
+0	-	启发式过度使用处理。拒绝明显的地址空间过量使用。用于典型系统。
+        它确保严重的疯狂分配失败，同时允许过度使用以减少交换使用。
+        在此模式下，允许 root 分配更多的内存。这是默认设置。
 
-1	-	Always overcommit. Appropriate for some scientific
-		applications.
+1	-	总是过度承诺。适用于某些科学应用。
 
-2	-	Don't overcommit. The total address space commit
-		for the system is not permitted to exceed swap + a
-		configurable percentage (default is 50) of physical RAM.
-		Depending on the percentage you use, in most situations
-		this means a process will not be killed while accessing
-		pages but will receive errors on memory allocation as
-		appropriate.
+2	-	不要过度承诺。系统的总地址空间提交不允许超过"交换 + 物理 RAM" 的可配置百分比（默认为 50）。
+        根据您使用的百分比，在大多数情况下，这意味着进程在访问页面时不会被终止，
+        但会在适当的时候收到内存分配错误。
 
-The overcommit policy is set via the sysctl `vm.overcommit_memory'.
+过量使用策略是通过 sysctl `vm.overcommit_memory' 设置的。
 
-The overcommit percentage is set via `vm.overcommit_ratio'.
+过量使用百分比通过“vm.overcommit_ratio”设置。
 
-The current overcommit limit and amount committed are viewable in
-/proc/meminfo as CommitLimit and Committed_AS respectively.
+当前的过量使用限制和提交量在 /proc/meminfo 中可分别作为 CommitLimit 和 Committed_AS 查看。
 
 Gotchas
 -------

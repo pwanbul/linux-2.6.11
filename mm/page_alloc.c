@@ -65,7 +65,7 @@ struct zone *zone_table[1 << (ZONES_SHIFT + NODES_SHIFT)];      // zone_table是
 EXPORT_SYMBOL(zone_table);
 
 static char *zone_names[MAX_NR_ZONES] = { "DMA", "Normal", "HighMem" };
-int min_free_kbytes = 1024;
+int min_free_kbytes = 1024;			// 默认的"保留的页框池"大小，1024KB
 
 unsigned long __initdata nr_kernel_pages;
 unsigned long __initdata nr_all_pages;
@@ -366,8 +366,7 @@ void __free_pages_ok(struct page *page, unsigned int order)
  * -- wli
  */
 static inline struct page *
-expand(struct zone *zone, struct page *page,
- 	int low, int high, struct free_area *area)
+expand(struct zone *zone, struct page *page, int low, int high, struct free_area *area)
 {
 	unsigned long size = 1 << high;
 
@@ -426,8 +425,7 @@ static void prep_new_page(struct page *page, int order)
 }
 
 /* 
- * Do the hard work of removing an element from the buddy allocator.
- * Call me with the zone->lock already held.
+ * 努力从伙伴分配器中移除一个元素。打电话给我，区域->锁定已经举行。
  */
 static struct page *__rmqueue(struct zone *zone, unsigned int order)
 {
@@ -499,6 +497,7 @@ static void __drain_pages(unsigned int cpu)
 
 #ifdef CONFIG_PM
 
+/* 标记空闲页 */
 void mark_free_pages(struct zone *zone)
 {
 	unsigned long zone_pfn, flags;
@@ -512,6 +511,7 @@ void mark_free_pages(struct zone *zone)
 	for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn)
 		ClearPageNosaveFree(pfn_to_page(zone_pfn + zone->zone_start_pfn));
 
+	// 从order11开始处理
 	for (order = MAX_ORDER - 1; order >= 0; --order)
 		list_for_each(curr, &zone->free_area[order].free_list) {
 			unsigned long start_pfn, i;
@@ -579,7 +579,7 @@ static void fastcall free_hot_cold_page(struct page *page, int cold)		// 0:hot,1
 	inc_page_state(pgfree);		// ???
 	if (PageAnon(page))
 		page->mapping = NULL;
-	free_pages_check(__FUNCTION__, page);		// 检查页面，用问题打印堆栈
+	free_pages_check(__FUNCTION__, page);		// 检查页面，有问题打印堆栈
 	pcp = &zone->pageset[get_cpu()].pcp[cold];
 	local_irq_save(flags);
 	if (pcp->count >= pcp->high)		// 当页框数大于等于高水位时，移除页框
@@ -621,14 +621,15 @@ buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
 	struct page *page = NULL;
 	int cold = !!(gfp_flags & __GFP_COLD);
 
+	// 只有分配单个页框时，才会用到per cpu页框高速缓存
 	if (order == 0) {
 		struct per_cpu_pages *pcp;
 
 		pcp = &zone->pageset[get_cpu()].pcp[cold];
 		local_irq_save(flags);
+		// 页框数低于最低水位，需要重伙伴系统的空闲链表中补充
 		if (pcp->count <= pcp->low)
-			pcp->count += rmqueue_bulk(zone, 0,
-						pcp->batch, &pcp->list);
+			pcp->count += rmqueue_bulk(zone, 0, pcp->batch, &pcp->list);
 		if (pcp->count) {
 			page = list_entry(pcp->list.next, struct page, lru);
 			list_del(&page->lru);
@@ -660,11 +661,18 @@ buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
 
 /*
  * 如果空闲页面高于“标记”，则返回 1。这考虑了分配的顺序。
+ *
+ * zone: 当前zone
+ * order:分配阶
+ * mark：水位标记
+ * classzone_idx：zone编号
+ *
+ * z, order, z->pages_low, classzone_idx, 0, 0
  */
 int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
 		int classzone_idx, int can_try_harder, int gfp_high)
 {
-	/* free_pages 我的结果是负面的 - 没关系 */
+	/* 计算出的free_pages中保存的分配之后剩余的页框数 */
 	long min = mark, free_pages = z->free_pages - (1 << order) + 1;
 	int o;
 
@@ -676,10 +684,10 @@ int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
 	if (free_pages <= min + z->lowmem_reserve[classzone_idx])
 		return 0;
 	for (o = 0; o < order; o++) {
-		/* At the next order, this order's pages become unavailable */
+		/* 在下一个order中，该order的页面变得不可用 */
 		free_pages -= z->free_area[o].nr_free << o;
 
-		/* Require fewer higher order pages to be free */
+		/* 需要更少的高阶页面才能free */
 		min >>= 1;
 
 		if (free_pages <= min)
@@ -749,8 +757,7 @@ struct page * fastcall __alloc_pages(unsigned int gfp_mask, unsigned int order, 
 		wakeup_kswapd(z, order);
 
 	/*
-	 * Go through the zonelist again. Let __GFP_HIGH and allocations
-	 * coming from realtime tasks to go deeper into reserves
+	 * 再次检查区域列表。让 __GFP_HIGH 和来自实时任务的分配更深入到储备中
 	 */
 	for (i = 0; (z = zones[i]) != NULL; i++) {
 		if (!zone_watermark_ok(z, order, z->pages_min,
@@ -763,7 +770,7 @@ struct page * fastcall __alloc_pages(unsigned int gfp_mask, unsigned int order, 
 			goto got_pg;
 	}
 
-	/* This allocation should allow future memory freeing. */
+	/* 此分配应允许将来释放内存. */
 	if (((p->flags & PF_MEMALLOC) || unlikely(test_thread_flag(TIF_MEMDIE))) && !in_interrupt()) {
 		/* go through the zonelist yet again, ignoring mins */
 		for (i = 0; (z = zones[i]) != NULL; i++) {
@@ -774,14 +781,14 @@ struct page * fastcall __alloc_pages(unsigned int gfp_mask, unsigned int order, 
 		goto nopage;
 	}
 
-	/* Atomic allocations - we can't balance anything */
+	/* 原子分配——我们无法平衡任何东西 */
 	if (!wait)
 		goto nopage;
 
 rebalance:
 	cond_resched();
 
-	/* We now go into synchronous reclaim */
+	/* 我们现在进入同步回收 */
 	p->flags |= PF_MEMALLOC;
 	reclaim_state.reclaimed_slab = 0;
 	p->reclaim_state = &reclaim_state;
@@ -812,10 +819,7 @@ rebalance:
 		}
 	} else if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY)) {
 		/*
-		 * Go through the zonelist yet one more time, keep
-		 * very high watermark here, this is only to catch
-		 * a parallel oom killing, we must fail if we're still
-		 * under heavy pressure.
+		 *再次遍历zonelist，这里保持非常高的watermark，这只是为了捕获一个并行的oom killing，如果我们仍然承受着沉重的压力，我们必须失败。
 		 */
 		for (i = 0; (z = zones[i]) != NULL; i++) {
 			if (!zone_watermark_ok(z, order, z->pages_high,
@@ -907,7 +911,7 @@ void __pagevec_free(struct pagevec *pvec)
 		free_hot_cold_page(pvec->pages[i], pvec->cold);
 }
 
-// 释放页框
+// 释放页框，其他接口都是对该接口的封装
 fastcall void __free_pages(struct page *, unsigned int order)
 {	// 释放是必须是可换出的，并且引用计数_count为-1
 	if (!PageReserved(page) && put_page_testzero(page)) {
@@ -972,6 +976,7 @@ static unsigned int nr_free_zone_pages(int offset)
 	pg_data_t *pgdat;
 	unsigned int sum = 0;
 
+	// 遍历所有内存节点
 	for_each_pgdat(pgdat) {
 		struct zonelist *zonelist = pgdat->node_zonelists + offset;
 		struct zone **zonep = zonelist->zones;
@@ -1388,7 +1393,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
 	nodemask_t used_mask;
 
 	/* 初始化区域列表 */
-	for (i = 0; i < GFP_ZONETYPES; i++) {
+	for (i = 0; i < GFP_ZONETYPES; i++) {   // GFP_ZONETYPES 3
 		zonelist = (pgdat->node_zonelists) + i;
 		memset(zonelist, 0, sizeof(*zonelist));
 		zonelist->zones[0] = NULL;
@@ -1565,6 +1570,10 @@ static void __init calculate_zone_totalpages(struct pglist_data *pgdat,
  * 非原子初始化，单程。
  *
  * 初始化当前zone管理页框描述符
+ * size: 当前zone的页框数量
+ * nid:内存节点ID
+ * zone: 当前zone指针
+ * start_pfn：当前zone的起始页框号
  */
 void __init memmap_init_zone(unsigned long size, int nid, unsigned long zone, unsigned long start_pfn)
 {
@@ -1628,6 +1637,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		unsigned long batch;
 
 		zone_table[NODEZONE(nid, j)] = zone;        // 初始化zone_table，为了支持从页框描述符找到其所在的内存区
+
 		realsize = size = zones_size[j];		// 当前zone中管理的页框数量
 		if (zholes_size)		// 没有hole
 			realsize -= zholes_size[j];
@@ -1636,11 +1646,14 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 			nr_kernel_pages += realsize;		// 低端内存页框数，0x38000000
 		nr_all_pages += realsize;		// 总的页框数，1M
 
+		// 正常情况下物理内存是没有hole的，所以下面两个值是一样的
 		zone->spanned_pages = size;
 		zone->present_pages = realsize;
+
 		zone->name = zone_names[j];		// 名称，一个字符串
 		spin_lock_init(&zone->lock);
 		spin_lock_init(&zone->lru_lock);
+
 		zone->zone_pgdat = pgdat;		// 反引用
 		zone->free_pages = 0;		// 空闲页框
 
@@ -1680,6 +1693,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		printk(KERN_DEBUG "  %s zone: %lu pages, LIFO batch:%lu\n", zone_names[j], realsize, batch);
 		INIT_LIST_HEAD(&zone->active_list);
 		INIT_LIST_HEAD(&zone->inactive_list);
+
 		zone->nr_scan_active = 0;
 		zone->nr_scan_inactive = 0;
 		zone->nr_active = 0;
@@ -1753,8 +1767,7 @@ EXPORT_SYMBOL(contig_page_data);
 
 void __init free_area_init(unsigned long *zones_size)       // 连续内存
 {
-	free_area_init_node(0, &contig_page_data, zones_size,
-			__pa(PAGE_OFFSET) >> PAGE_SHIFT, NULL);
+	free_area_init_node(0, &contig_page_data, zones_size, __pa(PAGE_OFFSET) >> PAGE_SHIFT, NULL);
 }
 #endif
 
@@ -2019,8 +2032,7 @@ static void setup_per_zone_pages_min(void)
 			/* if it's a lowmem zone, reserve a number of pages 
 			 * proportionate to the zone's size.
 			 */
-			zone->pages_min = (pages_min * zone->present_pages) / 
-			                   lowmem_pages;
+			zone->pages_min = (pages_min * zone->present_pages) / lowmem_pages;
 		}
 
 		/*
@@ -2068,6 +2080,7 @@ static int __init init_per_zone_pages_min(void)
 		min_free_kbytes = 128;
 	if (min_free_kbytes > 65536)
 		min_free_kbytes = 65536;
+
 	setup_per_zone_pages_min();
 	setup_per_zone_lowmem_reserve();
 	return 0;

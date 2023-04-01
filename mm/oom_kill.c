@@ -24,22 +24,18 @@
 /* #define DEBUG */
 
 /**
- * oom_badness - calculate a numeric value for how bad this task has been
+ * oom_badness - 计算此任务有多糟糕的数值
  * @p: task struct of which task we should calculate
  * @p: current uptime in seconds
  *
- * The formula used is relatively simple and documented inline in the
- * function. The main rationale is that we want to select a good task
- * to kill when we run out of memory.
+ * 使用的公式相对简单，并在函数中内联记录。主要理由是我们想在内存不足时选择一个好的任务来杀死。
  *
- * Good in this context means that:
- * 1) we lose the minimum amount of work done
- * 2) we recover a large amount of memory
- * 3) we don't kill anything innocent of eating tons of memory
- * 4) we want to kill the minimum amount of processes (one)
- * 5) we try to kill the process the user expects us to kill, this
- *    algorithm has been meticulously tuned to meet the principle
- *    of least surprise ... (be careful when you change it)
+ * 良好在这种情况下意味着：
+ * 1) 我们失去了完成的最少工作量
+ * 2) 我们恢复了大量内存
+ * 3) 我们不会杀死任何无辜的吃掉大量内存的东西
+ * 4) 我们想杀死最少数量的进程（一个）
+ * 5) 我们尝试杀死用户希望我们杀死的进程，该算法经过精心调整以满足最小意外原则......（更改时请小心）
  */
 
 unsigned long badness(struct task_struct *p, unsigned long uptime)
@@ -51,15 +47,13 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 		return 0;
 
 	/*
-	 * The memory size of the process is the basis for the badness.
+	 * 进程的内存大小是坏的基础。
 	 */
 	points = p->mm->total_vm;
 
 	/*
-	 * Processes which fork a lot of child processes are likely
-	 * a good choice. We add the vmsize of the childs if they
-	 * have an own mm. This prevents forking servers to flood the
-	 * machine with an endless amount of childs
+	 * 派生出很多子进程的进程可能是一个不错的选择。如果他们有自己的 mm，我们添加孩子的 vmsize。
+	 * 这可以防止fork服务器用无穷无尽的孩子淹没机器。
 	 */
 	list_for_each(tsk, &p->children) {
 		struct task_struct *chld;
@@ -69,12 +63,9 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 	}
 
 	/*
-	 * CPU time is in tens of seconds and run time is in thousands
-         * of seconds. There is no particular reason for this other than
-         * that it turned out to work very well in practice.
+	 * CPU 时间以几十秒为单位，运行时间以数千秒为单位。除了在实践中证明它工作得很好之外，没有特别的原因。
 	 */
-	cpu_time = (cputime_to_jiffies(p->utime) + cputime_to_jiffies(p->stime))
-		>> (SHIFT_HZ + 3);
+	cpu_time = (cputime_to_jiffies(p->utime) + cputime_to_jiffies(p->stime)) >> (SHIFT_HZ + 3);
 
 	if (uptime >= p->start_time.tv_sec)
 		run_time = (uptime - p->start_time.tv_sec) >> 10;
@@ -89,31 +80,27 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 		points /= s;
 
 	/*
-	 * Niced processes are most likely less important, so double
-	 * their badness points.
+	 * 好的过程很可能不太重要，因此将它们的坏点加倍。
 	 */
 	if (task_nice(p) > 0)
 		points *= 2;
 
 	/*
-	 * Superuser processes are usually more important, so we make it
-	 * less likely that we kill those.
+	 * 超级用户进程通常更重要，因此我们不太可能杀死它们。
 	 */
 	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_ADMIN) ||
 				p->uid == 0 || p->euid == 0)
 		points /= 4;
 
 	/*
-	 * We don't want to kill a process with direct hardware access.
-	 * Not only could that mess up the hardware, but usually users
-	 * tend to only have this flag set on applications they think
-	 * of as important.
+	 * 我们不想终止具有直接硬件访问权限的进程。这不仅会弄乱硬件，
+	 * 而且通常用户倾向于只在他们认为重要的应用程序上设置此标志。
 	 */
 	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO))
 		points /= 4;
 
 	/*
-	 * Adjust the score by oomkilladj.
+	 * 通过 oomkilladj 调整分数。
 	 */
 	if (p->oomkilladj) {
 		if (p->oomkilladj > 0)
@@ -130,10 +117,9 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 }
 
 /*
- * Simple selection loop. We chose the process with the highest
- * number of 'points'. We expect the caller will lock the tasklist.
+ * 简单的选择循环。我们选择了“点数”最高的过程。我们期望调用者将锁定任务列表。
  *
- * (not docbooked, we don't want this one cluttering up the manual)
+ * (没有 docbooked，我们不希望这个弄乱手册)
  */
 static struct task_struct * select_bad_process(void)
 {
@@ -149,12 +135,11 @@ static struct task_struct * select_bad_process(void)
 			unsigned long points;
 
 			/*
-			 * This is in the process of releasing memory so wait it
-			 * to finish before killing some other task by mistake.
+			 * 这是在释放内存的过程中，所以在错误地杀死其他任务之前等待它完成。
 			 */
-			if ((unlikely(test_tsk_thread_flag(p, TIF_MEMDIE)) || (p->flags & PF_EXITING)) &&
-			    !(p->flags & PF_DEAD))
+			if ((unlikely(test_tsk_thread_flag(p, TIF_MEMDIE)) || (p->flags & PF_EXITING)) && !(p->flags & PF_DEAD))
 				return ERR_PTR(-1UL);
+
 			if (p->flags & PF_SWAPOFF)
 				return p;
 
@@ -246,12 +231,11 @@ static struct mm_struct *oom_kill_process(struct task_struct *p)
 }
 
 /**
- * oom_kill - kill the "best" process when we run out of memory
+ * oom_kill - 当内存不足时杀死“最佳”进程
  *
- * If we run out of memory, we have the choice between either
- * killing a random task (bad), letting the system crash (worse)
- * OR try to be smart about which process to kill. Note that we
- * don't have to be perfect here, we just have to be good.
+ * 如果内存不足，我们可以选择终止随机任务（坏）、
+ * 让系统崩溃（更糟）或尝试聪明地决定要终止哪个进程。
+ * 请注意，我们不必在这里做到完美，我们只需要做好。
  */
 void out_of_memory(int gfp_mask)
 {

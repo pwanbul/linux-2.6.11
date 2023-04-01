@@ -295,6 +295,7 @@ static inline void mm_free_pgd(struct mm_struct * mm)
 
 #include <linux/init_task.h>
 
+/* mm_struct 初始化 */
 static struct mm_struct * mm_init(struct mm_struct * mm)
 {
 	atomic_set(&mm->mm_users, 1);
@@ -451,7 +452,7 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 		return 0;
 
 	if (clone_flags & CLONE_VM) {		// 如果设置了CLONE_VM，则父子进程共享mm
-		atomic_inc(&oldmm->mm_users);		// 主计数器加1
+		atomic_inc(&oldmm->mm_users);		// 次计数器加1
 		mm = oldmm;
 		/*
 		 * There are cases where the PTL is held to ensure no

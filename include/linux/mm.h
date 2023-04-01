@@ -94,8 +94,8 @@ struct vm_area_struct {
 	 * MAP_SHARED vma只能在i_mmap树中。匿名MAP_PRIVATE、堆栈或 brk vma（带有 NULL 文件）
 	 * 只能在 anon_vma 列表中。
 	 */
-	struct list_head anon_vma_node;	/* 由 anon_vma->lock 序列化 链入anon_vma中的链表 */
-	struct anon_vma *anon_vma;	/* 由 page_table_lock 序列化 指向anon_vma */
+	struct list_head anon_vma_node;	/* FPRA反向映射：链入anon_vma中的链表 */
+	struct anon_vma *anon_vma;	/* FPRA反向映射：指向anon_vma */
 
 	/* Function pointers to deal with this struct. */
 	struct vm_operations_struct * vm_ops;	// 处理此结构的函数指针
@@ -222,14 +222,9 @@ typedef unsigned long page_flags_t;
  * 用来描述页框本身，而不描述其中的数据
  */
 struct page {
-	page_flags_t flags;		/* Atomic flags, some possibly updated asynchronously  标志*/
+	page_flags_t flags;		/* 原子标志，一些可能异步更新，高位被编码存放其他数据*/
 	atomic_t _count;		/* 引用计数器，若为-1则表示页框空闲；当有一个进程或内核数据结构占用时为0，...*/
-	atomic_t _mapcount;		/*
- 					 * 页表项的引用计数，没有引用则为-1，0表示非共享，大于0表共享
-					 * Count of ptes mapped in mms,
-					 * to show when page is mapped
-					 * & limit reverse map searches.
-					 */
+	atomic_t _mapcount;		/* 页表项的引用计数，没有引用则为-1，0表示非共享，大于0表示共享 */
 	unsigned long private;		/* Mapping-private opaque data:     私有数据使用
 					 * usually used for buffer_heads
 					 * if PagePrivate set; used for
@@ -250,18 +245,15 @@ struct page {
 	pgoff_t index;			/* 我们在映射中的偏移量。 */
 	struct list_head lru;		/* 页框高速缓存 分页列表，例如。受 zone->lru_lock 保护的 active_list!*/
 	/*
-	 * On machines where all RAM is mapped into kernel address space,
-	 * we can simply calculate the virtual address. On machines with
-	 * highmem some memory is mapped into kernel virtual memory
-	 * dynamically, so we need a place to store that address.
-	 * Note that this field could be 16 bits on x86 ... ;)
+	 * 在所有 RAM 都映射到内核地址空间的机器上，我们可以简单地计算虚拟地址。
+	 * 在具有 highmem 的机器上，一些内存被动态映射到内核虚拟内存中，因此我们需要一个地方来存储该地址。
+	 * 请注意，该字段在 x86 上可能是 16 位 ... ;)
 	 *
-	 * Architectures with slow multiplication can define
-	 * WANT_PAGE_VIRTUAL in asm/page.h
+	 * 乘法慢的架构可以在 asm/page.h 中定义 WANT_PAGE_VIRTUAL
 	 */
 #if defined(WANT_PAGE_VIRTUAL)
 	/* 内核也可能会有虚拟地址，在highmem中为NULL*/
-	void *virtual;			/* Kernel virtual address (NULL if not kmapped, ie. highmem) */
+	void *virtual;			/* 内核虚拟地址（如果没有 kmapped，则为 NULL，即 highmem） */
 #endif /* WANT_PAGE_VIRTUAL */
 };
 
